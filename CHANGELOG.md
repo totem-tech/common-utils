@@ -4,13 +4,19 @@ This repo contains the type definitions compatible with Totem Live Accounting de
 
 ## 0.1.1 (2019-11-17)
 
+---
+
 ### Affected repos
 
-#### Faucet Service
+---
+
+These repos should change the code and test. This log does not reflect test status in these repos. Refer to the issue number directly.
+
+#### Faucet Service (#120)
 
 * https://gitlab.com/totem-tech/faucet/blob/master/index.js
 
-#### Totem UI Server Master and Dev
+#### Totem UI Server Master and Dev (#121)
 
 * https://gitlab.com/totem-tech/totem-ui/tree/dev-totem-live/src
 
