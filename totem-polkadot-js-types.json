@@ -24,6 +24,8 @@
     },
     "Timekeeper": 
     {
+        "worker": "AccountId",
+        "project_hash": "Hash",
         "total_blocks": "NumberOfBlocks",
         "locked_status": "LockStatus",
         "locked_reason": "ReasonCodeStruct",
