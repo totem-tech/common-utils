@@ -17,29 +17,34 @@
     "RandomHashedData": "Hash",
     "SignedKeyData": "Vec<u8>",
     "Data": "Vec<u8>",
+    "MessageSignature": "Vec<u8>",
     "ReasonCodeStruct": {
-      "ReasonCodeKey": "ReasonCode",
-      "ReasonCodeTypeKey": "ReasonCodeType"
+        "ReasonCodeKey": "ReasonCode",
+        "ReasonCodeTypeKey": "ReasonCodeType"
     },
+    "ReasonCodeStruct<ReasonCode,ReasonCodeType>": "ReasonCodeStruct",
     "BannedStruct": {
-      "BanStatusKey": "BanStatus",
-      "ReasonCodeStructKey": "ReasonCodeStruct"
+        "BanStatusKey": "BanStatus",
+        "ReasonCodeStructKey": "ReasonCodeStruct"
     },
+    "BannedStruct<BanStatus,ReasonCodeStruct>": "BannedStruct",
     "Timekeeper": {
-      "total_blocks": "NumberOfBlocks",
-      "locked_status": "LockStatus",
-      "locked_reason": "ReasonCodeStruct",
-      "submit_status": "StatusOfTimeRecord",
-      "reason_code": "ReasonCodeStruct",
-      "posting_period": "PostingPeriod",
-      "start_block": "StartOrEndBlockNumber",
-      "end_block": "StartOrEndBlockNumber"
+        "total_blocks": "NumberOfBlocks",
+        "locked_status": "LockStatus",
+        "locked_reason": "ReasonCodeStruct",
+        "submit_status": "StatusOfTimeRecord",
+        "reason_code": "ReasonCodeStruct",
+        "posting_period": "PostingPeriod",
+        "start_block": "StartOrEndBlockNumber",
+        "end_block": "StartOrEndBlockNumber"
     },
+    "Timekeeper<AccountId,ProjectHashRef,NumberOfBlocks,LockStatus,\nStatusOfTimeRecord,ReasonCodeStruct,PostingPeriod,StartOrEndBlockNumber>": "Timekeeper",
     "SignedData": {
-      "userHash": "UserNameHash",
-      "pub_enc_key": "AccountId",
-      "pub_sign_key": "AccountId",
-      "random_hash": "RandomHashedData",
-      "nonce": "EncryptNonce"
-    }
+        "userHash": "UserNameHash",
+        "pub_enc_key": "AccountId",
+        "pub_sign_key": "AccountId",
+        "random_hash": "RandomHashedData",
+        "nonce": "EncryptNonce"
+    },
+    "SignedData<UserNameHash,AccountId,RandomHashedData,EncryptNonce>": "SignedData"
   }
