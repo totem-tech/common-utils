@@ -15,9 +15,9 @@
     "EncryptNonce": "u16",
     "UserNameHash": "Hash",
     "RandomHashedData": "Hash",
-    "SignedKeyData": "Vec<u8>",
+    "Ed25519signature": "H512",
+    "SignedBy": "H256",
     "Data": "Vec<u8>",
-    "MessageSignature": "Vec<u8>",
     "ReasonCodeStruct": {
         "ReasonCodeKey": "ReasonCode",
         "ReasonCodeTypeKey": "ReasonCodeType"
