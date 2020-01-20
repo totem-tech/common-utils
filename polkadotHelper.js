@@ -8,6 +8,7 @@ const config = {
     timeout: 30000,
     types: {},
 }
+let nonce = 0
 
 // connect initiates a connection to the blockchain using PolkadotJS
 //
@@ -78,10 +79,14 @@ export const transfer = (toAddress, amount, secretKey, publicKey, api) => {
     return Promise.all([
         api.query.balances.freeBalance(sender.address),
         api.query.system.accountNonce(sender.address),
-    ]).then(([balance, nonce]) => new Promise((resolve, reject) => {
+    ]).then(([balance, nonceFromChain]) => new Promise((resolve, reject) => {
         if (balance <= amount) return reject('Insufficient balance')
-        console.log('Polkadot: transfer', { balance: balance.toString(), nonce: nonce.toString() })
-
+        if (!nonce || nonceFromChain > nonce) {
+            nonce = parseInt(nonceFromChain)
+        } else {
+            nonce++
+        }
+        console.log('Polkadot: transfer', { sender: sender.address, balance: balance.toString(), nonce })
         api.tx.balances
             .transfer(toAddress, amount)
             .sign(sender, { nonce })
