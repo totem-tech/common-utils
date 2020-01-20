@@ -14,6 +14,7 @@
     "StartOrEndBlockNumber": "u64",
     "StatusOfTimeRecord": "u16",
     "EncryptPublicKey": "H256",
+    "BoxNonce": "Vec<u8>",
     "EncryptNonce": "u64",
     "UserNameHash": "Hash",
     "RandomHashedData": "Hash",
@@ -27,6 +28,11 @@
         "nonce": "EncryptNonce"
     },
     "SignedData<UserNameHash, EncryptPublicKey, SignedBy, EncryptNonce>": "SignedData", 
+    "EncryptedVerificationData": {
+        "key": "EncryptPublicKey",
+        "data": "Data"
+    },
+    "EncryptedVerificationData<EncryptPublicKey, Data> ": "EncryptedVerificationData", 
     "ReasonCodeStruct": {
         "ReasonCodeKey": "ReasonCode",
         "ReasonCodeTypeKey": "ReasonCodeType"
