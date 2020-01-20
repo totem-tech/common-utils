@@ -13,6 +13,7 @@
     "ProjectHashRef": "Hash",
     "StartOrEndBlockNumber": "u64",
     "StatusOfTimeRecord": "u16",
+    "RecordType": "u16",
     "EncryptPublicKey": "H256",
     "BoxNonce": "Vec<u8>",
     "EncryptNonce": "u64",
