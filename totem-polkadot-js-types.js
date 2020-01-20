@@ -1,4 +1,5 @@
 export default {
+    "Archival": "u16",
     "ProjectHash": "Hash",
     "DeletedProject": "Hash",
     "ProjectStatus": "u16",
