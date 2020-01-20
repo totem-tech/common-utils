@@ -1,4 +1,4 @@
-{
+export default {
     "ProjectHash": "Hash",
     "DeletedProject": "Hash",
     "ProjectStatus": "u16",
@@ -28,12 +28,12 @@
         "pub_sign_key": "SignedBy",
         "nonce": "EncryptNonce"
     },
-    "SignedData<UserNameHash, EncryptPublicKey, SignedBy, EncryptNonce>": "SignedData", 
+    "SignedData<UserNameHash, EncryptPublicKey, SignedBy, EncryptNonce>": "SignedData",
     "EncryptedVerificationData": {
         "key": "EncryptPublicKey",
         "data": "Data"
     },
-    "EncryptedVerificationData<EncryptPublicKey, Data> ": "EncryptedVerificationData", 
+    "EncryptedVerificationData<EncryptPublicKey, Data> ": "EncryptedVerificationData",
     "ReasonCodeStruct": {
         "ReasonCodeKey": "ReasonCode",
         "ReasonCodeTypeKey": "ReasonCodeType"
@@ -56,4 +56,4 @@
         "nr_of_breaks": "NumberOfBreaks"
     },
     "Timekeeper<AccountId,ProjectHashRef,NumberOfBlocks,LockStatus,\nStatusOfTimeRecord,ReasonCodeStruct,PostingPeriod,StartOrEndBlockNumber,\nNumberOfBreaks>": "Timekeeper"
-  }
+}
