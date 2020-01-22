@@ -496,6 +496,7 @@ export const textEllipsis = (text, maxLen, numDots, split = true) => {
 	return left + dots + right
 }
 
+// default icons used in Message component
 export const icons = {
 	basic: '',
 	error: 'exclamation circle',

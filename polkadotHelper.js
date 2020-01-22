@@ -86,7 +86,8 @@ export const transfer = (toAddress, amount, secretKey, publicKey, api) => {
         } else {
             nonce++
         }
-        console.log('Polkadot: transfer', { sender: sender.address, balance: balance.toString(), nonce })
+        console.log('Polkadot: transfer from ', { address: sender.address, balance: balance.toString(), nonce })
+        console.log('Polkadot: transfer to ', { address: toAddress, amount })
         api.tx.balances
             .transfer(toAddress, amount)
             .sign(sender, { nonce })
