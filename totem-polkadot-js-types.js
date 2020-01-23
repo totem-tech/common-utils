@@ -1,28 +1,38 @@
 export default {
-    "Archival": "bool",
-    "ProjectHash": "Hash",
-    "DeletedProject": "Hash",
-    "ProjectStatus": "u16",
     "AcceptAssignedStatus": "bool",
+    "Archival": "bool",
     "BanStatus": "bool",
+    "BoxNonce": "Vec<u8>",
+    "Data": "Vec<u8>",
+    "DeletedProject": "Hash",
+    "Ed25519signature": "H512",
+    "EncryptNonce": "u64",
+    "EncryptPublicKey": "H256",
     "LockStatus": "bool",
-    "ReasonCode": "u16",
-    "ReasonCodeType": "u16",
     "NumberOfBreaks": "u16",
     "NumberOfBlocks": "u64",
     "PostingPeriod": "u16",
+    "ProjectHash": "Hash",
     "ProjectHashRef": "Hash",
+    "ProjectStatus": "u16",
+    "RandomHashedData": "Hash",
+    "ReasonCode": "u16",
+    "ReasonCodeType": "u16",
+    "RecordType": "u16",
     "StartOrEndBlockNumber": "u64",
     "StatusOfTimeRecord": "u16",
-    "RecordType": "u16",
-    "EncryptPublicKey": "H256",
-    "BoxNonce": "Vec<u8>",
-    "EncryptNonce": "u64",
-    "UserNameHash": "Hash",
-    "RandomHashedData": "Hash",
-    "Ed25519signature": "H512",
     "SignedBy": "H256",
-    "Data": "Vec<u8>",
+    "UserNameHash": "Hash",
+    "EncryptedVerificationData": {
+        "key": "EncryptPublicKey",
+        "data": "Data"
+    },
+    "EncryptedVerificationData<EncryptPublicKey, Data>": "EncryptedVerificationData",
+    "ReasonCodeStruct": {
+        "ReasonCodeKey": "ReasonCode",
+        "ReasonCodeTypeKey": "ReasonCodeType"
+    },
+    "ReasonCodeStruct<ReasonCode,ReasonCodeType>": "ReasonCodeStruct",
     "SignedData": {
         "user_hash": "UserNameHash",
         "pub_enc_key": "EncryptPublicKey",
@@ -30,16 +40,7 @@ export default {
         "nonce": "EncryptNonce"
     },
     "SignedData<UserNameHash, EncryptPublicKey, SignedBy, EncryptNonce>": "SignedData",
-    "EncryptedVerificationData": {
-        "key": "EncryptPublicKey",
-        "data": "Data"
-    },
-    "EncryptedVerificationData<EncryptPublicKey, Data> ": "EncryptedVerificationData",
-    "ReasonCodeStruct": {
-        "ReasonCodeKey": "ReasonCode",
-        "ReasonCodeTypeKey": "ReasonCodeType"
-    },
-    "ReasonCodeStruct<ReasonCode,ReasonCodeType>": "ReasonCodeStruct",
+
     "BannedStruct": {
         "BanStatusKey": "BanStatus",
         "ReasonCodeStructKey": "ReasonCodeStruct"
