@@ -46,6 +46,8 @@ export default {
     },
     "BannedStruct<BanStatus,ReasonCodeStruct>": "BannedStruct",
     "Timekeeper": {
+        "worker": "AccountId",
+        "project_hash": "ProjectHashRef",
         "total_blocks": "NumberOfBlocks",
         "locked_status": "LockStatus",
         "locked_reason": "ReasonCodeStruct",
