@@ -37,6 +37,8 @@ export const connect = (
     ApiPromise.create({ provider, types }).then(api => resolve({ api, provider }) | clearTimeout(tId), reject)
 })
 
+export const getDefaultConfig = () => config
+
 // setDefaultConfig sets nodes and types for use with once-off connections as well as default values for @connect function
 export const setDefaultConfig = (nodes = config.nodes, types = config.types, timeout = config.timeout) => {
     config.nodes = nodes
@@ -56,15 +58,12 @@ export const setDefaultConfig = (nodes = config.nodes, types = config.types, tim
 export const transfer = (toAddress, amount, secretKey, publicKey, api) => {
     if (!api) {
         // config.nodes wasn't set => return empty promise that rejects immediately
-        if (config.nodes.length === 0) {
-            return new Promise((_, reject) => reject('Unable to connect: invalid configuration'))
-        }
-        return connect(config.nodes[0], config.types, false)
-            .then(({ api, provider }) => {
-                console.log({ api, provider })
-                return transfer(toAddress, amount, secretKey, publicKey, api)
-                    .finally(() => provider.disconnect())
-            })
+        if (config.nodes.length === 0) return new Promise((_, r) => r('Unable to connect: invalid configuration'))
+        return connect(config.nodes[0], config.types, false).then(({ api, provider }) => {
+            console.log('Polkadot connected', { api, provider })
+            return transfer(toAddress, amount, secretKey, publicKey, api)
+                .finally(() => provider.disconnect() | console.log('Polkadot: disconnected'))
+        })
     }
 
     const keyring = new Keyring({ type: TYPE })
@@ -86,6 +85,7 @@ export const transfer = (toAddress, amount, secretKey, publicKey, api) => {
         } else {
             nonce++
         }
+        console.log('Polkadot: initiating transation')
         console.log('Polkadot: transfer from ', { address: sender.address, balance: balance.toString(), nonce })
         console.log('Polkadot: transfer to ', { address: toAddress, amount })
         api.tx.balances
