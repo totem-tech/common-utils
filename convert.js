@@ -57,3 +57,28 @@ export const hashToStr = hash => {
         return '0x0'
     }
 }
+
+// Convert TSV (Tab Seprated Value) string to Map
+//
+// Params:
+// @str             string: TSV text
+// @columnTitles    array: 
+//                      if null, indicates no column title to be used
+//                      if undefined, will use first line as column title
+//
+// Returns Map
+export const tsvToMap = (str, columnTitles) => {
+    const result = new Map()
+    const lines = str.split('\n')
+    const titles = columnTitles || lines[0].split('\t')
+    const skipLines = columnTitles === null ? 0 : 1
+    lines.slice(skipLines).forEach(line => {
+        const cells = line.split('\t')
+        cells.forEach((text, i) => {
+            const columnTexts = result.get(titles[i]) || []
+            columnTitles !== null && columnTexts.push(text)
+            result.set(titles[i], columnTexts)
+        })
+    })
+    return result
+}

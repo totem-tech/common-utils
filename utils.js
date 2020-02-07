@@ -18,6 +18,14 @@ export const copyToClipboard = str => {
 	document.body.removeChild(el)
 }
 
+export const downloadFile = (content, fileName, contentType) => {
+	const a = document.createElement("a");
+	const file = new Blob([content], { type: contentType });
+	a.href = URL.createObjectURL(file);
+	a.download = fileName;
+	a.click();
+}
+
 // generateHash generates a hash based on a specific seed and algorithm 
 // if seed is not supplied a random UUID will be used as seed.
 export const generateHash = (seed, algo, asBytes) => {
