@@ -29,7 +29,6 @@ export const generateHash = (seed, algo, asBytes) => {
 	const bytesArr = hash.read()
 	return asBytes ? bytesArr : hashToStr(bytesArr)
 }
-window.generateHash = generateHash
 
 /*
  * Data validation
