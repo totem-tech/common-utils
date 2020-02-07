@@ -1,4 +1,5 @@
 import { Bond } from 'oo7'
+import uuid from 'uuid'
 import createHash from 'create-hash/browser'
 import { hashToStr } from './convert'
 
@@ -17,20 +18,18 @@ export const copyToClipboard = str => {
 	document.body.removeChild(el)
 }
 
-// generateHash generates a 
+// generateHash generates a hash based on a specific seed and algorithm 
+// if seed is not supplied a random UUID will be used as seed.
 export const generateHash = (seed, algo, asBytes) => {
 	var hash = createHash(algo || 'sha256')
-	seed = !isDefined(seed) || isStr(seed) ? seed : JSON.stringify(seed)
-	if (seed) {
-		hash.update(seed) // optional encoding parameter
-		hash.digest() // synchronously get result with optional encoding parameter
-	}
-
-	hash.write('write to it as a stream')
+	seed = !seed || isStr(seed) ? seed || uuid.v1() : JSON.stringify(seed)
+	hash.update(seed) // encoding parameter
+	hash.digest() // synchronously get result with encoding parameter
 	hash.end()
 	const bytesArr = hash.read()
 	return asBytes ? bytesArr : hashToStr(bytesArr)
 }
+window.generateHash = generateHash
 
 /*
  * Data validation
