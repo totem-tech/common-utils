@@ -1,6 +1,7 @@
 import { ApiPromise, WsProvider } from '@polkadot/api'
 import Keyring from '@polkadot/keyring/'
 import createPair from '@polkadot/keyring/pair'
+import { isDefined } from './utils'
 
 const TYPE = 'sr25519'
 const config = {
@@ -8,7 +9,7 @@ const config = {
     timeout: 30000,
     types: {},
 }
-let nonce = 0
+const nonces = {}
 
 // connect initiates a connection to the blockchain using PolkadotJS
 //
@@ -80,23 +81,29 @@ export const transfer = (toAddress, amount, secretKey, publicKey, api) => {
         api.query.system.accountNonce(sender.address),
     ]).then(([balance, nonceFromChain]) => new Promise((resolve, reject) => {
         if (balance <= amount) return reject('Insufficient balance')
-        if (!nonce || nonceFromChain > nonce) {
-            nonce = parseInt(nonceFromChain)
+        let nonce = nonces[sender.address] || 0
+        nonceFromChain = parseInt(nonceFromChain)
+        if (nonce <= nonceFromChain) {
+            nonce = nonceFromChain
         } else {
             nonce++
         }
+        nonces[sender.address] = nonce
         console.log('Polkadot: initiating transation')
         console.log('Polkadot: transfer from ', { address: sender.address, balance: balance.toString(), nonce })
         console.log('Polkadot: transfer to ', { address: toAddress, amount })
-        api.tx.balances
-            .transfer(toAddress, amount)
-            .sign(sender, { nonce })
-            .send(({ status }) => {
-                console.log('Polkadot: Transaction status', status.type)
-                if (!status.isFinalized) return
-                const hash = status.asFinalized.toHex()
-                console.log('Polkadot: Completed at block hash', hash)
-                resolve(hash)
-            })
+        try {
+            api.tx.balances
+                .transfer(toAddress, amount)
+                .sign(sender, { nonce })
+                .send(({ status }) => {
+                    console.log('Polkadot: Transaction status', status.type)
+                    // status.type = 'Future' means transaction will be executed in the future. there is a nonce gap that need to be filled. 
+                    if (!status.isFinalized && status.type !== 'Future') return
+                    const hash = status.asFinalized.toHex()
+                    console.log('Polkadot: Completed at block hash', hash)
+                    resolve(hash)
+                })
+        } catch (e) { reject(e) }
     }))
 }
