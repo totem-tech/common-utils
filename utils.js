@@ -3,6 +3,9 @@ import uuid from 'uuid'
 import createHash from 'create-hash/browser'
 import { hashToStr } from './convert'
 
+// trim texts
+const clearClutter = x => x.split('\n').map(y => y.trim()).filter(Boolean).join(' ')
+
 /*
  * Copies supplied string to system clipboard
  */
