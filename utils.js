@@ -76,15 +76,6 @@ export const hasValue = x => {
 	}
 }
 
-// forceClearCachedData removes any cached data from localStorage
-export const forceClearCachedData = () => {
-	const keys = ['totem__cache_', 'totem__static']
-	Object.keys(localStorage).forEach(key => keys.includes(key) && localStorage.removeItem(key))
-	forceRefreshPage()
-}
-// force refresh page from server
-export const forceRefreshPage = () => window.location.reload(true)
-
 // randomInt generates random number within a range
 //
 // Params:
