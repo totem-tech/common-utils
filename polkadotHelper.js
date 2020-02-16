@@ -3,7 +3,7 @@ import Keyring from '@polkadot/keyring/'
 import createPair from '@polkadot/keyring/pair'
 
 const TYPE = 'sr25519'
-const keyring = new Keyring({ type: TYPE })
+const _keyring = new Keyring({ type: TYPE })
 const config = {
     nodes: [],
     timeout: 30000,
@@ -48,8 +48,41 @@ export const setDefaultConfig = (nodes, types, timeout) => {
     config.timeout = timeout || config.timeout
 }
 
-export const setKeyring = (seeds = []) => seeds.forEach(s => keyring.addFromUri(s))
+export const keyring = {
+    // add pair(s) to keyring 
+    //
+    // Params:
+    // @seeds   array: uri/seed
+    add: (seeds = []) => seeds.forEach(s => _keyring.addFromUri(s)),
 
+    // contains checks if identity exists in the keyring
+    //
+    // Params:
+    // @address string/Uint8Array
+    //
+    // Returns boolean
+    contains: address => {
+        try {
+            // test if @secretKey is an address already added to the keyring
+            _keyring.getPair(address)
+            return true
+        } catch (_) {
+            return false
+        }
+    },
+
+    // reference to the keyring
+    keyring: _keyring,
+
+    // remove a pair from the keyring
+    //
+    // Params:
+    // @address     string/Uint8Array
+    // 
+    // returns boolean: indicates success/failure
+    remove: address => keyring.contains(address) && !_keyring.removePair(address),
+
+}
 // transfer funds between accounts
 //
 // Params:
@@ -74,29 +107,29 @@ export const transfer = (toAddress, amount, secretKey, publicKey, api) => {
     if (!!publicKey) {
         // public and private key supplied
         pair = createPair(TYPE, { secretKey, publicKey })
-        keyring.addPair(pair)
+        _keyring.addPair(pair)
     } else {
         try {
             // test if @secretKey is an address already added to the keyring
-            pair = keyring.getPair(secretKey)
+            pair = _keyring.getPair(secretKey)
         } catch (_) {
             // assumes @secretKey is a seed/uri
-            pair = keyring.addFromUri(secretKey)
+            pair = _keyring.addFromUri(secretKey)
         }
     }
-    const sender = keyring.getPair(pair.address)
+    const sender = _keyring.getPair(pair.address)
     return api.query.balances.freeBalance(sender.address).then(balance => {
         if (balance <= (amount + config.txFeeMin)) throw 'Insufficient balance'
         console.log('Polkadot: transfer from ', { address: sender.address, balance: balance.toString() })
         console.log('Polkadot: transfer to ', { address: toAddress, amount })
         const tx = api.tx.balances.transfer(toAddress, amount)
-        return signAndSend(api, sender.address, tx, keyring)
+        return signAndSend(api, sender.address, tx, _keyring)
     })
 }
 
 export const signAndSend = (api, address, tx) => new Promise((resolve, reject) => {
     try {
-        const account = keyring.getPair(address)
+        const account = _keyring.getPair(address)
         api.query.system.accountNonce(address).then(nonce => {
             nonce = parseInt(nonce)
             console.log('Polkadot: initiating transation', { nonce })
