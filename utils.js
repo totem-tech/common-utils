@@ -329,6 +329,10 @@ export const mapSearch = (map, keyValues, matchExact, matchAll, ignoreCase) => {
 				value = value.toLowerCase()
 				keyword = isStr(keyword) ? keyword.toLowerCase() : keyword
 			}
+			if (isValidNumber(value)) {
+				// convert to string to enable partial match and avoid string and number type mismatch
+				value = `${value}`
+			}
 
 			matched = !matchExact && (isStr(value) || isArr(value)) ? value.indexOf(keyword) >= 0 : value === keyword
 			if ((matchAll && !matched) || (!matchAll && matched)) break
