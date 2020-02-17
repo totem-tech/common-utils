@@ -25,13 +25,18 @@ export const encodeBase64 = encodeBase641
 export const decodeBase64 = decodeBase641
 
 
-// validateAddress checks if an address is valid
+// validateAddress checks if an address is valid. If valid, converts to string otherwise, returns empty string
 //
 // Params:
-// @address     string/bond 
-export const validateAddress = address => runtime.indices.tryIndex(
-    new Bond().defaultTo(ss58Decode(isBond(address) ? address._value : address))
-)
+// @address     string/bond
+export const validateAddress = address => {
+    if (isUint8Arr(address)) {
+        address = ss58Encode(address)
+        return address || ''
+    }
+    return isStr(address) && ss58Decode(address) ? address : ''
+}
+export const addressToStr = validateAddress
 
 // hashToBytes converts hash to bytes array. Will return 0x0 if value is unsupported type.
 //
