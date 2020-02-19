@@ -1,4 +1,4 @@
-import { isDefined, isStr, mapSearch, isMap } from './utils'
+import { isDefined, isStr, mapSearch, isMap, isValidNumber } from './utils'
 import { Bond } from 'oo7'
 import uuid from 'uuid'
 
@@ -75,8 +75,12 @@ export default class DataStorage {
         return data
     }
 
-    search(keyValues, matchExact, matchAll, ignoreCase) {
-        return mapSearch(this.getAll(), keyValues, matchExact, matchAll, ignoreCase)
+    search(keyValues, matchExact, matchAll, ignoreCase, limit) {
+        let result = mapSearch(this.getAll(), keyValues, matchExact, matchAll, ignoreCase)
+        if (isValidNumber(limit) && result.size > limit) {
+            result = new Map(Array.from(result).slice(0, limit))
+        }
+        return result
     }
 
     set(key, value) {
