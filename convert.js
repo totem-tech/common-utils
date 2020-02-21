@@ -49,7 +49,7 @@ export const addressToStr = address => {
 //                      Each item will be an array consisting of all column cells.
 //                      If @columnTitles not supplied, first cell of each column will be used as key and be excluded from item value array.
 export const csvToArr = (str, columnTitles, separator = ',') => {
-    const lines = str.split('\n')
+    const lines = str.split('\n').map(line => line.replace('\r', ''))
     const ignoreFirst = !isArr(columnTitles) || columnTitles.length === 0
     const keys = !ignoreFirst ? columnTitles : (lines[0] || '').split(separator)
     return lines.filter(line => line.replace(separator, '').trim() !== '')
@@ -76,7 +76,7 @@ export const csvToArr = (str, columnTitles, separator = ',') => {
 //                      If @columnTitles not supplied, first cell of each column will be used as key and be excluded from item value array.
 export const csvToMap = (str, columnTitles, separator = ',') => {
     const result = new Map()
-    const lines = str.split('\n')
+    const lines = str.split('\n').map(line => line.replace('\r', ''))
     const ignoreFirst = !isArr(columnTitles) || columnTitles.length === 0
     const titles = !ignoreFirst ? columnTitles : lines[0].split(separator)
     lines.filter(line => line.replace(separator, '').trim() !== '')
