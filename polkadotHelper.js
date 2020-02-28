@@ -1,15 +1,15 @@
 import { ApiPromise, WsProvider } from '@polkadot/api'
 import Keyring from '@polkadot/keyring/'
 import createPair from '@polkadot/keyring/pair'
-import { isDefined } from './utils'
 
 const TYPE = 'sr25519'
+const _keyring = new Keyring({ type: TYPE })
 const config = {
     nodes: [],
     timeout: 30000,
     types: {},
+    txFeeMin: 140,
 }
-const nonces = {}
 
 // connect initiates a connection to the blockchain using PolkadotJS
 //
@@ -38,28 +38,64 @@ export const connect = (
     ApiPromise.create({ provider, types }).then(api => resolve({ api, provider }) | clearTimeout(tId), reject)
 })
 
+// remove
 export const getDefaultConfig = () => config
 
 // setDefaultConfig sets nodes and types for use with once-off connections as well as default values for @connect function
-export const setDefaultConfig = (nodes = config.nodes, types = config.types, timeout = config.timeout) => {
-    config.nodes = nodes
-    config.types = types
-    config.timeout = timeout
+export const setDefaultConfig = (nodes, types, timeout) => {
+    config.nodes = nodes || config.nodes
+    config.types = types || config.types
+    config.timeout = timeout || config.timeout
 }
 
+export const keyring = {
+    // add pair(s) to keyring 
+    //
+    // Params:
+    // @seeds   array: uri/seed
+    add: (seeds = []) => seeds.forEach(s => _keyring.addFromUri(s)),
+
+    // contains checks if identity exists in the keyring
+    //
+    // Params:
+    // @address string/Uint8Array
+    //
+    // Returns boolean
+    contains: address => {
+        try {
+            // test if @secretKey is an address already added to the keyring
+            _keyring.getPair(address)
+            return true
+        } catch (_) {
+            return false
+        }
+    },
+
+    // reference to the keyring
+    keyring: _keyring,
+
+    // remove a pair from the keyring
+    //
+    // Params:
+    // @address     string/Uint8Array
+    // 
+    // returns boolean: indicates success/failure
+    remove: address => keyring.contains(address) && !_keyring.removePair(address),
+
+}
 // transfer funds between accounts
 //
 // Params:
 // @toAddress   string: destination identity/address
-// @secretKey   string: secretKey or seed
-// @publicKey   string: if falsy, @secretkey will be assumed to be a seed with type: 'sr25519'
-// @api         object: Polkadot API from `ApiPromise`
+// @secretKey   string: address (must have already been added to keyring) or secretKey or seed (type: 'sr25519')
+// @publicKey   string: if falsy, @secretkey will be assumed to be a seed or an address 
+// @api         object: PolkadkRingot API from `ApiPromise`
 //
 // Returns promise: will resolve to transaction hash
 export const transfer = (toAddress, amount, secretKey, publicKey, api) => {
     if (!api) {
         // config.nodes wasn't set => return empty promise that rejects immediately
-        if (config.nodes.length === 0) return new Promise((_, r) => r('Unable to connect: invalid configuration'))
+        if (config.nodes.length === 0) return new Promise((_, r) => r('Unable to connect: node URL not set'))
         return connect(config.nodes[0], config.types, false).then(({ api, provider }) => {
             console.log('Polkadot connected', { api, provider })
             return transfer(toAddress, amount, secretKey, publicKey, api)
@@ -67,43 +103,46 @@ export const transfer = (toAddress, amount, secretKey, publicKey, api) => {
         })
     }
 
-    const keyring = new Keyring({ type: TYPE })
     let pair
     if (!!publicKey) {
+        // public and private key supplied
         pair = createPair(TYPE, { secretKey, publicKey })
-        keyring.addPair(pair)
+        _keyring.addPair(pair)
     } else {
-        pair = keyring.addFromUri(secretKey)
-    }
-    const sender = keyring.getPair(pair.address)
-    return Promise.all([
-        api.query.balances.freeBalance(sender.address),
-        api.query.system.accountNonce(sender.address),
-    ]).then(([balance, nonceFromChain]) => new Promise((resolve, reject) => {
-        if (balance <= amount) return reject('Insufficient balance')
-        let nonce = nonces[sender.address] || 0
-        nonceFromChain = parseInt(nonceFromChain)
-        if (nonce <= nonceFromChain) {
-            nonce = nonceFromChain
-        } else {
-            nonce++
-        }
-        nonces[sender.address] = nonce
-        console.log('Polkadot: initiating transation')
-        console.log('Polkadot: transfer from ', { address: sender.address, balance: balance.toString(), nonce })
-        console.log('Polkadot: transfer to ', { address: toAddress, amount })
         try {
-            api.tx.balances
-                .transfer(toAddress, amount)
-                .sign(sender, { nonce })
-                .send(({ status }) => {
-                    console.log('Polkadot: Transaction status', status.type)
-                    // status.type = 'Future' means transaction will be executed in the future. there is a nonce gap that need to be filled. 
-                    if (!status.isFinalized && status.type !== 'Future') return
-                    const hash = status.asFinalized.toHex()
-                    console.log('Polkadot: Completed at block hash', hash)
-                    resolve(hash)
-                })
-        } catch (e) { reject(e) }
-    }))
+            // test if @secretKey is an address already added to the keyring
+            pair = _keyring.getPair(secretKey)
+        } catch (_) {
+            // assumes @secretKey is a seed/uri
+            pair = _keyring.addFromUri(secretKey)
+        }
+    }
+    const sender = _keyring.getPair(pair.address)
+    return api.query.balances.freeBalance(sender.address).then(balance => {
+        if (balance <= (amount + config.txFeeMin)) throw 'Insufficient balance'
+        console.log('Polkadot: transfer from ', { address: sender.address, balance: balance.toString() })
+        console.log('Polkadot: transfer to ', { address: toAddress, amount })
+        const tx = api.tx.balances.transfer(toAddress, amount)
+        return signAndSend(api, sender.address, tx, _keyring)
+    })
 }
+
+export const signAndSend = (api, address, tx) => new Promise((resolve, reject) => {
+    try {
+        const account = _keyring.getPair(address)
+        api.query.system.accountNonce(address).then(nonce => {
+            nonce = parseInt(nonce)
+            console.log('Polkadot: initiating transation', { nonce })
+            tx.sign(account, { nonce }).send(({ status }) => {
+                console.log('Polkadot: Transaction status', status.type)
+                // status.type = 'Future' means transaction will be executed in the future. there is a nonce gap that need to be filled. 
+                if (!status.isFinalized && status.type !== 'Future') return
+                const hash = status.asFinalized.toHex()
+                console.log('Polkadot: Completed at block hash', hash)
+                resolve(hash)
+            })
+        })
+    } catch (e) {
+        reject(e)
+    }
+})

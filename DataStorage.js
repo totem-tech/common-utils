@@ -1,4 +1,4 @@
-import { isStr, mapSearch, isMap } from './utils'
+import { isDefined, isStr, mapSearch, isMap, isValidNumber } from './utils'
 import { Bond } from 'oo7'
 import uuid from 'uuid'
 
@@ -25,7 +25,7 @@ const write = (key, value) => {
     storage.setItem(key, JSON.stringify(value))
 }
 
-class DataStorage {
+export default class DataStorage {
     constructor(name, disableCache = false) {
         this.bond = new Bond().defaultTo(uuid.v1())
         this.name = name
@@ -34,7 +34,7 @@ class DataStorage {
         this.Type = Map
         this.data = new this.Type()
         if (name && !disableCache) {
-            this.data = this.getAll()
+            this.data = read(this.name)
         }
         this.size = this.data.size
     }
@@ -66,7 +66,7 @@ class DataStorage {
     }
 
     getAll() {
-        if (!this.name) return this.data
+        if (!this.name || !this.disableCache) return this.data
         const data = read(this.name)
         this.size = data.size
         if (!this.disableCache) {
@@ -75,17 +75,18 @@ class DataStorage {
         return data
     }
 
-    search(keyValues, matchExact, matchAll, ignoreCase) {
-        return mapSearch(this.getAll(), keyValues, matchExact, matchAll, ignoreCase)
+    search(keyValues, matchExact, matchAll, ignoreCase, limit) {
+        let result = mapSearch(this.getAll(), keyValues, matchExact, matchAll, ignoreCase)
+        if (isValidNumber(limit) && result.size > limit) {
+            result = new Map(Array.from(result).slice(0, limit))
+        }
+        return result
     }
 
     set(key, value) {
-        if (!key) return this
+        if (!isDefined(key)) return this
         const data = this.getAll()
         data.set(key, value)
-        if (!this.disableCache || !this.name) {
-            this.data = data
-        }
         this.name && write(this.name, data)
         this.size = data.size
         this._updateBond()
@@ -103,4 +104,3 @@ class DataStorage {
         return this
     }
 }
-export default DataStorage

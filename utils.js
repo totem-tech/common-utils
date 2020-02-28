@@ -76,15 +76,6 @@ export const hasValue = x => {
 	}
 }
 
-// forceClearCachedData removes any cached data from localStorage
-export const forceClearCachedData = () => {
-	const keys = ['totem__cache_', 'totem__static']
-	Object.keys(localStorage).forEach(key => keys.includes(key) && localStorage.removeItem(key))
-	forceRefreshPage()
-}
-// force refresh page from server
-export const forceRefreshPage = () => window.location.reload(true)
-
 // randomInt generates random number within a range
 //
 // Params:
@@ -337,6 +328,10 @@ export const mapSearch = (map, keyValues, matchExact, matchAll, ignoreCase) => {
 			if (ignoreCase && isStr(value)) {
 				value = value.toLowerCase()
 				keyword = isStr(keyword) ? keyword.toLowerCase() : keyword
+			}
+			if (isValidNumber(value)) {
+				// convert to string to enable partial match and avoid string and number type mismatch
+				value = `${value}`
 			}
 
 			matched = !matchExact && (isStr(value) || isArr(value)) ? value.indexOf(keyword) >= 0 : value === keyword
