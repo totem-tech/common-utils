@@ -10,6 +10,7 @@ const config = {
     types: {},
     txFeeMin: 140,
 }
+const nonces = {}
 
 // connect initiates a connection to the blockchain using PolkadotJS
 //
@@ -53,7 +54,11 @@ export const keyring = {
     //
     // Params:
     // @seeds   array: uri/seed
-    add: (seeds = []) => seeds.forEach(s => _keyring.addFromUri(s)),
+    add: (seeds = []) => seeds.forEach(s => {
+        try {
+            _keyring.addFromUri(s)
+        } catch (error) { console.log('Failed to add seed to keyring', error) }
+    }),
 
     // contains checks if identity exists in the keyring
     //
@@ -132,6 +137,10 @@ export const signAndSend = (api, address, tx) => new Promise((resolve, reject) =
         const account = _keyring.getPair(address)
         api.query.system.accountNonce(address).then(nonce => {
             nonce = parseInt(nonce)
+            if (nonces[address] && nonces[address] >= nonce) {
+                nonce = nonces[address] + 1
+            }
+            nonces[address] = nonce
             console.log('Polkadot: initiating transation', { nonce })
             tx.sign(account, { nonce }).send(({ status }) => {
                 console.log('Polkadot: Transaction status', status.type)
