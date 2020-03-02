@@ -25,7 +25,7 @@ export const formatStrTimestamp = tsStr => !tsStr ? '' : tsStr.replace(/\T|\Z/g,
 /*
  * rate related stuff
  */
-export const BLOCK_DURATION_SECONDS = 5
+export const BLOCK_DURATION_SECONDS = 10
 export const BLOCK_DURATION_REGEX = /^(\d{2}):[0-5][0-9]:[0-5](0|5)$/ // valid duration up to 99:59:55
 
 export const secondsToDuration = numSeconds => {
