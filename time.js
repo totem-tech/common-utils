@@ -25,7 +25,7 @@ export const formatStrTimestamp = tsStr => !tsStr ? '' : tsStr.replace(/\T|\Z/g,
 /*
  * rate related stuff
  */
-export const BLOCK_DURATION_SECONDS = 10
+export const BLOCK_DURATION_SECONDS = 15
 export const BLOCK_DURATION_REGEX = /^(\d{2}):[0-5][0-9]:[0-5](0|5)$/ // valid duration up to 99:59:55
 
 export const secondsToDuration = numSeconds => {
@@ -40,21 +40,3 @@ export const durationToSeconds = duration => {
     const [hours, minutes, seconds] = duration.split(':')
     return parseInt(seconds) + parseInt(minutes) * 60 + parseInt(hours) * 60 * 60
 }
-
-export const RATE_PERIODS = [
-    'block',
-    'hour',
-    'day'
-]
-export const RATE_PERIOD_SECONDS = [
-    BLOCK_DURATION_SECONDS,
-    3600,
-    86400
-]
-
-export const calcAmount = (blockCount, rateAmount, ratePeriod) => {
-    const seconds = blockCount * BLOCK_DURATION_SECONDS
-    const cycles = seconds / RATE_PERIOD_SECONDS[RATE_PERIODS.indexOf((ratePeriod || 'block').toLowerCase())]
-    return rateAmount * cycles
-}
-
