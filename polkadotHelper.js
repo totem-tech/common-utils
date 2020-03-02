@@ -10,6 +10,7 @@ const config = {
     types: {},
     txFeeMin: 140,
 }
+const nonces = {}
 
 // connect initiates a connection to the blockchain using PolkadotJS
 //
@@ -132,6 +133,10 @@ export const signAndSend = (api, address, tx) => new Promise((resolve, reject) =
         const account = _keyring.getPair(address)
         api.query.system.accountNonce(address).then(nonce => {
             nonce = parseInt(nonce)
+            if (nonces[address] && nonces[address] >= nonce) {
+                nonce = nonces[address] + 1
+            }
+            nonces[address] = nonce
             console.log('Polkadot: initiating transation', { nonce })
             tx.sign(account, { nonce }).send(({ status }) => {
                 console.log('Polkadot: Transaction status', status.type)
