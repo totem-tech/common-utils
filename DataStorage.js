@@ -2,21 +2,27 @@ import { isDefined, isStr, mapSearch, isMap, isValidNumber } from './utils'
 import { Bond } from 'oo7'
 import uuid from 'uuid'
 
-let storage;
+let storage, isNode
 try {
     // Use browser localStorage if available
     storage = localStorage
+    isNode = false
 } catch (e) {
     // for node server
     const nls = require('node-localstorage')
     const STORAGE_PATH = process.env.STORAGE_PATH || './server/data'
+    isNode = true
     console.log({ STORAGE_PATH })
     storage = new nls.LocalStorage(STORAGE_PATH, 500 * 1024 * 1024)
 }
 
 const read = key => {
-    const data = JSON.parse(storage.getItem(key) || '[]')
-    return new Map(data)
+    try {
+        const data = JSON.parse(storage.getItem(key) || '[]')
+        return new Map(data)
+    } catch (e) {
+        console.log(`Invalid JSON on ${isNode && key ? 'file' : 'localStorage key'}: ${key}`)
+    }
 }
 const write = (key, value) => {
     // invalid key: ignore request
