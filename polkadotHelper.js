@@ -53,7 +53,11 @@ export const keyring = {
     //
     // Params:
     // @seeds   array: uri/seed
-    add: (seeds = []) => seeds.forEach(s => _keyring.addFromUri(s)),
+    add: (seeds = []) => seeds.forEach(s => {
+        try {
+            _keyring.addFromUri(s)
+        } catch (error) { console.log('Failed to add seed to keyring', error) }
+    }),
 
     // contains checks if identity exists in the keyring
     //
