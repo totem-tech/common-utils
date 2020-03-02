@@ -97,15 +97,13 @@ export const keyring = {
 // @api         object: PolkadkRingot API from `ApiPromise`
 //
 // Returns promise: will resolve to transaction hash
-export const transfer = (toAddress, amount, secretKey, publicKey, api) => {
+export const transfer = async (toAddress, amount, secretKey, publicKey, api) => {
     if (!api) {
         // config.nodes wasn't set => return empty promise that rejects immediately
-        if (config.nodes.length === 0) return new Promise((_, r) => r('Unable to connect: node URL not set'))
-        return connect(config.nodes[0], config.types, false).then(({ api, provider }) => {
-            console.log('Polkadot connected', { api, provider })
-            return transfer(toAddress, amount, secretKey, publicKey, api)
-                .finally(() => provider.disconnect() | console.log('Polkadot: disconnected'))
-        })
+        if (config.nodes.length === 0) throw new Error('Unable to connect: node URL not set')
+        const res = await connect(config.nodes[0], config.types, false)
+        api = res.api
+        console.log('Polkadot connected', res)
     }
 
     let pair
@@ -123,35 +121,33 @@ export const transfer = (toAddress, amount, secretKey, publicKey, api) => {
         }
     }
     const sender = _keyring.getPair(pair.address)
-    return api.query.balances.freeBalance(sender.address).then(balance => {
-        if (balance <= (amount + config.txFeeMin)) throw 'Insufficient balance'
-        console.log('Polkadot: transfer from ', { address: sender.address, balance: balance.toString() })
-        console.log('Polkadot: transfer to ', { address: toAddress, amount })
-        const tx = api.tx.balances.transfer(toAddress, amount)
-        return signAndSend(api, sender.address, tx, _keyring)
-    })
+    const balance = await api.query.balances.freeBalance(sender.address)
+
+    if (balance <= (amount + config.txFeeMin)) throw 'Insufficient balance'
+    console.log('Polkadot: transfer from ', { address: sender.address, balance: balance.toString() })
+    console.log('Polkadot: transfer to ', { address: toAddress, amount })
+    const tx = api.tx.balances.transfer(toAddress, amount)
+    return await signAndSend(api, sender.address, tx)
 }
 
-export const signAndSend = (api, address, tx) => new Promise((resolve, reject) => {
-    try {
-        const account = _keyring.getPair(address)
-        api.query.system.accountNonce(address).then(nonce => {
-            nonce = parseInt(nonce)
-            if (nonces[address] && nonces[address] >= nonce) {
-                nonce = nonces[address] + 1
-            }
-            nonces[address] = nonce
-            console.log('Polkadot: initiating transation', { nonce })
-            tx.sign(account, { nonce }).send(({ status }) => {
-                console.log('Polkadot: Transaction status', status.type)
-                // status.type = 'Future' means transaction will be executed in the future. there is a nonce gap that need to be filled. 
-                if (!status.isFinalized && status.type !== 'Future') return
-                const hash = status.asFinalized.toHex()
-                console.log('Polkadot: Completed at block hash', hash)
-                resolve(hash)
-            })
-        })
-    } catch (e) {
-        reject(e)
+export const signAndSend = async (api, address, tx) => {
+    const account = _keyring.getPair(address)
+    let nonce = await api.query.system.accountNonce(address)
+    nonce = parseInt(nonce)
+    if (nonces[address] && nonces[address] >= nonce) {
+        nonce = nonces[address] + 1
     }
-})
+    nonces[address] = nonce
+    console.log('Polkadot: initiating transation', { nonce })
+
+    return await new Promise((resolve, reject) => {
+        tx.sign(account, { nonce }).send(({ status }) => {
+            console.log('Polkadot: Transaction status', status.type)
+            // status.type = 'Future' means transaction will be executed in the future. there is a nonce gap that need to be filled. 
+            if (!status.isFinalized && status.type !== 'Future') return
+            const hash = status.asFinalized.toHex()
+            console.log('Polkadot: Completed at block hash', hash)
+            resolve(hash)
+        })
+    })
+}
