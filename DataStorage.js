@@ -63,7 +63,7 @@ export default class DataStorage {
 
     // returns first item matching criteria
     find(keyValues, matchExact, matchAll, ignoreCase) {
-        const result = this.search(keyValues, matchExact, matchAll, ignoreCase)
+        const result = this.search(keyValues, matchExact, matchAll, ignoreCase, 1)
         return result.size === 0 ? null : Array.from(result)[0][1]
     }
 
@@ -81,12 +81,10 @@ export default class DataStorage {
         return data
     }
 
-    search(keyValues, matchExact, matchAll, ignoreCase, limit) {
-        let result = mapSearch(this.getAll(), keyValues, matchExact, matchAll, ignoreCase)
-        if (isValidNumber(limit) && result.size > limit) {
-            result = new Map(Array.from(result).slice(0, limit))
-        }
-        return result
+    search(keyValues, matchExact, matchAll, ignoreCase, limit = 0) {
+        const result = mapSearch(this.getAll(), keyValues, matchExact, matchAll, ignoreCase)
+        const doLimit = isValidNumber(limit) && limit > 0 && result.size > limit
+        return !doLimit ? result : new Map(Array.from(result).slice(0, limit))
     }
 
     set(key, value) {
