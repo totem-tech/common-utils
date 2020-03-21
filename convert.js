@@ -52,14 +52,19 @@ export const csvToArr = (str, columnTitles, separator = ',') => {
     const lines = str.split('\n').map(line => line.replace('\r', ''))
     const ignoreFirst = !isArr(columnTitles) || columnTitles.length === 0
     const keys = !ignoreFirst ? columnTitles : (lines[0] || '').split(separator)
-    return lines.filter(line => line.replace(separator, '').trim() !== '')
+    return lines
         .slice(ignoreFirst ? 1 : 0)
-        .map(line => line.split(separator)
-            .reduce((obj, str, i) => {
+        .map(line => {
+            const cells = line.split(separator)
+            // ignore empty line
+            if (cells.join('').trim() === '') return
+            // convert array to object with column titles as respective keys
+            return cells.reduce((obj, str, i) => {
                 obj[keys[i]] = str
                 return obj
             }, {})
-        )
+        })
+        .filter(Boolean)
 }
 
 // Convert CSV/TSV (Comma/Tab Seprated Value) string to Map
@@ -79,10 +84,11 @@ export const csvToMap = (str, columnTitles, separator = ',') => {
     const lines = str.split('\n').map(line => line.replace('\r', ''))
     const ignoreFirst = !isArr(columnTitles) || columnTitles.length === 0
     const titles = !ignoreFirst ? columnTitles : lines[0].split(separator)
-    lines.filter(line => line.replace(separator, '').trim() !== '')
-        .slice(ignoreFirst ? 1 : 0)
+    lines.slice(ignoreFirst ? 1 : 0)
         .forEach(line => {
             const cells = line.split(separator)
+            // ignore empty line
+            if (cells.join('').trim() === '') return
             cells.forEach((text, i) => {
                 if (!titles[i]) return
                 const columnTexts = result.get(titles[i]) || []
