@@ -33,7 +33,7 @@ export const downloadFile = (content, fileName, contentType) => {
 // if seed is not supplied a random UUID will be used as seed.
 export const generateHash = (seed, algo, asBytes) => {
 	var hash = createHash(algo || 'sha256')
-	seed = !seed || isStr(seed) ? seed || uuid.v1() : JSON.stringify(seed)
+	seed = !seed ? uuid.v1() : (isStr(seed) ? seed : JSON.stringify(seed))
 	hash.update(seed) // encoding parameter
 	hash.digest() // synchronously get result with encoding parameter
 	hash.end()
