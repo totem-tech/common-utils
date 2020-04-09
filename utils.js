@@ -463,15 +463,18 @@ export function deferred(callback, delay, thisArg) {
 // Params:
 // @text			string/array/object
 // @fullSentence	bool: whether to capitalize every single word or just the first word
+// @forceLowercase	bool: convert string to lower case before capitalizing
 //
 // Returns string/array/object (same as input if supported otherwise undefined)
-export const textCapitalize = (input, fullSentence = false) => {
+export const textCapitalize = (input, fullSentence = false, forceLowercase = false) => {
+	if (!input) return input
 	if (isStr(input)) {
+		if (forceLowercase) input = input.toLowerCase()
 		if (!fullSentence) return input[0].toUpperCase() + input.slice(1)
 		return input.split(' ').map(word => textCapitalize(word, false)).join(' ')
 	}
 	if (isObj(input)) return Object.keys(input).reduce((obj, key) => {
-		obj[key] = textCapitalize(input[key], fullSentence)
+		obj[key] = textCapitalize(input[key], fullSentence, forceLowercase)
 		return obj
 	}, isArr(input) ? [] : {})
 }
