@@ -116,7 +116,7 @@ export const hashToBytes = hash => isUint8Arr(hash) ? hash : hexToBytes(isBond(h
 export const hashToStr = hash => {
     hash = isBond(hash) ? hash._value : hash
     try {
-        if (isStr(hash) && eval(bytesToHex(hexToBytes(hash)))) return (hash.startsWith('0x') ? '' : '0x') + hash
+        if (isStr(hash) && hexToBytes(hash)) return (hash.startsWith('0x') ? '' : '0x') + hash
         return '0x' + bytesToHex(hash)
     } catch (e) {
         return '0x0'
