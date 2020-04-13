@@ -49,6 +49,7 @@ export const isBool = x => typeof x === 'boolean'
 export const isBond = x => x instanceof Bond
 export const isDefined = x => x !== undefined && x !== null
 export const isFn = x => typeof x === 'function'
+export const isHash = x => hashToStr(x) !== '0x0'
 export const isMap = x => x instanceof Map
 export const isObj = x => x !== null && !isArr(x) && typeof x === 'object'
 // Checks if argument is an Array of Objects. Each element type must be object, otherwise will return false.
