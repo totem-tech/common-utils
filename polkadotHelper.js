@@ -36,7 +36,7 @@ export const connect = (
     // reject if connection fails
     provider.websocket.addEventListener('error', () => reject('Connection failed') | clearTimeout(tId))
     // instantiate the Polkadot API using the provider and supplied types
-    ApiPromise.create({ provider, types }).then(api => resolve({ api, provider }) | clearTimeout(tId), reject)
+    ApiPromise.create({ provider, types }).then(api => resolve({ api, keyring: _keyring, provider }) | clearTimeout(tId), reject)
 })
 
 // remove

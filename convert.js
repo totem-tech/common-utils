@@ -119,7 +119,6 @@ export const hashToStr = hash => {
         if (isStr(hash) && hexToBytes(hash)) return (hash.startsWith('0x') ? '' : '0x') + hash
         return '0x' + bytesToHex(hash)
     } catch (e) {
-        console.log(e)
         return '0x0'
     }
 }

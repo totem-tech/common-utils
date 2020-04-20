@@ -33,7 +33,7 @@ export const downloadFile = (content, fileName, contentType) => {
 // if seed is not supplied a random UUID will be used as seed.
 export const generateHash = (seed, algo, asBytes) => {
 	var hash = createHash(algo || 'sha256')
-	seed = !seed || isStr(seed) ? seed || uuid.v1() : JSON.stringify(seed)
+	seed = !seed ? uuid.v1() : (isStr(seed) ? seed : JSON.stringify(seed))
 	hash.update(seed) // encoding parameter
 	hash.digest() // synchronously get result with encoding parameter
 	hash.end()
@@ -49,6 +49,7 @@ export const isBool = x => typeof x === 'boolean'
 export const isBond = x => x instanceof Bond
 export const isDefined = x => x !== undefined && x !== null
 export const isFn = x => typeof x === 'function'
+export const isHash = x => x.startsWith('0x')
 export const isMap = x => x instanceof Map
 export const isObj = x => x !== null && !isArr(x) && typeof x === 'object'
 // Checks if argument is an Array of Objects. Each element type must be object, otherwise will return false.
@@ -264,13 +265,6 @@ export const objWithoutKeys = (obj, keys) => !isObj(obj) || !isArr(keys) ? {} : 
 	}, {})
 )
 
-// mapCopy copies items from @source Map to @dest Map (overrides if already exists)
-export const mapCopy = (source, dest) => !isMap(source) ? (
-	!isMap(dest) ? new Map() : dest
-) : (
-		Array.from(source).reduce((dest, x) => dest.set(x[0], x[1]), dest)
-	)
-
 export const mapFilter = (map, callback) => {
 	const result = new Map()
 	if (!isMap(map)) return result
@@ -390,7 +384,7 @@ export const searchRanked = (searchKeys = ['text']) => (options, searchQuery) =>
 		}).filter(r => !!r)
 		return arrSort(matches, 'matchIndex').map(x => options[x.index])
 	}
-	return searchKeys.reduce((result, key) => result.concat(search(key)), [])
+	return arrSort(searchKeys.reduce((result, key) => result.concat(search(key)), []), 'text')
 }
 
 // Sort Array or Map
@@ -463,15 +457,18 @@ export function deferred(callback, delay, thisArg) {
 // Params:
 // @text			string/array/object
 // @fullSentence	bool: whether to capitalize every single word or just the first word
+// @forceLowercase	bool: convert string to lower case before capitalizing
 //
 // Returns string/array/object (same as input if supported otherwise undefined)
-export const textCapitalize = (input, fullSentence = false) => {
+export const textCapitalize = (input, fullSentence = false, forceLowercase = false) => {
+	if (!input) return input
 	if (isStr(input)) {
+		if (forceLowercase) input = input.toLowerCase()
 		if (!fullSentence) return input[0].toUpperCase() + input.slice(1)
 		return input.split(' ').map(word => textCapitalize(word, false)).join(' ')
 	}
 	if (isObj(input)) return Object.keys(input).reduce((obj, key) => {
-		obj[key] = textCapitalize(input[key], fullSentence)
+		obj[key] = textCapitalize(input[key], fullSentence, forceLowercase)
 		return obj
 	}, isArr(input) ? [] : {})
 }
