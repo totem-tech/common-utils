@@ -63,17 +63,11 @@ export const isValidNumber = x => typeof x == 'number' && !isNaN(x) && isFinite(
 export const hasValue = x => {
 	if (!isDefined(x)) return false
 	switch (typeof x) {
-		case 'string':
-			return isStr(x) && !!x.trim()
-		case 'number':
-			return isValidNumber(x)
-		case 'object':
-			const len = isArr(x) ? x.length : Object.keys(x)
-			return len > 0
+		case 'string': return isStr(x) && !!x.trim()
+		case 'number': return isValidNumber(x)
+		case 'object': return Object.keys(x).length > 0
 		case 'boolean':
-		default:
-			// already defined
-			return true
+		default: return true // already defined
 	}
 }
 
