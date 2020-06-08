@@ -125,7 +125,11 @@ export const arrMapSlice = (data, startIndex, endIndex, callback) => {
 export const arrReadOnly = (arr = [], strict = false) => objReadOnly(arr, strict)
 
 // Reverse array items
-export const arrReverse = (arr, reverse) => reverse ? arr.reverse() : arr
+export const arrReverse = (arr, reverse = true, newArray = true) => {
+	if (!isArr(arr)) return []
+	arr = !newArray ? arr : [...arr]
+	return reverse ? arr.reverse() : arr
+}
 
 // arrSearch search for objects by key-value pairs
 //
