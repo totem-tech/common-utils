@@ -22,11 +22,11 @@ export const copyToClipboard = str => {
 }
 
 export const downloadFile = (content, fileName, contentType) => {
-	const a = document.createElement("a");
-	const file = new Blob([content], { type: contentType });
-	a.href = URL.createObjectURL(file);
-	a.download = fileName;
-	a.click();
+	const a = document.createElement("a")
+	const file = new Blob([content], { type: contentType })
+	a.href = URL.createObjectURL(file)
+	a.download = fileName
+	a.click()
 }
 
 // generateHash generates a hash based on a specific seed and algorithm 
@@ -63,17 +63,11 @@ export const isValidNumber = x => typeof x == 'number' && !isNaN(x) && isFinite(
 export const hasValue = x => {
 	if (!isDefined(x)) return false
 	switch (typeof x) {
-		case 'string':
-			return isStr(x) && !!x.trim()
-		case 'number':
-			return isValidNumber(x)
-		case 'object':
-			const len = isArr(x) ? x.length : Object.keys(x)
-			return len > 0
+		case 'string': return isStr(x) && !!x.trim()
+		case 'number': return isValidNumber(x)
+		case 'object': return Object.keys(x).length > 0
 		case 'boolean':
-		default:
-			// already defined
-			return true
+		default: return true // already defined
 	}
 }
 
@@ -131,7 +125,11 @@ export const arrMapSlice = (data, startIndex, endIndex, callback) => {
 export const arrReadOnly = (arr = [], strict = false) => objReadOnly(arr, strict)
 
 // Reverse array items
-export const arrReverse = (arr, reverse) => reverse ? arr.reverse() : arr
+export const arrReverse = (arr, reverse = true, newArray = true) => {
+	if (!isArr(arr)) return []
+	arr = !newArray ? arr : [...arr]
+	return reverse ? arr.reverse() : arr
+}
 
 // arrSearch search for objects by key-value pairs
 //
@@ -235,7 +233,7 @@ export const objReadOnly = (obj = {}, strict = false, silent = false) => new Pro
 	setProperty: (self, key, value) => {
 		// prevents adding new or updating existing property
 		if (strict === true) {
-			if (silent) return true;
+			if (silent) return true
 			throw new TypeError(`Assignment to constant ${Array.isArray(obj) ? 'array' : 'object'} key: ${key}`)
 		} else if (!self.hasOwnProperty(key)) {
 			self[key] = value
@@ -485,7 +483,7 @@ export const textCapitalize = (input, fullSentence = false, forceLowercase = fal
 export const textEllipsis = (text, maxLen, numDots, split = true) => {
 	text = !isStr(text) ? '' : text
 	maxLen = maxLen || text.length
-	if (text.length <= maxLen || !maxLen) return text;
+	if (text.length <= maxLen || !maxLen) return text
 	numDots = numDots || 3
 	const textLen = maxLen - numDots
 	const partLen = Math.floor(textLen / 2)
