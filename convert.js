@@ -12,7 +12,7 @@ import {
     encodeBase64 as encodeBase641,
     decodeBase64 as decodeBase641
 } from "tweetnacl-util"
-import { isArr, isBond, isUint8Arr, isStr } from '../utils/utils'
+import { isArr, isBond, isUint8Arr, isStr, isObj } from '../utils/utils'
 
 // For easy access and placeholder for some functions to be copied here
 export const ss58Encode = ss58Encode1
@@ -115,6 +115,7 @@ export const hashToBytes = hash => isUint8Arr(hash) ? hash : hexToBytes(isBond(h
 // Returns string
 export const hashToStr = hash => {
     hash = isBond(hash) ? hash._value : hash
+    hash = isObj(hash) && hash.raw ? hash.raw : hash
     try {
         if (isStr(hash) && hexToBytes(hash)) return (hash.startsWith('0x') ? '' : '0x') + hash
         return '0x' + bytesToHex(hash)
