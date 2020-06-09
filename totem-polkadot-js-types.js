@@ -2,11 +2,13 @@ export default {
     "AcceptAssignedStatus": "bool",
     "Account": "u64",
     "AccountOf": "Account",
-    "AccountBalance": "i128",
+    // "AccountBalance": "i128", Not impl in this version of polkadot
+    "AccountBalance": "i64",
     "AccountBalanceOf": "AccountBalance",
     "ApprovalStatus": "u16",
     "Archival": "bool",
-    "Balance": "u128",
+    // "Balance": "u128", Not impl in this version of polkadot
+    "Balance": "u64",
     "CurrencyBalanceOf": "Balance",
     "BanStatus": "bool",
     "BoxNonce": "Vec<u8>",
@@ -46,7 +48,8 @@ export default {
     "SignedBy": "H256",
     "TimeReferenceHash": "Hash",
     "TimeHash": "TimeReferenceHash",
-    "UnitPrice": "i128",
+    // "UnitPrice": "i128", Not impl in this version of polkadot
+    "UnitPrice": "i64",
     "UnitOfMeasure": "u16",
     "UnLocked": "bool",
     "UserNameHash": "Hash",
