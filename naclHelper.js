@@ -78,3 +78,15 @@ export const signingKeyPair = (keyDataBytes, encode = true) => {
         secretKey: encode ? encodeBase64(secretKey) : secretKey
     }
 }
+
+export default {
+    isUint8Array,
+    newNonce,
+    encrypt,
+    decrypt,
+    newSignature,
+    verifySignature,
+    keyInfoFromKeyData,
+    encryptionKeypair,
+    signingKeyPair
+}
