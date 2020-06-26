@@ -37,6 +37,8 @@ export default {
     },
     "OrderItem": "Vec<(Product, UnitPrice, Quantity, UnitOfMeasure)>",
     "OrderStatus": "u16",
+    // "Quantity": "u128", Not impl in this version of polkadot
+    "Quantity": "u64",
     "RandomHashedData": "Hash",
     "ReasonCode": "u16",
     "ReasonCodeType": "u16",
