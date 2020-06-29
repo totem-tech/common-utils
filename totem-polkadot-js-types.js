@@ -35,7 +35,13 @@ export default {
         "deadline": "u64",
         "due_date": "u64"
     },
-    "OrderItem": "Vec<(Product, UnitPrice, Quantity, UnitOfMeasure)>",
+    "OrderItemStruct": {
+        "ProductKey": "Product",
+        "UnitPrice": "i128",
+        "Quantity": "i128",
+        "UnitOfMeasure": "u16"
+    },
+    "OrderItem": "Vec<OrderItemStruct>",
     "OrderStatus": "u16",
     // "Quantity": "u128", Not impl in this version of polkadot
     "Quantity": "u64",
