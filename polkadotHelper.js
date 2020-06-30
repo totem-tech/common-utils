@@ -162,7 +162,7 @@ export const signAndSend = async (api, address, tx) => {
     })
 }
 
-window.polkadotHelper = {
+export default {
     keyring,
     connect,
     getDefaultConfig,
@@ -170,4 +170,3 @@ window.polkadotHelper = {
     transfer,
     signAndSend
 }
-export default polkadotHelper
