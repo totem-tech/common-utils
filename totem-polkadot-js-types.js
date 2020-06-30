@@ -2,13 +2,13 @@ export default {
     "AcceptAssignedStatus": "bool",
     "Account": "u64",
     "AccountOf": "Account",
-    "AccountBalance": "i128", 
-    // "AccountBalance": "i64",
+    // "AccountBalance": "i128", Not impl in this version of polkadot
+    "AccountBalance": "i64",
     "AccountBalanceOf": "AccountBalance",
     "ApprovalStatus": "u16",
     "Archival": "bool",
-    "Balance": "u128", 
-    // "Balance": "u64",
+    // "Balance": "u128", Not impl in this version of polkadot
+    "Balance": "u64",
     "CurrencyBalanceOf": "Balance",
     "BanStatus": "bool",
     "BoxNonce": "Vec<u8>",
@@ -35,9 +35,16 @@ export default {
         "deadline": "u64",
         "due_date": "u64"
     },
+    "OrderItemStruct": {
+        "ProductKey": "Product",
+        "UnitPrice": "i128",
+        "Quantity": "i128",
+        "UnitOfMeasure": "u16"
+    },
+    "OrderItem": "Vec<OrderItemStruct>",
     "OrderStatus": "u16",
-    "Quantity": "u128", 
-    // "Quantity": "u64",
+    // "Quantity": "u128", Not impl in this version of polkadot
+    "Quantity": "u64",
     "RandomHashedData": "Hash",
     "ReasonCode": "u16",
     "ReasonCodeType": "u16",
@@ -49,19 +56,11 @@ export default {
     "SignedBy": "H256",
     "TimeReferenceHash": "Hash",
     "TimeHash": "TimeReferenceHash",
-    "UnitPrice": "i128",
-    // "UnitPrice": "i64",
+    // "UnitPrice": "i128", Not impl in this version of polkadot
+    "UnitPrice": "i64",
     "UnitOfMeasure": "u16",
     "UnLocked": "bool",
     "UserNameHash": "Hash",
-    "ItemDetailsStruct": {
-        "ProductKey": "Product",
-        "UnitPriceKey": "i128",
-        "QuantityKey": "u128",
-        "UnitOfMeasureKey": "u16"
-    },
-    "ItemDetailsStruct<Product,UnitPrice,Quantity,UnitOfMeasure>": "ItemDetailsStruct",
-    "OrderItem": "Vec<ItemDetailsStruct>",
     "EncryptedVerificationData": {
         "key": "EncryptPublicKey",
         "data": "Data"
@@ -79,6 +78,7 @@ export default {
         "nonce": "EncryptNonce"
     },
     "SignedData<UserNameHash, EncryptPublicKey, SignedBy, EncryptNonce>": "SignedData",
+
     "BannedStruct": {
         "BanStatusKey": "BanStatus",
         "ReasonCodeStructKey": "ReasonCodeStruct"
