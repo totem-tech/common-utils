@@ -60,7 +60,8 @@ export default {
         "QuantityKey": "Quantity",
         "UnitOfMeasureKey": "UnitOfMeasure"
     },
-    "OrderItem": "Vec<u8>",
+    "OrderItemStruct<Product,UnitPrice,Quantity,UnitOfMeasure>": "OrderItemStruct",
+    "OrderItem": "Vec<OrderItemStruct>",
     "EncryptedVerificationData": {
         "key": "EncryptPublicKey",
         "data": "Data"
