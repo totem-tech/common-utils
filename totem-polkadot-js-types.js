@@ -56,9 +56,9 @@ export default {
     "UserNameHash": "Hash",
     "ItemDetailsStruct": {
         "ProductKey": "Product",
-        "UnitPriceKey": "UnitPrice",
-        "QuantityKey": "Quantity",
-        "UnitOfMeasureKey": "UnitOfMeasure"
+        "UnitPriceKey": "i128",
+        "QuantityKey": "u128",
+        "UnitOfMeasureKey": "u16"
     },
     "ItemDetailsStruct<Product,UnitPrice,Quantity,UnitOfMeasure>": "ItemDetailsStruct",
     "OrderItem": "Vec<ItemDetailsStruct>",
