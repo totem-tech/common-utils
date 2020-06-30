@@ -35,13 +35,6 @@ export default {
         "deadline": "u64",
         "due_date": "u64"
     },
-    "OrderItemStruct": {
-        "ProductKey": "Product",
-        "UnitPrice": "i128",
-        "Quantity": "i128",
-        "UnitOfMeasure": "u16"
-    },
-    "OrderItem": "Vec<OrderItemStruct>",
     "OrderStatus": "u16",
     // "Quantity": "u128", Not impl in this version of polkadot
     "Quantity": "u64",
@@ -61,6 +54,13 @@ export default {
     "UnitOfMeasure": "u16",
     "UnLocked": "bool",
     "UserNameHash": "Hash",
+    "OrderItemStruct": {
+        "ProductKey": "Product",
+        "UnitPriceKey": "UnitPrice",
+        "QuantityKey": "Quantity",
+        "UnitOfMeasureKey": "UnitOfMeasure"
+    },
+    "OrderItem": "Vec<OrderItemStruct>",
     "EncryptedVerificationData": {
         "key": "EncryptPublicKey",
         "data": "Data"
@@ -78,7 +78,6 @@ export default {
         "nonce": "EncryptNonce"
     },
     "SignedData<UserNameHash, EncryptPublicKey, SignedBy, EncryptNonce>": "SignedData",
-
     "BannedStruct": {
         "BanStatusKey": "BanStatus",
         "ReasonCodeStructKey": "ReasonCodeStruct"
