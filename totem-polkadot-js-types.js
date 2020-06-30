@@ -54,14 +54,14 @@ export default {
     "UnitOfMeasure": "u16",
     "UnLocked": "bool",
     "UserNameHash": "Hash",
-    "OrderItemStruct": {
+    "ItemDetailsStruct": {
         "ProductKey": "Product",
         "UnitPriceKey": "UnitPrice",
         "QuantityKey": "Quantity",
         "UnitOfMeasureKey": "UnitOfMeasure"
     },
-    "OrderItemStruct<Product,UnitPrice,Quantity,UnitOfMeasure>": "OrderItemStruct",
-    "OrderItem": "Vec<OrderItemStruct>",
+    "ItemDetailsStruct<Product,UnitPrice,Quantity,UnitOfMeasure>": "ItemDetailsStruct",
+    "OrderItem": "Vec<ItemDetailsStruct>",
     "EncryptedVerificationData": {
         "key": "EncryptPublicKey",
         "data": "Data"
