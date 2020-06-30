@@ -137,21 +137,28 @@ export const signAndSend = async (api, address, tx) => {
     const account = _keyring.getPair(address)
     let nonce = await api.query.system.accountNonce(address)
     nonce = parseInt(nonce)
+    const nonceActual = nonce
     if (nonces[address] && nonces[address] >= nonce) {
         nonce = nonces[address] + 1
     }
     nonces[address] = nonce
     console.log('Polkadot: initiating transation', { nonce })
 
-    return await new Promise((resolve, reject) => {
-        tx.sign(account, { nonce }).send(({ status }) => {
-            console.log('Polkadot: Transaction status', status.type)
-            // status.type = 'Future' means transaction will be executed in the future. there is a nonce gap that need to be filled. 
-            if (!status.isFinalized && status.type !== 'Future') return
-            const hash = status.asFinalized.toHex()
-            console.log('Polkadot: Completed at block hash', hash)
-            resolve(hash)
-        })
+    return await new Promise(async (resolve, reject) => {
+        try {
+            const signed = await tx.sign(account, { nonce })
+            await signed.send(({ status }) => {
+                console.log('Polkadot: Transaction status', status.type)
+                // status.type = 'Future' means transaction will be executed in the future. 
+                // there is a nonce gap that need to be filled. 
+                if (!status.isFinalized && status.type !== 'Future') return
+                const hash = status.asFinalized.toHex()
+                console.log('Polkadot: Completed at block hash', hash)
+                resolve(hash)
+            })
+        } catch (err) {
+            reject(err)
+        }
     })
 }
 
