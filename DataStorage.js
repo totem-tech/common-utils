@@ -1,4 +1,4 @@
-import { isDefined, isStr, mapSearch, isMap, isValidNumber } from './utils'
+import { isDefined, isStr, mapSearch, isMap, isValidNumber, mapSort } from './utils'
 import { Bond } from 'oo7'
 import uuid from 'uuid'
 
@@ -97,14 +97,46 @@ export default class DataStorage {
         return this
     }
 
-    // overrides any existing entries
-    setAll(data) {
+    // save many items at once
+    //
+    // Params:
+    // @data        Map: list of items
+    // @override    boolean: whether to override or merge with existing data
+    //
+    // returns      DataStorage
+    setAll(data, override = true) {
         if (!isMap(data)) return this
+        if (!override) {
+            // merge data
+            const existing = this.getAll()
+            Array.from(data)
+                .forEach(([key, value]) => existing.set(key, value))
+            data = existing // merged value
+        }
         if (!this.disableCache || !this.name) {
             this.data = data
         }
         this.name && write(this.name, data)
         this._updateBond()
         return this
+    }
+
+    // sort data by key or simply reverse the entire list
+    //
+    // Params:
+    // @reverse     boolean: default = false
+    // @key         string: (optional) sort by specific key
+    // @save        boolean: (optional) whether to save sorted data to storage. default = false
+    // @data        Map: (optional) if supplied and save is truthy, WILL OVERRIDE all existing data
+    //
+    // Returns Map
+    sort(key, reverse = false, save = false) {
+        let data = this.getAll()
+        if (!key && !reverse) return data // nothing to do
+
+        data = !key ? new Map(Array.from(data).reverse()) : mapSort(data, key, reverse)
+        if (save) this.setAll(data)
+
+        return data
     }
 }
