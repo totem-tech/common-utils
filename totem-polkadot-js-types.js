@@ -23,7 +23,6 @@ export default {
     "NumberOfBreaks": "u16",
     "NumberOfBlocks": "u64",
     "PostingPeriod": "u16",
-    "Product": "Hash",
     "ProjectHash": "Hash",
     "ProjectHashRef": "Hash",
     "ProjectStatus": "u16",
@@ -36,15 +35,13 @@ export default {
         "due_date": "u64"
     },
     "OrderItemStruct": {
-        "ProductKey": "Product",
+        "ProductHash": "Hash",
         "UnitPrice": "i128",
         "Quantity": "i128",
         "UnitOfMeasure": "u16"
     },
     "OrderItem": "Vec<OrderItemStruct>",
     "OrderStatus": "u16",
-    // "Quantity": "u128", Not impl in this version of polkadot
-    "Quantity": "u64",
     "RandomHashedData": "Hash",
     "ReasonCode": "u16",
     "ReasonCodeType": "u16",
@@ -56,9 +53,6 @@ export default {
     "SignedBy": "H256",
     "TimeReferenceHash": "Hash",
     "TimeHash": "TimeReferenceHash",
-    // "UnitPrice": "i128", Not impl in this version of polkadot
-    "UnitPrice": "i64",
-    "UnitOfMeasure": "u16",
     "UnLocked": "bool",
     "UserNameHash": "Hash",
     "EncryptedVerificationData": {
