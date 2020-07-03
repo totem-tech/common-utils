@@ -54,7 +54,7 @@ export const isMap = x => x instanceof Map
 export const isObj = x => x !== null && !isArr(x) && typeof x === 'object'
 // Checks if argument is an Array of Objects. Each element type must be object, otherwise will return false.
 export const isObjArr = x => !isArr(x) ? false : !x.reduce((no, item) => no || !isObj(item), false)
-// Checks if argument is an Map of Objects. Each element type must be object, otherwise will return false.
+// Checks if argument is a Map of Objects. Each element type must be object, otherwise will return false.
 export const isObjMap = x => !isMap(x) ? false : !Array.from(x).reduce((no, item) => no || !isObj(item[1]), false)
 export const isPromise = x => x instanceof Promise
 export const isStr = x => typeof x === 'string'
@@ -172,12 +172,28 @@ export const arrSort = (arr, key, reverse, sortOriginal) => {
 	return arrReverse(sortedArr.sort((a, b) => a[key] > b[key] ? 1 : -1), reverse)
 }
 
+// arrUnique returns unique values in an array
 export const arrUnique = (arr = []) => Object.values(
 	arr.reduce((itemsObj, item) => {
 		itemsObj[item] = item
 		return itemsObj
 	}, {})
 )
+
+// objContains tests if an object contains all the supplied keys/properties
+//
+// Params:
+// @obj		object
+// @keys	array: list of required properties in the object
+//
+// Returns	boolean
+export const objContains = (obj = {}, keys = []) => {
+	if (!isObj(obj) || !isArr(keys)) return false
+	for (let i = 0; i < keys.length; i++) {
+		if (!obj.hasOwnProperty(keys[i])) return false
+	}
+	return true
+}
 
 // objCopy copies top level properties and returns another object
 //
