@@ -5,6 +5,9 @@ export default {
     "DispatchInfo": "DispatchInfoTo244", // ## 1.14.1 May 14, 2020
     "Weight": "u32", // ## 1.11.1 Apr 21, 2020
     "StakingLedger": "StakingLedgerTo240", // ## 1.10.1 Apr 13, 2020
+    "Address": "AccountId", // Comments in Riot Channel
+    "Event": "Vec<EventRecord>", // Comments in Riot Channel
+    "Storage": "<Vec<StorageKey>", // Comments in Riot Channel
     "AcceptAssignedStatus": "bool",
     "Account": "u64",
     "AccountOf": "Account",
