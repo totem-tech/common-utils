@@ -8,13 +8,13 @@ export default {
     "Address": "AccountId", // Comments in Riot Channel
     "Event": "Vec<EventRecord>", // Comments in Riot Channel
     "Storage": "<Vec<StorageKey>", // Comments in Riot Channel
-    "BalanceLock": {
+    "BalanceLockV1": {
         "Id": "Vec<u8>",
         "Amount": "u128",
         "Until": "u64",
         "Reasons": "i8",
     }, // Added for compatibility v1 
-    "BalanceLock<Balance,BlockNumber>": "BalanceLock", // Added for compatibility v1
+    "BalanceLockV1<Balance,BlockNumber>": "BalanceLockV1", // Added for compatibility v1
     "AcceptAssignedStatus": "bool",
     "Account": "u64",
     "AccountOf": "Account",
