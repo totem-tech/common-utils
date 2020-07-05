@@ -2,7 +2,7 @@
 // https://raw.githubusercontent.com/polkadot-js/api/master/CHANGELOG.md
 export default {
     "OpenTip": "OpenTipTo225", // ## 1.22.1 Jun 30, 2020
-    "DispatchInfo": "DispatchInfoTo244" // ## 1.14.1 May 14, 2020
+    "DispatchInfo": "DispatchInfoTo244", // ## 1.14.1 May 14, 2020
     "Weight": "u32", // ## 1.11.1 Apr 21, 2020
     "StakingLedger": "StakingLedgerTo240", // ## 1.10.1 Apr 13, 2020
     "AcceptAssignedStatus": "bool",
