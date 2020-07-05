@@ -8,17 +8,22 @@ export default {
     "Address": "AccountId", // Comments in Riot Channel
     "Event": "Vec<EventRecord>", // Comments in Riot Channel
     "Storage": "<Vec<StorageKey>", // Comments in Riot Channel
+    "BalanceLock": {
+        "Id": "Vec<u8>",
+        "Amount": "u128",
+        "Until": "u64",
+        "Reasons": "i8",
+    }, // Added for compatibility v1 
+    "BalanceLock<Balance,BlockNumber>": "BalanceLock", // Added for compatibility v1
     "AcceptAssignedStatus": "bool",
     "Account": "u64",
     "AccountOf": "Account",
-    // "AccountBalance": "i128", Not impl in this version of polkadot
-    "AccountBalance": "i64",
+    "AccountBalance": "i128",
     "AccountBalanceOf": "AccountBalance",
     "ApprovalStatus": "u16",
     "Archival": "bool",
-    // "Balance": "u128", Not impl in this version of polkadot
-    "Balance": "u64",
-    "CurrencyBalanceOf": "Balance",
+    // "Balance": "u128", 
+    // "CurrencyBalanceOf": "Balance",
     "BanStatus": "bool",
     "BoxNonce": "Vec<u8>",
     "Data": "Vec<u8>",
@@ -81,7 +86,6 @@ export default {
         "nonce": "EncryptNonce"
     },
     "SignedData<UserNameHash, EncryptPublicKey, SignedBy, EncryptNonce>": "SignedData",
-
     "BannedStruct": {
         "BanStatusKey": "BanStatus",
         "ReasonCodeStructKey": "ReasonCodeStruct"
