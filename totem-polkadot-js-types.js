@@ -50,12 +50,17 @@ export default {
         "deadline": "u64",
         "due_date": "u64"
     },
+    "Product": "Hash",
+    "UnitPrice": "i128",
+    "Quantity": "u128",
+    "UnitOfMeasure": "u16",
     "ItemDetailsStruct": {
-        "ProductHash": "Hash",
+        "Product": "Hash",
         "UnitPrice": "i128",
-        "Quantity": "i128",
+        "Quantity": "u128",
         "UnitOfMeasure": "u16"
     },
+    "ItemDetailsStruct<Product,UnitPrice,Quantity,UnitOfMeasure>": "ItemDetailsStruct",
     "OrderItem": "Vec<ItemDetailsStruct>",
     "OrderStatus": "u16",
     "RandomHashedData": "Hash",
