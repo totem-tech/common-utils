@@ -42,6 +42,12 @@ export default {
     "ProjectHash": "Hash",
     "ProjectHashRef": "Hash",
     "ProjectStatus": "u16",
+    "buyOrSell": "u16",
+    "amount": "i128",
+    "openClosed": "bool",
+    "orderType": "u16",
+    "deadline": "u64",
+    "dueDate": "u64",
     "OrderSubHeader": {
         "buy_or_sell": "u16",
         "amount": "i128",
@@ -60,7 +66,7 @@ export default {
         "Quantity": "u128",
         "UnitOfMeasure": "u16"
     },
-    "ItemDetailsStruct<Product,UnitPrice,Quantity,UnitOfMeasure>": "ItemDetailsStruct",
+    "ItemDetailsStruct<Hash,i128,u128,u16>": "ItemDetailsStruct",
     "OrderItem": "Vec<ItemDetailsStruct>",
     "OrderStatus": "u16",
     "RandomHashedData": "Hash",
