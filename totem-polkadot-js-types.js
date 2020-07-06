@@ -44,19 +44,19 @@ export default {
     "ProjectStatus": "u16",
     "OrderSubHeader": {
         "buy_or_sell": "u16",
-        "amount": "AccountBalanceOf",
+        "amount": "i128",
         "open_closed": "bool",
         "order_type": "u16",
         "deadline": "u64",
         "due_date": "u64"
     },
-    "OrderItemStruct": {
+    "ItemDetailsStruct": {
         "ProductHash": "Hash",
         "UnitPrice": "i128",
         "Quantity": "i128",
         "UnitOfMeasure": "u16"
     },
-    "OrderItem": "Vec<OrderItemStruct>",
+    "OrderItem": "Vec<ItemDetailsStruct>",
     "OrderStatus": "u16",
     "RandomHashedData": "Hash",
     "ReasonCode": "u16",
