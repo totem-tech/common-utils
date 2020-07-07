@@ -66,7 +66,8 @@ export default {
         "Quantity": "u128",
         "UnitOfMeasure": "u16"
     },
-    "OrderItem": "Vec<OrderItemStruct>",
+    // "OrderItem": "Vec<OrderItemStruct>",
+    "OrderItem": "Vec<(Product, UnitPrice, Quantity, UnitOfMeasure)>",
     // "ItemDetailsStruct": {
     //     "Product": "Hash",
     //     "UnitPrice": "i128",
