@@ -497,7 +497,11 @@ export const deferredPromise = () => {
 	return promise => new Promise((resolve, reject) => {
 		const id = Symbol()
 		ids.push(id)
-		promise.then(then(resolve, id), then(reject, id))
+		try {
+			promise.then(then(resolve, id), then(reject, id))
+		} catch (err) {
+			reject(err)
+		}
 	})
 }
 
