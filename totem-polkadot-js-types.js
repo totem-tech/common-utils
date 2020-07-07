@@ -60,22 +60,13 @@ export default {
     "UnitPrice": "i128",
     "Quantity": "u128",
     "UnitOfMeasure": "u16",
-    "OrderItemStruct": {
-        "ProductKey": "Product",
+    "ItemDetailsStruct": {
+        "Product": "Hash",
         "UnitPrice": "i128",
         "Quantity": "u128",
         "UnitOfMeasure": "u16"
     },
-    // "OrderItem": "Vec<OrderItemStruct>",
-    "OrderItem": "Vec<(Product, UnitPrice, Quantity, UnitOfMeasure)>",
-    // "ItemDetailsStruct": {
-    //     "Product": "Hash",
-    //     "UnitPrice": "i128",
-    //     "Quantity": "u128",
-    //     "UnitOfMeasure": "u16"
-    // },
-    // "ItemDetailsStruct<Hash,i128,u128,u16>": "ItemDetailsStruct",
-    // "OrderItem": "Vec<ItemDetailsStruct>",
+    "OrderItem": "ItemDetailsStruct",
     "OrderStatus": "u16",
     "RandomHashedData": "Hash",
     "ReasonCode": "u16",
