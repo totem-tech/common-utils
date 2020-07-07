@@ -12,7 +12,7 @@ export default {
         "Id": "[u8;8]",
         "Amount": "u128",
         "Until": "u64",
-        "Reasons": "i8",
+        "Reasons": "i8"
     }, // Added for compatibility v1 
     "BalanceLockV1<Balance,BlockNumber>": "BalanceLockV1", // Added for compatibility v1
     "Locks": "Vec<BalanceLockV1>", // Added for compatibility v1
