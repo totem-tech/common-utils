@@ -5,7 +5,9 @@ export default {
     "DispatchInfo": "DispatchInfoTo244", // ## 1.14.1 May 14, 2020
     "Weight": "u32", // ## 1.11.1 Apr 21, 2020
     "StakingLedger": "StakingLedgerTo240", // ## 1.10.1 Apr 13, 2020
-    "Address": "AccountId", // Comments in Riot Channel
+    // "Address": "AccountId", // Comments in Riot Channel
+    "DispatchResult": "DispatchResultTo198", // from PolkadotJS types
+    "EventRecord": "EventRecordTo76", // from PolkadotJS types
     "Event": "Vec<EventRecord>", // Comments in Riot Channel
     "Storage": "<Vec<StorageKey>", // Comments in Riot Channel
     "BalanceLockV1": {
@@ -66,6 +68,7 @@ export default {
         "Quantity": "u128",
         "UnitOfMeasure": "u16"
     },
+    "ItemDetailsStruct<Hash,i128,u128,u16>": "ItemDetailsStruct",
     "OrderItem": "ItemDetailsStruct",
     "OrderStatus": "u16",
     "RandomHashedData": "Hash",
