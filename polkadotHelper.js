@@ -149,14 +149,16 @@ export const signAndSend = async (api, address, tx) => {
             const signed = await tx.sign(account, { nonce })
             await signed.send(result => {
                 const { events, status } = result
-                console.log('Events:', JSON.stringify(events))
                 console.log('Polkadot: Transaction status', status.type)
                 // status.type = 'Future' means transaction will be executed in the future. 
                 // there is a nonce gap that need to be filled. 
                 if (!status.isFinalized && status.type !== 'Future') return
                 const hash = status.asFinalized.toHex()
-                console.log('Polkadot: Completed at block hash', hash)
-                resolve(hash)
+                const eventsArr = JSON.parse(JSON.stringify(events)).map(x => x.event) // get rid of all the jargon
+                const { data: eventData } = eventsArr
+                    .find(event => event.data && event.data.length) || {} // ignore the empty data array
+                console.log(`Polkadot: Completed at block hash: ${hash}`, { eventData })
+                resolve([hash, eventData])
             })
         } catch (err) {
             reject(err)
