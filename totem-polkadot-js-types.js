@@ -6,6 +6,8 @@ export default {
     "Weight": "u32", // ## 1.11.1 Apr 21, 2020
     "StakingLedger": "StakingLedgerTo240", // ## 1.10.1 Apr 13, 2020
     // "Address": "AccountId", // Comments in Riot Channel
+    "Address": "GenericAddress",
+    "LookupSource": "GenericAddress",
     "DispatchResult": "DispatchResultTo198", // from PolkadotJS types
     "EventRecord": "EventRecordTo76", // from PolkadotJS types
     "Event": "Vec<EventRecord>", // Comments in Riot Channel
