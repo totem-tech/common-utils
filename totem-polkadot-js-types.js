@@ -10,7 +10,7 @@ export default {
     "LookupSource": "GenericAddress",
     "DispatchResult": "DispatchResultTo198", // from PolkadotJS types
     "EventRecord": "EventRecordTo76", // from PolkadotJS types
-    "Event": "Vec<EventRecord>", // Comments in Riot Channel
+    // "Event": "Vec<EventRecord>", // Comments in Riot Channel
     "Storage": "<Vec<StorageKey>", // Comments in Riot Channel
     "BalanceLockV1": {
         "Id": "[u8;8]",

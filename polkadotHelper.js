@@ -147,7 +147,9 @@ export const signAndSend = async (api, address, tx) => {
     return await new Promise(async (resolve, reject) => {
         try {
             const signed = await tx.sign(account, { nonce })
-            await signed.send(({ status }) => {
+            await signed.send(result => {
+                const { events, status } = result
+                console.log('Events:', JSON.stringify(events))
                 console.log('Polkadot: Transaction status', status.type)
                 // status.type = 'Future' means transaction will be executed in the future. 
                 // there is a nonce gap that need to be filled. 
