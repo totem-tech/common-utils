@@ -1,6 +1,7 @@
 import { ApiPromise, WsProvider } from '@polkadot/api'
 import Keyring from '@polkadot/keyring/'
 import createPair from '@polkadot/keyring/pair'
+import { isArr, isObj, isValidNumber } from './utils'
 
 const TYPE = 'sr25519'
 const _keyring = new Keyring({ type: TYPE })
@@ -8,7 +9,11 @@ const config = {
     nodes: [],
     timeout: 30000,
     types: {},
-    txFeeMin: 140,
+    // minimum required amount in XTX to create a transation.
+    // This is a temporary solution until upgraded to PolkadotJS V2.
+    // 140 XTX for a simple transaction.
+    // 1 XTX for existential balance. 
+    txFeeMin: 141,
 }
 const nonces = {}
 
@@ -42,14 +47,19 @@ export const connect = (
     )
 })
 
-// remove
-export const getDefaultConfig = () => config
-
-// setDefaultConfig sets nodes and types for use with once-off connections as well as default values for @connect function
+// setDefaultConfig sets default config (node URL, type definitions etc) for use connections, 
+// unless explicitly provided in the @connect function.
+//
+// Params:
+// @nodes   array: array of node URLs
+// @types   object
+//
+// Returns object: @config
 export const setDefaultConfig = (nodes, types, timeout) => {
-    config.nodes = nodes || config.nodes
-    config.types = types || config.types
-    config.timeout = timeout || config.timeout
+    config.nodes = isArr(nodes) ? nodes : config.nodes
+    config.types = isObj(types) ? types : config.types
+    config.timeout = isValidNumber(timeout) && tiemout > 0 ? timeout : config.timeout
+    return config
 }
 
 export const keyring = {
@@ -137,7 +147,6 @@ export const signAndSend = async (api, address, tx) => {
     const account = _keyring.getPair(address)
     let nonce = await api.query.system.accountNonce(address)
     nonce = parseInt(nonce)
-    const nonceActual = nonce
     if (nonces[address] && nonces[address] >= nonce) {
         nonce = nonces[address] + 1
     }
@@ -169,7 +178,6 @@ export const signAndSend = async (api, address, tx) => {
 export default {
     keyring,
     connect,
-    getDefaultConfig,
     setDefaultConfig,
     transfer,
     signAndSend
