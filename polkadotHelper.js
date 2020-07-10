@@ -104,10 +104,10 @@ export const keyring = {
 // transfer funds between accounts
 //
 // Params:
-// @toAddress   string: destination identity/address
-// @secretKey   string: address (must have already been added to keyring) or secretKey or seed (type: 'sr25519')
-// @publicKey   string: if falsy, @secretkey will be assumed to be a seed or an address 
-// @api         object: PolkadkRingot API from `ApiPromise`
+// @toAddress       string: destination identity/address
+// @secretKey       string: address (must have already been added to keyring) or secretKey or seed (type: 'sr25519')
+// @publicKey       string: if falsy, @secretkey will be assumed to be a seed or an address 
+// @api             object: PolkadkRingot API from `ApiPromise`
 //
 // Returns promise: will resolve to transaction hash
 export const transfer = async (toAddress, amount, secretKey, publicKey, api) => {
@@ -134,10 +134,6 @@ export const transfer = async (toAddress, amount, secretKey, publicKey, api) => 
         }
     }
     const sender = _keyring.getPair(pair.address)
-    const balance = await api.query.balances.freeBalance(sender.address)
-
-    if (balance <= (amount + config.txFeeMin)) throw 'Insufficient balance'
-    console.log('Polkadot: transfer from ', { address: sender.address, balance: balance.toString() })
     console.log('Polkadot: transfer to ', { address: toAddress, amount })
     const tx = api.tx.balances.transfer(toAddress, amount)
     return await signAndSend(api, sender.address, tx)
@@ -164,8 +160,8 @@ export const signAndSend = async (api, address, tx) => {
                 if (!status.isFinalized && status.type !== 'Future') return
                 const hash = status.asFinalized.toHex()
                 const eventsArr = JSON.parse(JSON.stringify(events)).map(x => x.event) // get rid of all the jargon
-                const { data: eventData } = eventsArr
-                    .find(event => event.data && event.data.length) || {} // ignore the empty data array
+                // find the event that has data
+                const { data: eventData } = eventsArr.find(event => event.data && event.data.length) || {}
                 console.log(`Polkadot: Completed at block hash: ${hash}`, { eventData })
                 resolve([hash, eventData])
             })
