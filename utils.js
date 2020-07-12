@@ -237,6 +237,24 @@ export const objClean = (obj, keys) => !isObj(obj) || !isArr(keys) ? {} : keys.r
 	return cleanObj
 }, {})
 
+// objCreate constructs a new object with supplied key(s) and value(s)
+//
+// Params:
+// @key		string/array
+// @value	any/array
+//
+// Returns	object
+export const objCreate = (key, value) => {
+	const obj = {}
+	if (!isArr(key)) {
+		obj[key] = value
+		return obj
+	}
+	// arrays of keys and values supplied
+	value = !isArr(value) ? [value] : value
+	key.forEach(k => obj[k] = value[key])
+	return obj
+}
 // objHasKeys checks if all the supplied keys exists in a object
 //
 // Params:
