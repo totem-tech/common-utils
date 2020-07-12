@@ -180,6 +180,21 @@ export const arrUnique = (arr = []) => Object.values(
 	}, {})
 )
 
+// className formats supplied value into CSS class name compatible string for React
+//
+// Params:
+// @value	string/object/array: if object supplied, 
+//							key		string: CSS class
+//							value	boolean: whether to include the key to the final output
+export const className = value => {
+	if (isStr(value)) return value
+	if (isObj(value)) {
+		// convert into an array
+		value = Object.keys(value).map(key => !!value[key] && key)
+	}
+	if (isArr(value)) return value.filter(Boolean).join(' ')
+}
+
 // objContains tests if an object contains all the supplied keys/properties
 //
 // Params:
