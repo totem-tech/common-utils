@@ -46,7 +46,7 @@ export default {
     "PostingPeriod": "u16",
     "PostingIndex": "u128",
     "ProjectHash": "Hash",
-    "ProjectHashRef": "Hash",
+    "ProjectHashRef": "H256",
     "ProjectStatus": "u16",
     "buyOrSell": "u16",
     "amount": "i128",
