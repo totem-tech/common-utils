@@ -168,7 +168,7 @@ export const signAndSend = async (api, address, tx) => {
                 const { data: eventData } = eventsArr.find(event => event.data && event.data.length) || {}
                 console.log(`Polkadot: Completed at block hash: ${hash}`, { eventData })
                 // transaction finalized, but not included in a block => runtime rejected the TX
-                if (!includedInBlock) return reject('Transaction failed')
+                if (!includedInBlock) return reject('Transaction was rejected by runtime')
                 resolve([hash, eventData])
             })
         } catch (err) {
