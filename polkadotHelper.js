@@ -148,7 +148,7 @@ export const signAndSend = async (api, address, tx) => {
     }
     nonces[address] = nonce
     console.log('Polkadot: initiating transation', { nonce })
-    let includedInBlock = false
+    // let includedInBlock = false
     return await new Promise(async (resolve, reject) => {
         try {
             const signed = await tx.sign(account, { nonce })
@@ -157,7 +157,7 @@ export const signAndSend = async (api, address, tx) => {
                 console.log('Polkadot: Transaction status', status.type)
 
                 // transaction was included in the block
-                if (status.isInBlock) includedInBlock = true
+                // if (status.isInBlock) includedInBlock = true
 
                 // status.type = 'Future' means transaction will be executed in the future. 
                 // there is a nonce gap that need to be filled. 
@@ -168,7 +168,7 @@ export const signAndSend = async (api, address, tx) => {
                 const { data: eventData } = eventsArr.find(event => event.data && event.data.length) || {}
                 console.log(`Polkadot: Completed at block hash: ${hash}`, { eventData })
                 // transaction finalized, but not included in a block => runtime rejected the TX
-                if (!includedInBlock) return reject('Transaction was rejected by runtime')
+                // if (!includedInBlock) return reject('Transaction was rejected by runtime')
                 resolve([hash, eventData])
             })
         } catch (err) {
