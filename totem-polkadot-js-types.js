@@ -1,6 +1,13 @@
 // Updates to this file should always check the change log for compatibility issues
 // https://raw.githubusercontent.com/polkadot-js/api/master/CHANGELOG.md
 export default {
+    // "Digest": "Hash",
+    "Vote": "i8",
+    "ReferendumIndex": "u32",
+    "VoteOf": {
+        "referendumIndex": "ReferendumIndex",
+        "account": "AccountId",
+    },
     "OpenTip": "OpenTipTo225", // ## 1.22.1 Jun 30, 2020
     "DispatchInfo": "DispatchInfoTo244", // ## 1.14.1 May 14, 2020
     "Weight": "u32", // ## 1.11.1 Apr 21, 2020
@@ -11,21 +18,22 @@ export default {
     "DispatchResult": "DispatchResultTo198", // from PolkadotJS types
     "EventRecord": "EventRecordTo76", // from PolkadotJS types
     // "Event": "Vec<EventRecord>", // Comments in Riot Channel
-    "Storage": "<Vec<StorageKey>", // Comments in Riot Channel
+    // "Storage": "Vec<StorageKey>", // Comments in Riot Channel
     "BalanceLockV1": {
-        "Id": "[u8;8]",
-        "Amount": "u128",
-        "Until": "u64",
-        "Reasons": "i8"
+        "id": "[u8;8]",
+        "amount": "u64",
+        "until": "u64",
+        "reasons": "i8"
     }, // Added for compatibility v1 
-    "BalanceLockV1<Balance,BlockNumber>": "BalanceLockV1", // Added for compatibility v1
-    "Locks": "Vec<BalanceLockV1>", // Added for compatibility v1
+    "BalanceLockV1<[u8;8],u64,u64,i8>": "BalanceLockV1", // Added for compatibility v1
+    "Locks": "Vec<BalanceLockV1<Vec<u8>,u64,u64,i8>>", // Added for compatibility v1
     "LockIdentifier": "[u8;8]", // Added for compatibility v1
     "AcceptAssignedStatus": "bool",
     "Account": "u64",
     "AccountOf": "Account",
     "AccountBalance": "i128",
     "AccountBalanceOf": "i128",
+    "AccountBalanceOf<T>": "i128",
     "ApprovalStatus": "u16",
     "Archival": "bool",
     "Balance": "u128",
@@ -34,7 +42,6 @@ export default {
     "ComparisonAmounts": "u128",
     "CurrencyBalanceOf": "Balance",
     "Data": "Vec<u8>",
-    // "DataHash": "Hash",
     "DeletedProject": "Hash",
     "Ed25519signature": "H512",
     "EncryptNonce": "u64",
@@ -79,7 +86,6 @@ export default {
     "RandomHashedData": "Hash",
     "ReasonCode": "u16",
     "ReasonCodeType": "u16",
-    // "RecordHash": "Hash",
     "RecordType": "u16",
     "StartOrEndBlockNumber": "u64",
     "Status": "u16",
