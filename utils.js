@@ -31,9 +31,12 @@ export const downloadFile = (content, fileName, contentType) => {
 
 // generateHash generates a hash based on a specific seed and algorithm 
 // if seed is not supplied a random UUID will be used as seed.
-export const generateHash = (seed, algo, asBytes) => {
+export const generateHash = (seed, algo, asBytes, stringify = true) => {
 	var hash = createHash(algo || 'sha256')
-	hash.update(!seed ? uuid.v1() : seed) // encoding parameter
+	seed = !seed ? uuid.v1() : (
+		stringify ? JSON.stringify(seed) : seed
+	)
+	hash.update(seed) // encoding parameter
 	hash.digest() // synchronously get result with encoding parameter
 	hash.end()
 	const bytesArr = hash.read()
