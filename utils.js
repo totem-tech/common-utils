@@ -31,9 +31,11 @@ export const downloadFile = (content, fileName, contentType) => {
 
 // generateHash generates a hash based on a specific seed and algorithm 
 // if seed is not supplied a random UUID will be used as seed.
-export const generateHash = (seed, algo, asBytes) => {
+export const generateHash = (seed, algo, asBytes, stringify = true) => {
 	var hash = createHash(algo || 'sha256')
-	seed = !seed ? uuid.v1() : (isStr(seed) ? seed : JSON.stringify(seed))
+	seed = !seed ? uuid.v1() : (
+		stringify ? JSON.stringify(seed) : seed
+	)
 	hash.update(seed) // encoding parameter
 	hash.digest() // synchronously get result with encoding parameter
 	hash.end()
@@ -54,7 +56,7 @@ export const isMap = x => x instanceof Map
 export const isObj = x => x !== null && !isArr(x) && typeof x === 'object'
 // Checks if argument is an Array of Objects. Each element type must be object, otherwise will return false.
 export const isObjArr = x => !isArr(x) ? false : !x.reduce((no, item) => no || !isObj(item), false)
-// Checks if argument is an Map of Objects. Each element type must be object, otherwise will return false.
+// Checks if argument is a Map of Objects. Each element type must be object, otherwise will return false.
 export const isObjMap = x => !isMap(x) ? false : !Array.from(x).reduce((no, item) => no || !isObj(item[1]), false)
 export const isPromise = x => x instanceof Promise
 export const isStr = x => typeof x === 'string'
@@ -172,12 +174,43 @@ export const arrSort = (arr, key, reverse, sortOriginal) => {
 	return arrReverse(sortedArr.sort((a, b) => a[key] > b[key] ? 1 : -1), reverse)
 }
 
+// arrUnique returns unique values in an array
 export const arrUnique = (arr = []) => Object.values(
 	arr.reduce((itemsObj, item) => {
 		itemsObj[item] = item
 		return itemsObj
 	}, {})
 )
+
+// className formats supplied value into CSS class name compatible string for React
+//
+// Params:
+// @value	string/object/array: if object supplied, 
+//							key		string: CSS class
+//							value	boolean: whether to include the key to the final output
+export const className = value => {
+	if (isStr(value)) return value
+	if (isObj(value)) {
+		// convert into an array
+		value = Object.keys(value).map(key => !!value[key] && key)
+	}
+	if (isArr(value)) return value.filter(Boolean).join(' ')
+}
+
+// objContains tests if an object contains all the supplied keys/properties
+//
+// Params:
+// @obj		object
+// @keys	array: list of required properties in the object
+//
+// Returns	boolean
+export const objContains = (obj = {}, keys = []) => {
+	if (!isObj(obj) || !isArr(keys)) return false
+	for (let i = 0; i < keys.length; i++) {
+		if (!obj.hasOwnProperty(keys[i])) return false
+	}
+	return true
+}
 
 // objCopy copies top level properties and returns another object
 //
@@ -206,6 +239,24 @@ export const objClean = (obj, keys) => !isObj(obj) || !isArr(keys) ? {} : keys.r
 	return cleanObj
 }, {})
 
+// objCreate constructs a new object with supplied key(s) and value(s)
+//
+// Params:
+// @key		string/array
+// @value	any/array
+//
+// Returns	object
+export const objCreate = (key, value) => {
+	const obj = {}
+	if (!isArr(key)) {
+		obj[key] = value
+		return obj
+	}
+	// arrays of keys and values supplied
+	value = !isArr(value) ? [value] : value
+	key.forEach(k => obj[k] = value[key])
+	return obj
+}
 // objHasKeys checks if all the supplied keys exists in a object
 //
 // Params:
@@ -439,15 +490,54 @@ export function setState(instance, key, value) {
 // @delay     number    : number of milliseconds to be delayed.
 //                        Default value: 50
 // @thisArg    object   : optional, makes sure callback is bounded to supplied object 
-export function deferred(callback, delay, thisArg) {
+export const deferred = (callback, delay, thisArg) => {
+	if (!isFn(callback)) return // nothing to do!!
 	let timeoutId
 	return function () {
 		const args = arguments
 		if (timeoutId) clearTimeout(timeoutId)
-		timeoutId = setTimeout(function () {
-			isFn(callback) && callback.apply(thisArg, args)
-		}, delay || 50)
+		timeoutId = setTimeout(() => callback.apply(thisArg, args), delay || 50)
 	}
+}
+
+// deferredPromise is the modified version of the `deferred()` function.
+// The main difference is that defferedPromise is to be used with promises and there is no specific time delay.
+// The last/only promise in an on-going promise pool will be handled.
+// The time when a supplied promise is resolved is irrelevant. 
+// Once a promise is handled all previous ones will be ignored and new ones will be added to the pool.
+//
+// Params: 	No parameter accepted
+// Returns function: callback accepts only one argument and it must be a promise
+/*  Explanation & example usage:
+	const df = deferredPromise()
+	const delayer = delay => new Promise(r => setTimeout(() => r(delay),  delay))
+	df(delayer(5000)).then(console.log)
+	df(delayer(500)).then(console.log)
+	df(delayer(1000)).then(console.log)
+
+	setTimeout(() => df(delayer(200)).then(console.log), 2000)
+ */
+export const deferredPromise = () => {
+	let ids = []
+	const then = (cb, id) => function () {
+		const index = ids.indexOf(id)
+		// Ignore if:
+		// 1. this is not the last promise or only promise
+		// 2. if a successor promise has already resolved/rejected
+		if (index === -1 || index !== ids.length - 1) return
+		// invalidates all unfinished previous promises
+		ids = []
+		cb.apply(null, arguments)
+	}
+	return promise => new Promise((resolve, reject) => {
+		const id = Symbol()
+		ids.push(id)
+		try {
+			promise.then(then(resolve, id), then(reject, id))
+		} catch (err) {
+			reject(err)
+		}
+	})
 }
 
 // textCapitalize capitalizes the first letter of the given string(s)
