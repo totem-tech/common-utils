@@ -1,4 +1,4 @@
-import { isDefined, isStr, mapSearch, isMap, isValidNumber, mapSort } from './utils'
+import { isDefined, isStr, mapSearch, isMap, isValidNumber, mapSort, isArr } from './utils'
 import { Bond } from 'oo7'
 import uuid from 'uuid'
 
@@ -49,14 +49,19 @@ export default class DataStorage {
         setTimeout(() => this.bond.changed(uuid.v1()))
     }
 
-    delete(key) {
+    // delete one or more items by key
+    delete(keys = []) {
         const data = this.getAll()
-        data.delete(key)
+        keys = isArr(keys) ? keys : [keys]
+        // nothing to do
+        if (!keys.length) return this
+        keys.forEach(key => data.delete(key))
+
         if (!this.disableCache || !this.name) {
             this.data = data
         }
         this.name && write(this.name, data)
-        this.size--
+        this.size = data.size
         this._updateBond()
         return this
     }
