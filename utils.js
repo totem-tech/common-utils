@@ -503,46 +503,6 @@ export const deferred = (callback, delay, thisArg) => {
 	}
 }
 
-// deferredPromise is the modified version of the `deferred()` function.
-// The main difference is that defferedPromise is to be used with promises and there is no specific time delay.
-// The last/only promise in an on-going promise pool will be handled.
-// The time when a supplied promise is resolved is irrelevant. 
-// Once a promise is handled all previous ones will be ignored and new ones will be added to the pool.
-//
-// Params: 	No parameter accepted
-// Returns function: callback accepts only one argument and it must be a promise
-/*  Explanation & example usage:
-	const df = deferredPromise()
-	const delayer = delay => new Promise(r => setTimeout(() => r(delay),  delay))
-	df(delayer(5000)).then(console.log)
-	df(delayer(500)).then(console.log)
-	df(delayer(1000)).then(console.log)
-
-	setTimeout(() => df(delayer(200)).then(console.log), 2000)
- */
-export const deferredPromise = () => {
-	let ids = []
-	const then = (cb, id) => function () {
-		const index = ids.indexOf(id)
-		// Ignore if:
-		// 1. this is not the last promise or only promise
-		// 2. if a successor promise has already resolved/rejected
-		if (index === -1 || index !== ids.length - 1) return
-		// invalidates all unfinished previous promises
-		ids = []
-		cb.apply(null, arguments)
-	}
-	return promise => new Promise((resolve, reject) => {
-		const id = Symbol()
-		ids.push(id)
-		try {
-			promise.then(then(resolve, id), then(reject, id))
-		} catch (err) {
-			reject(err)
-		}
-	})
-}
-
 // textCapitalize capitalizes the first letter of the given string(s)
 //
 // Params:
