@@ -15,22 +15,29 @@
 //
 // Returns      Promise (with 3 accessible boolean properties: pending, rejected, resolved)
 export default function PromisE(promise) {
-    if (!(promise instanceof Promise)) {
-        const args = [...arguments]
-        // supplied is not a promise instance
-        // check if it is an uninvoked async function
-        const isAsyncFn = promise instanceof (async () => { }).constructor
-        promise = isAsyncFn ? promise.apply(null, args.slice(1)) : new Promise(promise)
+    try {
+        if (!(promise instanceof Promise)) {
+            const args = [...arguments]
+            // supplied is not a promise instance
+            // check if it is an uninvoked async function
+            const isAsyncFn = promise instanceof (async () => { }).constructor
+            promise = isAsyncFn ? promise.apply(null, args.slice(1)) : new Promise(promise)
+        }
+        promise.resolved = false
+        promise.rejected = false
+        promise.pending = true
+        promise.then(() => {
+            promise.resolved = true
+            promise.pending = false
+        }, () => {
+            promise.rejected = true
+            promise.pending = false
+        })
+    } catch (err) {
+        promise = Promise.reject(err)
     }
-    promise.resolved = false
-    promise.rejected = false
-    promise.pending = true
-    promise.then(() => {
-        promise.resolved = true
-        promise.pending = false
-    }, () => {
-        promise.rejected = true
-        promise.pending = false
-    })
     return promise
+}
+PromisE.all = function () {
+    return PromisE(Promise.all(arguments))
 }

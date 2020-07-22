@@ -168,10 +168,12 @@ export const arrSearch = (arr, keyValues, matchExact, matchAll, ignoreCase, retu
 }
 
 // Returns new array sorted by key. If sortOriginal is 'truty', existing array will be sorted and returned.
-export const arrSort = (arr, key, reverse, sortOriginal) => {
+export const arrSort = (arr, key, reverse = false, sortOriginal = false) => {
 	if (!isObjArr(arr)) return []
-	const sortedArr = sortOriginal ? arr : arr.map(x => objCopy(x, {}))
-	return arrReverse(sortedArr.sort((a, b) => a[key] > b[key] ? 1 : -1), reverse)
+	const sortedArr = (sortOriginal ? arr : [...arr])
+		.sort((a, b) => a[key] > b[key] ? 1 : -1)
+
+	return reverse ? arrReverse(sortedArr, true) : sortedArr
 }
 
 // arrUnique returns unique values in an array
@@ -433,7 +435,8 @@ export const searchRanked = (searchKeys = ['text']) => (options, searchQuery) =>
 		}).filter(r => !!r)
 		return arrSort(matches, 'matchIndex').map(x => options[x.index])
 	}
-	return arrSort(searchKeys.reduce((result, key) => result.concat(search(key)), []), 'text')
+
+	return searchKeys.reduce((result, key) => result.concat(search(key)), [])
 }
 
 // Sort Array or Map
