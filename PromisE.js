@@ -1,3 +1,5 @@
+import { isAsyncFn, isPromise } from "./utils"
+
 // PromisE attempts to solve a simple problem of Promise status (resolved/rejected) not being accessible externally.
 // Also compatible with async functions
 //
@@ -20,10 +22,13 @@ export default function PromisE(promise) {
             const args = [...arguments]
             // supplied is not a promise instance
             // check if it is an uninvoked async function
-            const isAsyncFn = promise instanceof (async () => { }).constructor
-            promise = isAsyncFn ? promise.apply(null, args.slice(1)) : new Promise(promise)
+            promise = isPromise(promise) ? promise : (
+                isAsyncFn(promise) ? promise.apply(null, args.slice(1)) : (
+                    isFn(promise) ? new Promise(promise) : Promise.resolve(promise)
+                )
+            )
         } catch (err) {
-            // invalid @promise arg supplied
+            // something unexpected happened!
             promise = Promise.reject(err)
         }
     }
@@ -54,8 +59,8 @@ PromisE.timeout = (promise, timeout = 0) => {
     return PromisE(Promise.race([PromisE(promise), timeoutPromise]))
 }
 
-// PromisE.deferred is the modified version of the `deferred()` function.
-// The main difference is that defferedPromise is to be used with promises and there is no specific time delay.
+// PromisE.deferred is the adaptation of the `deferred()` function tailored for Promises.
+// The main difference is that PromisE.deferred is to be used with promises and there is no specific time delay.
 // The last/only promise in an on-going promise pool will be handled.
 // The time when a supplied promise is resolved is irrelevant. 
 // Once a promise is handled all previous ones will be ignored and new ones will be added to the pool.

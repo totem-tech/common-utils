@@ -47,6 +47,7 @@ export const generateHash = (seed, algo, asBytes, stringify = true) => {
  * Data validation
  */
 export const isArr = x => Array.isArray(x)
+export const isAsyncFn = x => x instanceof (async () => { }).constructor
 export const isBool = x => typeof x === 'boolean'
 export const isBond = x => x instanceof Bond
 export const isDefined = x => x !== undefined && x !== null
