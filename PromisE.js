@@ -1,4 +1,4 @@
-import { isAsyncFn, isPromise } from "./utils"
+import { isAsyncFn, isPromise, isFn } from "./utils"
 
 // PromisE attempts to solve a simple problem of Promise status (resolved/rejected) not being accessible externally.
 // Also compatible with async functions
