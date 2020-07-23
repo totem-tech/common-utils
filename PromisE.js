@@ -1,4 +1,5 @@
 import { isAsyncFn, isPromise, isFn } from "./utils"
+import { isValidElement } from "react"
 
 // PromisE attempts to solve a simple problem of Promise status (resolved/rejected) not being accessible externally.
 // Also compatible with async functions
@@ -50,13 +51,20 @@ PromisE.all = function () {
 // PromisE.timeout times out a promise after specified timeout duration.
 //
 // Params:
-// @promise     promise/function: any argument that is valid for PromisE()
-// @timeout     integer: timeout duration in milliseconds
+// @...promise  promise/function: one or more promises as individual arguments
+// @timeout     integer: <last argument> timeout duration in milliseconds
 //
 // Returns      PromisE
-PromisE.timeout = (promise, timeout = 0) => {
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('Timed out'), timeout))
-    return PromisE(Promise.race([PromisE(promise), timeoutPromise]))
+PromisE.timeout = function () {
+    const args = [...arguments]
+    const timeout = args.slice(-1)
+    // use all arguments except last one
+    const promiseArgs = args.slice(0, args.length - 1)
+    const promise = PromisE.all.apply(null, [...promiseArgs])
+    const timeoutPromise = new Promise(
+        (_, reject) => setTimeout(() => reject('Timed out'), timeout || 0)
+    )
+    return PromisE(Promise.race([promise, timeoutPromise].filter(Boolean)))
 }
 
 // PromisE.deferred is the adaptation of the `deferred()` function tailored for Promises.
