@@ -15,27 +15,26 @@
 //
 // Returns      Promise (with 3 accessible boolean properties: pending, rejected, resolved)
 export default function PromisE(promise) {
-    try {
-        if (!(promise instanceof Promise)) {
+    if (!(promise instanceof Promise)) {
+        try {
             const args = [...arguments]
             // supplied is not a promise instance
             // check if it is an uninvoked async function
             const isAsyncFn = promise instanceof (async () => { }).constructor
             promise = isAsyncFn ? promise.apply(null, args.slice(1)) : new Promise(promise)
+        } catch (err) {
+            // invalid @promise arg supplied
+            promise = Promise.reject(err)
         }
-        promise.resolved = false
-        promise.rejected = false
-        promise.pending = true
-        promise.then(() => {
-            promise.resolved = true
-            promise.pending = false
-        }, () => {
-            promise.rejected = true
-            promise.pending = false
-        })
-    } catch (err) {
-        promise = Promise.reject(err)
     }
+
+    promise.resolved = false
+    promise.rejected = false
+    promise.pending = true
+    promise.then(
+        () => promise.resolved = true,
+        () => promise.rejected = true
+    ).finally(() => promise.pending = false)
     return promise
 }
 
@@ -77,7 +76,7 @@ PromisE.deferred = () => {
     const done = (cb, id) => function () {
         const index = ids.indexOf(id)
         // Ignore if:
-        // 1. this is not the last promise or only promise
+        // 1. this is not the only/last promise
         // 2. if a successor promise has already resolved/rejected
         if (index === -1 || index !== ids.length - 1) return
         // invalidates all unfinished previous promises
