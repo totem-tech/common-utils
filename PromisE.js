@@ -60,7 +60,7 @@ PromisE.all = function () {
 //                          30000,
 //                        )
 //                      ```
-//                      Result: [1]
+//                      Result: 1
 //
 //                  Example 2: multiple promises
 //                      ```
@@ -71,7 +71,7 @@ PromisE.all = function () {
 //                          30000, 
 //                      )
 //                      ```
-//                      Result: [[ 1, 2, 3 ]]
+//                      Result: [ 1, 2, 3 ]
 //
 // Returns      PromisE
 PromisE.timeout = function () {
