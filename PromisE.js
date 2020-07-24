@@ -52,19 +52,43 @@ PromisE.all = function () {
 //
 // Params:
 // @...promise  promise/function: one or more promises as individual arguments
-// @timeout     integer: <last argument> timeout duration in milliseconds
+// @timeout     integer: <last argument> timeout duration in milliseconds. If not supplied will fail immediately.
+//                  Example 1: multiple promises
+//                      ```
+//                      PromisE.timeout(
+//                          Promise.resolve(1), 
+//                          30000,
+//                        )
+//                      ```
+//                      Result: [1]
+//
+//                  Example 2: multiple promises
+//                      ```
+//                      PromisE.timeout(
+//                          Promise.resolve(1), 
+//                          Promise.resolve(2), 
+//                          Promise.resolve(3), 
+//                          30000, 
+//                      )
+//                      ```
+//                      Result: [[ 1, 2, 3 ]]
 //
 // Returns      PromisE
 PromisE.timeout = function () {
     const args = [...arguments]
-    const timeout = args.slice(-1)
+    const timeout = args.slice(-1) || 0
     // use all arguments except last one
     const promiseArgs = args.slice(0, args.length - 1)
-    const promise = PromisE.all.apply(null, [...promiseArgs])
-    const timeoutPromise = new Promise(
-        (_, reject) => setTimeout(() => reject('Timed out'), timeout || 0)
+    const promise = promiseArgs.length === 1 ? PromisE(promiseArgs[0]) : PromisE.all.apply(null, [...promiseArgs])
+    const timeoutPromise = new PromisE((_, reject) =>
+        // only reject if it's still pending
+        setTimeout(() => promise.pending && reject('Timed out'), timeout)
     )
-    return PromisE(Promise.race([promise, timeoutPromise].filter(Boolean)))
+    const resultPromise = PromisE(Promise.race([promise, timeoutPromise]))
+    // attach the timoutPromise so that it can be used to determined whether the error was 
+    // due to timeout or request failure by checking `timtoutPromise.rejected === true`
+    resultPromise.timeout = timeoutPromise
+    return resultPromise
 }
 
 // PromisE.deferred is the adaptation of the `deferred()` function tailored for Promises.
