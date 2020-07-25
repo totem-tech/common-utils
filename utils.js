@@ -47,6 +47,8 @@ export const generateHash = (seed, algo, asBytes, stringify = true) => {
  * Data validation
  */
 export const isArr = x => Array.isArray(x)
+// isArr2D checks if argument is a 2-dimentional array
+export const isArr2D = x => isArr(x) && isArr(x[0])
 export const isAsyncFn = x => x instanceof (async () => { }).constructor
 export const isBool = x => typeof x === 'boolean'
 export const isBond = x => x instanceof Bond

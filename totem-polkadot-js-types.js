@@ -54,7 +54,6 @@ export default {
     "PostingPeriod": "u16",
     "PostingIndex": "u128",
     "ProjectHash": "Hash",
-    "ProjectHashRef": "H256",
     "ProjectStatus": "u16",
     "buyOrSell": "u16",
     "amount": "i128",
@@ -119,7 +118,7 @@ export default {
     "BannedStruct<BanStatus,ReasonCodeStruct>": "BannedStruct",
     "Timekeeper": {
         "worker": "AccountId",
-        "project_hash": "ProjectHashRef",
+        "project_hash": "Hash",
         "total_blocks": "NumberOfBlocks",
         "locked_status": "LockStatus",
         "locked_reason": "ReasonCodeStruct",
@@ -130,5 +129,8 @@ export default {
         "end_block": "StartOrEndBlockNumber",
         "nr_of_breaks": "NumberOfBreaks"
     },
-    "Timekeeper<AccountId,ProjectHashRef,NumberOfBlocks,LockStatus,\nStatusOfTimeRecord,ReasonCodeStruct,PostingPeriod,StartOrEndBlockNumber,\nNumberOfBreaks>": "Timekeeper"
+    "Timekeeper<AccountId,Hash,NumberOfBlocks,LockStatus,\nStatusOfTimeRecord,ReasonCodeStruct,PostingPeriod,StartOrEndBlockNumber,\nNumberOfBreaks>": "Timekeeper",
+
+    // deperecated
+    "ProjectHashRef": "H256"
 }
