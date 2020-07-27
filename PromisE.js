@@ -88,6 +88,7 @@ PromisE.timeout = function () {
     // attach the timoutPromise so that it can be used to determined whether the error was 
     // due to timeout or request failure by checking `timtoutPromise.rejected === true`
     resultPromise.timeout = timeoutPromise
+    resultPromise.promise = promise
     return resultPromise
 }
 
