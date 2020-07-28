@@ -31,7 +31,10 @@ export const ss58Encode = address => fallbackIfFails(encodeAddress, [address])
 //
 // Returns      string/null: null if invalid address supplied
 export const ss58Decode = address => fallbackIfFails(decodeAddress, [address])
-export const hexToBytes = (hex, bitLength) => fallbackIfFails(hexToU8a, [hex, bitLength])
+export const hexToBytes = (hex, bitLength) => fallbackIfFails(hexToU8a, [
+    isStr(hex) && !hex.startsWith('0x') ? '0x' + hex : hex,
+    bitLength
+])
 export const bytesToHex = bytes => fallbackIfFails(hexToString, [bytes])
 export const decodeUTF8 = decodeUTF81
 export const encodeUTF8 = encodeUTF81
