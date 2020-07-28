@@ -1,41 +1,52 @@
 import {
-    ss58Encode as ss58Encode1,
-    ss58Decode as ss58Decode1
-} from 'oo7-substrate/src/ss58'
-import {
-    hexToBytes as hexToBytes1,
-    bytesToHex as bytesToHex1
-} from 'oo7-substrate/src/utils.js'
-import {
     decodeUTF8 as decodeUTF81,
     encodeUTF8 as encodeUTF81,
     encodeBase64 as encodeBase641,
     decodeBase64 as decodeBase641
 } from "tweetnacl-util"
 import { isArr, isBond, isUint8Arr, isStr, isObj } from '../utils/utils'
+import { hexToString, hexToU8a } from '@polkadot/util'
+import { checkAddress, decodeAddress, encodeAddress, setSS58Format } from '@polkadot/util-crypto'
 
-// For easy access and placeholder for some functions to be copied here
-export const ss58Encode = ss58Encode1
-export const ss58Decode = ss58Decode1
-export const hexToBytes = hexToBytes1
-export const bytesToHex = bytesToHex1
+// returns null if function call throws error
+const fallbackIfFails = (func, args = [], fallbackValue = null) => {
+    try {
+        return func.apply(null, args)
+    } catch (e) {
+        return fallbackValue
+    }
+}
+
+// convert identity/address from bytes to string
+// 
+// Params: 
+// @address     Uint8Array
+//
+// Returns      string/null: null if invalid address supplied
+export const ss58Encode = address => fallbackIfFails(encodeAddress, [address])
+// convert identity/address from string to bytes
+// 
+// Params: 
+// @address     string
+//
+// Returns      string/null: null if invalid address supplied
+export const ss58Decode = address => fallbackIfFails(decodeAddress, [address])
+export const hexToBytes = (hex, bitLength) => fallbackIfFails(hexToU8a, [hex, bitLength])
+export const bytesToHex = bytes => fallbackIfFails(hexToString, [bytes])
 export const decodeUTF8 = decodeUTF81
 export const encodeUTF8 = encodeUTF81
 export const encodeBase64 = encodeBase641
 export const decodeBase64 = decodeBase641
 
-
 // addressToStr checks if an address is valid. If valid, converts to string otherwise, returns empty string
 //
 // Params:
-// @address     string/bond
-export const addressToStr = address => {
-    if (isUint8Arr(address)) {
-        address = ss58Encode(address)
-        return address || ''
-    }
-    return isStr(address) && ss58Decode(address) ? address : ''
-}
+// @address     string/bytes
+export const addressToStr = address => fallbackIfFails(
+    ss58Encode, // first attempt to convert bytes to string
+    [address],
+    fallbackIfFails(ss58Encode, [address]) && address || '',
+)
 // Convert CSV/TSV (Comma/Tab Seprated Value) string to an Array
 //
 // Params:
@@ -99,18 +110,18 @@ export const csvToMap = (str, columnTitles, separator = ',') => {
     return result
 }
 
-// hashToBytes converts hash to bytes array. Will return 0x0 if value is unsupported type.
-//
-// Params:
-// @hash    string/Uint8Array/Bond
-//
-// Returns Uint8Array
-export const hashToBytes = hash => isUint8Arr(hash) ? hash : hexToBytes(isBond(hash) ? hash._value : hash)
+// // hashToBytes converts hash to bytes array. Will return 0x0 if value is unsupported type.
+// //
+// // Params:
+// // @hash    string/Uint8Array
+// //
+// // Returns Uint8Array
+// export const hashToBytes = hex => isUint8Arr(hex) ? hex : hexToBytes(isBond(hex) ? hex._value : hex)
 
 // hashToStr converts given hash to string prefixed by '0x'.  Will return '0x0', if not invalid hash.
 //
 // Params:
-// @hash    string/Uint8Array/Bond
+// @hash    string/Uint8Array
 //
 // Returns string
 export const hashToStr = hash => {

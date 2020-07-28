@@ -1,7 +1,7 @@
 import { ApiPromise, WsProvider } from '@polkadot/api'
 import Keyring from '@polkadot/keyring/'
 import createPair from '@polkadot/keyring/pair'
-import { isArr, isObj, isValidNumber } from './utils'
+import { isFn, isArr, isDefined, isObj, isStr, isValidNumber } from '../utils/utils'
 
 const TYPE = 'sr25519'
 const _keyring = new Keyring({ type: TYPE })
@@ -101,44 +101,81 @@ export const keyring = {
     remove: address => keyring.contains(address) && !_keyring.removePair(address),
 
 }
-// transfer funds between accounts
+
+// query makes storage API calls using PolkadotJS. All values returned will be sanitised.
 //
 // Params:
-// @toAddress       string: destination identity/address
-// @secretKey       string: address (must have already been added to keyring) or secretKey or seed (type: 'sr25519')
-// @publicKey       string: if falsy, @secretkey will be assumed to be a seed or an address 
-// @api             object: PolkadkRingot API from `ApiPromise`
+// @api     ApiRx: API instance created using PolkadotJS or @connect()
+// @func    string: path to the PolkadotJS API function as a string. Eg: 'api.rpc.system.health'
+// @args    array: arguments to be supplied when invoking the API function.
+//              To subscribe to the API supply a callback function as the last item in the array.
+// @print   boolean: if true, will print the result of the query
 //
-// Returns promise: will resolve to transaction hash
-export const transfer = async (toAddress, amount, secretKey, publicKey, api) => {
-    if (!api) {
-        // config.nodes wasn't set => return empty promise that rejects immediately
-        if (config.nodes.length === 0) throw new Error('Unable to connect: node URL not set')
-        const res = await connect(config.nodes[0], config.types, false)
-        api = res.api
-        console.log('Polkadot connected', res)
-    }
+// Returns  function/any: If callback is supplied in @args, will return the unsubscribe function.
+//              Otherwise, value of the query will be returned
+export const query = async (api, func, args = [], multi = false, print = false, invalidApiMsg, invalidMutliArgsMsg) => {
+    if (!isObj(api)) return
+    // **** keep { api } **** It is expected to be used with eval()
+    if (!func || func === 'api') return api
+    // add .multi if required
+    if (isStr(func) && multi && !func.endsWith('.multi')) func += '.multi'
 
-    let pair
-    if (!!publicKey) {
-        // public and private key supplied
-        pair = createPair(TYPE, { secretKey, publicKey })
-        _keyring.addPair(pair)
-    } else {
-        try {
-            // test if @secretKey is an address already added to the keyring
-            pair = _keyring.getPair(secretKey)
-        } catch (_) {
-            // assumes @secretKey is a seed/uri
-            pair = _keyring.addFromUri(secretKey)
+    const fn = eval(func)
+    if (!fn) throw new Error(invalidApiMsg || 'Invalid API function', func)
+
+    args = isArr(args) || !isDefined(args) ? args : [args]
+    multi = isFn(fn) && !!multi
+    const sanitise = x => JSON.parse(JSON.stringify(x)) // get rid of jargon
+    const cb = args[args.length - 1]
+    const isSubscribe = isFn(cb) && isFn(fn)
+
+    if (isSubscribe) {
+        // only add interceptor to process result
+        args[args.length - 1] = result => {
+            result = sanitise(result)
+            print && console.log(func, result)
+            cb.call(null, result)
         }
     }
-    const sender = _keyring.getPair(pair.address)
-    console.log('Polkadot: transfer to ', { address: toAddress, amount })
-    const tx = api.tx.balances.transfer(toAddress, amount)
-    return await signAndSend(api, sender.address, tx)
+
+    // For multi query arguments needs to be constructs as 2D Array.
+    // If only one argument in @args is supplied, assume that it is a 2D array.
+    // Otherwise, construct a 2D array as required by 
+    const len = isSubscribe ? 2 : 1
+    if (multi && !isFn(args[0]) && args.length > len) {
+        try {
+            // remove subscription callback before processing arguments
+            let interceptor
+            if (isSubscribe) {
+                interceptor = args.slice(-1)[0]
+                args = args.slice(0, -1)
+            }
+            // construct a 2D array
+            args = [
+                args[0].map((_, i) =>
+                    args.map(ar => ar[i])
+                )
+            ]
+            // re-add subscription callback
+            if (isSubscribe) args.push(interceptor)
+
+        } catch (err) {
+            throw `${invalidMutliArgsMsg || 'Failed to process arguments for multi-query'} ${err}`
+        }
+    }
+    const result = isFn(fn) ? await fn.apply(null, args) : fn
+    !isSubscribe && print && console.log(JSON.stringify(result, null, 4))
+    return isSubscribe ? result : sanitise(result)
 }
 
+// sign and send an already instantiated transaction
+//
+// Params:
+// @api         ApiRx: API instance created using PolkadotJS or @connect()
+// @address     string: account holder identity
+// @tx          TxRx: an already instantiated transaction created using the @api
+//
+// Returns      promise 
 export const signAndSend = async (api, address, tx) => {
     const account = _keyring.getPair(address)
     let nonce = await api.query.system.accountNonce(address)
@@ -175,6 +212,44 @@ export const signAndSend = async (api, address, tx) => {
             reject(err)
         }
     })
+}
+
+// transfer funds between accounts
+//
+// Params:
+// @toAddress       string: destination identity/address
+// @secretKey       string: address (must have already been added to keyring) or secretKey or seed (type: 'sr25519')
+// @publicKey       string: if falsy, @secretkey will be assumed to be a seed or an address 
+// @api             object: PolkadkRingot API from `ApiPromise`
+//
+// Returns promise: will resolve to transaction hash
+export const transfer = async (toAddress, amount, secretKey, publicKey, api) => {
+    if (!api) {
+        // config.nodes wasn't set => return empty promise that rejects immediately
+        if (config.nodes.length === 0) throw new Error('Unable to connect: node URL not set')
+        const res = await connect(config.nodes[0], config.types, false)
+        api = res.api
+        console.log('Polkadot connected', res)
+    }
+
+    let pair
+    if (!!publicKey) {
+        // public and private key supplied
+        pair = createPair(TYPE, { secretKey, publicKey })
+        _keyring.addPair(pair)
+    } else {
+        try {
+            // test if @secretKey is an address already added to the keyring
+            pair = _keyring.getPair(secretKey)
+        } catch (_) {
+            // assumes @secretKey is a seed/uri
+            pair = _keyring.addFromUri(secretKey)
+        }
+    }
+    const sender = _keyring.getPair(pair.address)
+    console.log('Polkadot: transfer to ', { address: toAddress, amount })
+    const tx = api.tx.balances.transfer(toAddress, amount)
+    return await signAndSend(api, sender.address, tx)
 }
 
 export default {
