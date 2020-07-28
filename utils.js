@@ -1,7 +1,5 @@
 import { Bond } from 'oo7'
-import uuid from 'uuid'
-import createHash from 'create-hash/browser'
-import { hashToStr } from './convert'
+import { blake2AsHex } from '@polkadot/util-crypto'
 
 // trim texts
 export const clearClutter = x => x.split('\n').map(y => y.trim()).filter(Boolean).join(' ')
@@ -29,18 +27,16 @@ export const downloadFile = (content, fileName, contentType) => {
 	a.click()
 }
 
-// generateHash generates a hash based on a specific seed and algorithm 
-// if seed is not supplied a random UUID will be used as seed.
-export const generateHash = (seed, algo, asBytes, stringify = true) => {
-	var hash = createHash(algo || 'sha256')
-	seed = !seed ? uuid.v1() : (
-		stringify ? JSON.stringify(seed) : seed
-	)
-	hash.update(seed) // encoding parameter
-	hash.digest() // synchronously get result with encoding parameter
-	hash.end()
-	const bytesArr = hash.read()
-	return asBytes ? bytesArr : hashToStr(bytesArr)
+export const generateHash = (seed, algo = 'blake2', bitLength = 256) => {
+	switch (algo) {
+		case 'blake2':
+			seed = isUint8Arr(seed) ? seed : (
+				isStr(seed) ? seed : JSON.stringify(seed)
+			)
+			return blake2AsHex(seed, bitLength)
+		// ToDo: add support for other algo from Polkadot/utils-crypto
+	}
+	return // unsuporrted
 }
 
 /*
