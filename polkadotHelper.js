@@ -1,7 +1,7 @@
 import { ApiPromise, WsProvider } from '@polkadot/api'
 import Keyring from '@polkadot/keyring/'
 import createPair from '@polkadot/keyring/pair'
-import { isFn, isArr, isDefined, isObj, isStr, isValidNumber } from '../utils/utils'
+import { isFn, isArr, isDefined, isObj, isStr, isValidNumber, isArr2D } from '../utils/utils'
 
 const TYPE = 'sr25519'
 const _keyring = new Keyring({ type: TYPE })
@@ -151,7 +151,8 @@ export const query = async (api, func, args = [], multi = false, print = false, 
                 args = args.slice(0, -1)
             }
             // construct a 2D array
-            args = [
+
+            args = !isArr2D(args) ? [args] : [
                 args[0].map((_, i) =>
                     args.map(ar => ar[i])
                 )
