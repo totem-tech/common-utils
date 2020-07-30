@@ -114,18 +114,17 @@ export const keyring = {
 // Returns  function/any: If callback is supplied in @args, will return the unsubscribe function.
 //              Otherwise, value of the query will be returned
 export const query = async (api, func, args = [], multi = false, print = false, invalidApiMsg, invalidMutliArgsMsg) => {
-    if (!isObj(api)) return
-    // **** keep { api } **** It is expected to be used with eval()
-    if (!func || func === 'api') return api
+    const isApiValid = api instanceof ApiPromise
+    if (!isApiValid) throw new Error('ApiPromise instance required')
+    if (!func) return api
     // add .multi if required
     if (isStr(func) && multi && !func.endsWith('.multi')) func += '.multi'
 
     const fn = eval(func)
-    if (!fn) throw new Error(invalidApiMsg || 'Invalid API function', func)
+    if (!fn) throw new Error(`${invalidApiMsg || 'Invalid API function'}: ${func}`)
 
     args = isArr(args) || !isDefined(args) ? args : [args]
     multi = isFn(fn) && !!multi
-    const sanitise = x => JSON.parse(JSON.stringify(x)) // get rid of jargon
     const cb = args[args.length - 1]
     const isSubscribe = isFn(cb) && isFn(fn)
 
@@ -151,7 +150,6 @@ export const query = async (api, func, args = [], multi = false, print = false, 
                 args = args.slice(0, -1)
             }
             // construct a 2D array
-
             args = !isArr2D(args) ? [args] : [
                 args[0].map((_, i) =>
                     args.map(ar => ar[i])
@@ -169,6 +167,8 @@ export const query = async (api, func, args = [], multi = false, print = false, 
     return isSubscribe ? result : sanitise(result)
 }
 
+export const sanitise = x => JSON.parse(JSON.stringify(x)) // get rid of jargon
+
 // sign and send an already instantiated transaction
 //
 // Params:
@@ -177,14 +177,13 @@ export const query = async (api, func, args = [], multi = false, print = false, 
 // @tx          TxRx: an already instantiated transaction created using the @api
 //
 // Returns      promise 
-export const signAndSend = async (api, address, tx) => {
+export const signAndSend = async (api, address, tx, nonce) => {
     const account = _keyring.getPair(address)
-    let nonce = await api.query.system.accountNonce(address)
-    nonce = parseInt(nonce)
+    nonce = nonce || await query(api, api.query.system.accountNonce, address)
     if (nonces[address] && nonces[address] >= nonce) {
         nonce = nonces[address] + 1
     }
-    nonces[address] = nonce
+    nonces[address] = nonce - 20
     console.log('Polkadot: initiating transation', { nonce })
     // let includedInBlock = false
     return await new Promise(async (resolve, reject) => {
@@ -201,7 +200,7 @@ export const signAndSend = async (api, address, tx) => {
                 // there is a nonce gap that need to be filled. 
                 if (!status.isFinalized && status.type !== 'Future') return
                 const hash = status.asFinalized.toHex()
-                const eventsArr = JSON.parse(JSON.stringify(events)).map(x => x.event) // get rid of all the jargon
+                const eventsArr = sanitise(events).map(x => x.event) // get rid of all the jargon
                 // find the event that has data
                 const { data: eventData } = eventsArr.find(event => event.data && event.data.length) || {}
                 console.log(`Polkadot: Completed at block hash: ${hash}`, { eventData })
@@ -249,7 +248,7 @@ export const transfer = async (toAddress, amount, secretKey, publicKey, api) => 
     }
     const sender = _keyring.getPair(pair.address)
     console.log('Polkadot: transfer to ', { address: toAddress, amount })
-    const tx = api.tx.balances.transfer(toAddress, amount)
+    const tx = await api.tx.balances.transfer(toAddress, amount)
     return await signAndSend(api, sender.address, tx)
 }
 
@@ -258,5 +257,7 @@ export default {
     connect,
     setDefaultConfig,
     transfer,
-    signAndSend
+    query,
+    sanitise,
+    signAndSend,
 }
