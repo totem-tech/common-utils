@@ -1,9 +1,3 @@
-import {
-    decodeUTF8 as decodeUTF81,
-    encodeUTF8 as encodeUTF81,
-    encodeBase64 as encodeBase641,
-    decodeBase64 as decodeBase641
-} from "tweetnacl-util"
 import { isArr, isBond, isStr, isObj, isUint8Arr } from '../utils/utils'
 import { hexToString, hexToU8a, stringToU8a, u8aToString, u8aToHex } from '@polkadot/util'
 import { checkAddress, decodeAddress, encodeAddress, setSS58Format } from '@polkadot/util-crypto'
@@ -22,6 +16,7 @@ const fallbackIfFails = (func, args = [], fallbackValue = null) => {
 // @address     Uint8Array
 //
 // Returns      string/null: null if invalid address supplied
+
 export const ss58Encode = address => fallbackIfFails(encodeAddress, [address])
 // convert identity/address from string to bytes
 // 
@@ -29,18 +24,19 @@ export const ss58Encode = address => fallbackIfFails(encodeAddress, [address])
 // @address     string
 //
 // Returns      string/null: null if invalid address supplied
+
 export const ss58Decode = address => fallbackIfFails(decodeAddress, [address])
+
 export const hexToBytes = (hex, bitLength) => isUint8Arr(hex) ? hex : fallbackIfFails(hexToU8a, [
     isStr(hex) && !hex.startsWith('0x') ? '0x' + hex : hex,
     bitLength
 ])
+
 export const bytesToHex = bytes => fallbackIfFails(u8aToHex, [bytes])
 export const decodeUTF8 = stringToU8a // ToDo: deprecate
 export const encodeUTF8 = u8aToString // ToDo: deprecate
 export const u8aToStr = u8aToString
 export const strToU8a = stringToU8a
-export const encodeBase64 = encodeBase641
-export const decodeBase64 = decodeBase641
 
 // addressToStr checks if an address is valid. If valid, converts to string otherwise, returns empty string
 //
@@ -63,7 +59,8 @@ export const addressToStr = address => fallbackIfFails(
 //
 // Returns          Map: exactly the same number of items as the number of columns.
 //                      Each item will be an array consisting of all column cells.
-//                      If @columnTitles not supplied, first cell of each column will be used as key and be excluded from item value array.
+//                      If @columnTitles not supplied, first cell of each column will be used as key
+//                      and be excluded from item value array.
 export const csvToArr = (str, columnTitles, separator = ',') => {
     const lines = str.split('\n').map(line => line.replace('\r', ''))
     const ignoreFirst = !isArr(columnTitles) || columnTitles.length === 0
@@ -94,7 +91,8 @@ export const csvToArr = (str, columnTitles, separator = ',') => {
 //
 // Returns          Map: exactly the same number of items as the number of columns.
 //                      Each item will be an array consisting of all column cells.
-//                      If @columnTitles not supplied, first cell of each column will be used as key and be excluded from item value array.
+//                      If @columnTitles not supplied, first cell of each column will be used as key 
+//                      and be excluded from item value array.
 export const csvToMap = (str, columnTitles, separator = ',') => {
     const result = new Map()
     const lines = str.split('\n').map(line => line.replace('\r', ''))
@@ -140,9 +138,7 @@ export default {
     bytesToHex,
     csvToArr,
     csvToMap,
-    decodeBase64,
     decodeUTF8,
-    encodeBase64,
     encodeUTF8,
     hashToStr,
     hexToBytes,
