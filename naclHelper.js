@@ -117,15 +117,29 @@ export const newSignature = (message = '', publicKey = '', secretKey = '', asHex
  */
 export const verifySignature = naclVerify
 
-export const keyInfoFromKeyData = (keyData = '') => {
-    let bytes = hexToBytes(keyData)
-    if (keyData.length > 192) {
-        // Polkadot keyring encoded identity
-        bytes = new Uint8Array([
-            ...bytes.slice(16, 80),
-            ...bytes.slice(85)
+/**
+ * @name    keyDateFromEncoded
+ * @summary converts Polkadot keypair `encoded` hex to `oo7` style keyData, if required
+ * 
+ * @param {Uint8Array} encoded 
+ * @param {Boolean} asHex default: false
+ * 
+ * @returns Uint8Array/String
+ */
+export const keyDataFromEncoded = (encoded, asHex = false) => {
+    encoded = isUint8Arr(encoded) ? encoded : hexToBytes(encoded)
+    if (encoded.length > 96) {
+        // Polkadot keypair encoded identity
+        encoded = new Uint8Array([
+            ...encoded.slice(16, 80),
+            ...encoded.slice(85)
         ])
     }
+    return asHex ? encoded : bytesToHex(encoded)
+}
+
+export const keyInfoFromKeyData = (keyData = '') => {
+    let bytes = keyDataFromEncoded(keyData, false)
     return {
         address: ss58Encode(bytes.slice(64, 96)),
         publicKey: bytes.slice(64, 96),
@@ -133,16 +147,18 @@ export const keyInfoFromKeyData = (keyData = '') => {
     }
 }
 
-export const encryptionKeypair = (keyDataBytes, asHex = true) => {
-    const pair = naclBoxKeypairFromSecret(blake2b(keyDataBytes, null, 32))
+export const encryptionKeypair = (keyData, asHex = true) => {
+    const bytes = keyDataFromEncoded(keyData)
+    const pair = naclBoxKeypairFromSecret(blake2b(bytes, null, 32))
     return !asHex ? pair : {
         publicKey: bytesToHex(pair.publicKey),
         secretKey: bytesToHex(pair.secretKey),
     }
 }
 
-export const signingKeyPair = (keyDataBytes, asHex = true) => {
-    const pair = naclKeypairFromSeed(blake2b(keyDataBytes, null, 32))
+export const signingKeyPair = (keyData, asHex = true) => {
+    const bytes = keyDataFromEncoded(keyData)
+    const pair = naclKeypairFromSeed(blake2b(bytes, null, 32))
     return !asHex ? pair : {
         publicKey: bytesToHex(pair.publicKey),
         secretKey: bytesToHex(pair.secretKey),

@@ -45,7 +45,8 @@ export const strToU8a = stringToU8a
 export const addressToStr = address => fallbackIfFails(
     ss58Encode, // first attempt to convert bytes to string
     [address],
-    fallbackIfFails(ss58Encode, [address]) && address || '',
+    // if fails check if address is a valid string
+    fallbackIfFails(ss58Decode, [address]) && address || '',
 )
 
 // Convert CSV/TSV (Comma/Tab Seprated Value) string to an Array
@@ -113,26 +114,6 @@ export const csvToMap = (str, columnTitles, separator = ',') => {
     return result
 }
 
-
-// ToDO: deprecate
-// hashToStr converts given hash to string prefixed by '0x'.  Will return '0x0', if not invalid hash.
-//
-// Params:
-// @hash    string/Uint8Array
-//
-// Returns string
-export const hashToStr = hash => {
-    hash = isBond(hash) ? hash._value : hash
-    hash = isObj(hash) && hash.raw ? hash.raw : hash
-    try {
-        if (isStr(hash) && hexToBytes(hash)) return (hash.startsWith('0x') ? '' : '0x') + hash
-        return '0x' + bytesToHex(hash)
-    } catch (e) {
-        return '0x0'
-    }
-}
-
-
 export default {
     addressToStr,
     bytesToHex,
@@ -140,7 +121,6 @@ export default {
     csvToMap,
     decodeUTF8,
     encodeUTF8,
-    hashToStr,
     hexToBytes,
     ss58Decode,
     ss58Encode,
