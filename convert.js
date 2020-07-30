@@ -4,11 +4,11 @@ import {
     encodeBase64 as encodeBase641,
     decodeBase64 as decodeBase641
 } from "tweetnacl-util"
-import { isArr, isBond, isUint8Arr, isStr, isObj } from '../utils/utils'
-import { hexToString, hexToU8a } from '@polkadot/util'
+import { isArr, isBond, isStr, isObj, isUint8Arr } from '../utils/utils'
+import { hexToString, hexToU8a, stringToU8a, u8aToString, u8aToHex } from '@polkadot/util'
 import { checkAddress, decodeAddress, encodeAddress, setSS58Format } from '@polkadot/util-crypto'
 
-// returns null if function call throws error
+// returns @fallbackValue if function call throws error
 const fallbackIfFails = (func, args = [], fallbackValue = null) => {
     try {
         return func.apply(null, args)
@@ -16,7 +16,6 @@ const fallbackIfFails = (func, args = [], fallbackValue = null) => {
         return fallbackValue
     }
 }
-
 // convert identity/address from bytes to string
 // 
 // Params: 
@@ -31,13 +30,15 @@ export const ss58Encode = address => fallbackIfFails(encodeAddress, [address])
 //
 // Returns      string/null: null if invalid address supplied
 export const ss58Decode = address => fallbackIfFails(decodeAddress, [address])
-export const hexToBytes = (hex, bitLength) => fallbackIfFails(hexToU8a, [
+export const hexToBytes = (hex, bitLength) => isUint8Arr(hex) ? hex : fallbackIfFails(hexToU8a, [
     isStr(hex) && !hex.startsWith('0x') ? '0x' + hex : hex,
     bitLength
 ])
-export const bytesToHex = bytes => fallbackIfFails(hexToString, [bytes])
-export const decodeUTF8 = decodeUTF81
-export const encodeUTF8 = encodeUTF81
+export const bytesToHex = bytes => fallbackIfFails(u8aToHex, [bytes])
+export const decodeUTF8 = stringToU8a // ToDo: deprecate
+export const encodeUTF8 = u8aToString // ToDo: deprecate
+export const u8aToStr = u8aToString
+export const strToU8a = stringToU8a
 export const encodeBase64 = encodeBase641
 export const decodeBase64 = decodeBase641
 
@@ -50,6 +51,7 @@ export const addressToStr = address => fallbackIfFails(
     [address],
     fallbackIfFails(ss58Encode, [address]) && address || '',
 )
+
 // Convert CSV/TSV (Comma/Tab Seprated Value) string to an Array
 //
 // Params:
@@ -113,14 +115,8 @@ export const csvToMap = (str, columnTitles, separator = ',') => {
     return result
 }
 
-// // hashToBytes converts hash to bytes array. Will return 0x0 if value is unsupported type.
-// //
-// // Params:
-// // @hash    string/Uint8Array
-// //
-// // Returns Uint8Array
-// export const hashToBytes = hex => isUint8Arr(hex) ? hex : hexToBytes(isBond(hex) ? hex._value : hex)
 
+// ToDO: deprecate
 // hashToStr converts given hash to string prefixed by '0x'.  Will return '0x0', if not invalid hash.
 //
 // Params:
@@ -136,4 +132,20 @@ export const hashToStr = hash => {
     } catch (e) {
         return '0x0'
     }
+}
+
+
+export default {
+    addressToStr,
+    bytesToHex,
+    csvToArr,
+    csvToMap,
+    decodeBase64,
+    decodeUTF8,
+    encodeBase64,
+    encodeUTF8,
+    hashToStr,
+    hexToBytes,
+    ss58Decode,
+    ss58Encode,
 }
