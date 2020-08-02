@@ -201,12 +201,12 @@ export const signAndSend = async (api, address, tx, nonce) => {
                 if (!status.isFinalized && status.type !== 'Future') return
                 const hash = status.asFinalized.toHex()
                 const eventsArr = sanitise(events).map(x => x.event) // get rid of all the jargon
-                // find the event that has data
-                const { data: eventData } = eventsArr.find(event => event.data && event.data.length) || {}
-                console.log(`Polkadot: Completed at block hash: ${hash}`, { eventData })
+                    // exclude empty event data
+                    .filter(event => event.data && event.data.length) || {}
+                console.log(`Polkadot: Completed at block hash: ${hash}`, { eventsArr })
                 // transaction finalized, but not included in a block => runtime rejected the TX
                 // if (!includedInBlock) return reject('Transaction was rejected by runtime')
-                resolve([hash, eventData])
+                resolve([hash, eventsArr])
             })
         } catch (err) {
             reject(err)
