@@ -1,26 +1,22 @@
 /*
  * Date formatting etc.
  */
-// prepend0 prepends '0' if number is less than 10
-export const prepend0 = n => (n < 10 ? '0' : '') + n
 
-// For todays date;
-Date.prototype.today = function () {
-    return prepend0(this.getDate()) + "/" + prepend0(this.getMonth() + 1) + "/" + this.getFullYear();
-}
+import { isDate, isStr, strFill } from "./utils";
 
-// For the time now
-Date.prototype.timeNow = function () {
-    return prepend0(this.getHours()) + ":" + prepend0(this.getMinutes()) + ":" + prepend0(this.getSeconds())
-}
 
-export const getNow = () => new Date().today() + " @ " + new Date().timeNow()
-
+// prepends '0' if number is less than 10
+const fill = n => strFill(n, 2, '0')
 
 // formats string timestamp
 //
 // converts '2019-10-05T16:58:06.093Z' to '2019-10-05 16:58'
-export const format = tsStr => !tsStr ? '' : tsStr.replace(/\T|\Z/g, ' ').substr(0, 16)
+export const format = date => {
+    if (isDate(date)) {
+        date = date.toISOString()
+    }
+    return isStr(date) ? date.replace(/\T|\Z/g, ' ').substr(0, 16) : ''
+}
 
 /*
  * rate related stuff
@@ -33,10 +29,12 @@ export const secondsToDuration = numSeconds => {
     const seconds = numSeconds % 60
     const totalMinutes = parseInt(numSeconds / 60)
     const hours = parseInt(totalMinutes / 60)
-    return prepend0(hours) + ':' + prepend0(totalMinutes % 60) + ':' + prepend0(seconds)
+    return fill(hours) + ':' + fill(totalMinutes % 60) + ':' + fill(seconds)
 }
 
 export const durationToSeconds = duration => {
-    const [hours, minutes, seconds] = duration.split(':')
+    const [hours = 0, minutes = 0, seconds = 0] = duration.split(':')
     return parseInt(seconds) + parseInt(minutes) * 60 + parseInt(hours) * 60 * 60
 }
+
+window.strFill = strFill

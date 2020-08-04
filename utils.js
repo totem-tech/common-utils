@@ -48,6 +48,7 @@ export const isArr2D = x => isArr(x) && isArr(x[0])
 export const isAsyncFn = x => x instanceof (async () => { }).constructor
 export const isBool = x => typeof x === 'boolean'
 export const isBond = x => x instanceof Bond
+export const isDate = x => x instanceof Date
 export const isDefined = x => x !== undefined && x !== null
 export const isFn = x => typeof x === 'function'
 export const isHash = x => x.startsWith('0x')
@@ -443,46 +444,23 @@ export const sort = (data, key, reverse, sortOriginal) => isArr(data) ? arrSort(
 	isMap(data) ? mapSort(data, key, reverse) : data
 )
 
-/*
- * State management
+/**
+ * @name 	strFill
+ * @summary pre/post-fill a string
+ * @param {String}	str text to pre/post-fill 
+ * @param {Number}	maxLen maximum total length of result string. Default: 2
+ * @param {String}	filler string to fill
+ * @param {Boolean}	after whether to add filler after or before @str.
+ * 
+ * @returns {String}
  */
-// setStateTimeout sets state property value before and after timeout
-//
-// Params: 
-// @instance React component instance : state of the instance that will be changed
-//                        Make sure the component is ready beforehand
-// @key         string  : state property name to be manipulated
-// @dataBefore  any     : value to be applied immediately & before timeout
-// @dataAfter   any     : value to be applied after timeout
-// @delay       number  : duration in miliseconds.
-//                        Default value: 2000
-//
-// Returns:
-// @timeoutId   number  : Use this to cancel timeout. Handy when component is about to unmount
-export function setStateTimeout(instance, key, dataBefore, dataAfter, delay) {
-	if (!isFn(instance.setState)) return
-	dataBefore !== undefined && setState(instance, key, dataBefore)
-	return setTimeout(() => {
-		setState(instance, key, dataAfter)
-	}, delay || 2000)
+export const strFill = (str, maxLen = 2, filler = ' ', after = false) => {
+	str = `${str}`
+	filler = `${filler}`
+	const count = parseInt((maxLen - str.length) / filler.length)
+	if (count <= 0) return str
+	return arrReverse([filler.repeat(count), str], after).join('')
 }
-
-// setState changes state property value immediately
-// TODO: deprecate
-//
-// Params: 
-// @instance React component instance : state of the instance that will be changed
-//                        Make sure the component is ready beforehand
-// @key         string  : state property name to be manipulated
-// @value       any     : value to be applied immediately
-//
-// Returns void
-export function setState(instance, key, value) {
-	const data = {}
-	data[key] = value
-	instance.setState(data)
-}
-
 // deferred returns a function that invokes the callback function after certain delay/timeout
 // If the returned function is invoked again before timeout,
 // the invokation will be deferred further with the duration supplied in @delay
