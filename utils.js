@@ -48,7 +48,9 @@ export const isArr2D = x => isArr(x) && isArr(x[0])
 export const isAsyncFn = x => x instanceof (async () => { }).constructor
 export const isBool = x => typeof x === 'boolean'
 export const isBond = x => x instanceof Bond
-export const isDate = x => x instanceof Date
+// Date object can sometimes be "Invalid Date" without any timestamp.
+// Date.getUTCMilliseconds() is used to make sure it's a valid Date
+export const isDate = x => x instanceof Date && isValidNumber(x.getUTCMilliseconds())
 export const isDefined = x => x !== undefined && x !== null
 export const isFn = x => typeof x === 'function'
 export const isHash = x => x.startsWith('0x')
