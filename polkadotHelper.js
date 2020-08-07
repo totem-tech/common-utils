@@ -131,9 +131,9 @@ export const query = async (api, func, args = [], multi = false, print = false, 
     if (isSubscribe) {
         // only add interceptor to process result
         args[args.length - 1] = result => {
-            result = sanitise(result)
-            print && console.log(func, result)
-            cb.call(null, result)
+            const sanitised = sanitise(result)
+            print && console.log(func, sanitised)
+            cb(sanitised, result)
         }
     }
 

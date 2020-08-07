@@ -1,5 +1,6 @@
 import { Bond } from 'oo7'
 import { blake2AsHex } from '@polkadot/util-crypto'
+import { ss58Decode } from './convert'
 
 // trim texts
 export const clearClutter = x => x.split('\n').map(y => y.trim()).filter(Boolean).join(' ')
@@ -42,6 +43,15 @@ export const generateHash = (seed, algo = 'blake2', bitLength = 256) => {
 /*
  * Data validation
  */
+// checks if supplied is a valid ss58 address string
+export const isAddress = x => {
+	try {
+		ss58Decode(x)
+		return true
+	} catch (e) {
+		return false
+	}
+}
 export const isArr = x => Array.isArray(x)
 // isArr2D checks if argument is a 2-dimentional array
 export const isArr2D = x => isArr(x) && isArr(x[0])
