@@ -14,6 +14,13 @@ const config = {
     // 140 XTX for a simple transaction.
     // 1 XTX for existential balance. 
     txFeeMin: 141,
+    errorMsgs: {
+        connectionFailed: 'Connection failed',
+        connectionTimeout: 'Connection timeout',
+        invalidApi: 'ApiPromise instance required',
+        invalidApiFunc: 'Invalid API function',
+        invalidMutliArgsMsg: 'Failed to process arguments for multi-query',
+    },
 }
 const nonces = {}
 
@@ -32,14 +39,16 @@ export const connect = (
     nodeUrl = config.nodes[0],
     types = config.types,
     autoConnect = true,
-    timeout = config.timeout
+    timeout = config.timeout,
+    timeoutMsg = config.errorMsgs.connectionTimeout,
+    failedMsg = config.errorMsgs.connectionFailed,
 ) => new Promise((resolve, reject) => {
     const provider = new WsProvider(nodeUrl, autoConnect)
     if (!autoConnect) provider.connect()
     // auto reject if doesn't connect within specified duration
-    const tId = setTimeout(() => !provider.isConnected() && reject('Connection timeout'), timeout)
+    const tId = setTimeout(() => !provider.isConnected() && reject(timeoutMsg), timeout)
     // reject if connection fails
-    provider.websocket.addEventListener('error', () => reject('Connection failed') | clearTimeout(tId))
+    provider.websocket.addEventListener('error', () => reject(failedMsg) | clearTimeout(tId))
     // instantiate the Polkadot API using the provider and supplied types
     ApiPromise.create({ provider, types }).then(api =>
         resolve({ api, keyring, provider }) | clearTimeout(tId),
@@ -55,10 +64,11 @@ export const connect = (
 // @types   object
 //
 // Returns object: @config
-export const setDefaultConfig = (nodes, types, timeout) => {
+export const setDefaultConfig = (nodes, types, timeout, errorMsgs = {}) => {
     config.nodes = isArr(nodes) ? nodes : config.nodes
     config.types = isObj(types) ? types : config.types
-    config.timeout = isValidNumber(timeout) && tiemout > 0 ? timeout : config.timeout
+    config.timeout = isValidNumber(timeout) && timeout > 0 ? timeout : config.timeout
+    config.errorMsgs = { ...config.errorMsgs, ...errorMsgs }
     return config
 }
 
@@ -113,15 +123,21 @@ export const keyring = {
 //
 // Returns  function/any: If callback is supplied in @args, will return the unsubscribe function.
 //              Otherwise, value of the query will be returned
-export const query = async (api, func, args = [], multi = false, print = false, invalidApiMsg, invalidMutliArgsMsg) => {
+export const query = async (
+    api,
+    func,
+    args = [],
+    multi = false,
+    print = false,
+) => {
     const isApiValid = api instanceof ApiPromise
-    if (!isApiValid) throw new Error('ApiPromise instance required')
+    if (!isApiValid) throw new Error(config.errorMsgs.invalidApi)
     if (!func) return api
     // add .multi if required
     if (isStr(func) && multi && !func.endsWith('.multi')) func += '.multi'
 
     const fn = eval(func)
-    if (!fn) throw new Error(`${invalidApiMsg || 'Invalid API function'}: ${func}`)
+    if (!fn) throw new Error(`${config.errorMsgs.invalidApiFunc}: ${func}`)
 
     args = isArr(args) || !isDefined(args) ? args : [args]
     multi = isFn(fn) && !!multi
@@ -159,7 +175,7 @@ export const query = async (api, func, args = [], multi = false, print = false, 
             if (isSubscribe) args.push(interceptor)
 
         } catch (err) {
-            throw `${invalidMutliArgsMsg || 'Failed to process arguments for multi-query'} ${err}`
+            throw `${config.errorMsgs.invalidMutliArgsMsg} ${err}`
         }
     }
     const result = isFn(fn) ? await fn.apply(null, args) : fn
