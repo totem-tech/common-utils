@@ -131,6 +131,31 @@ export default {
     },
     "Timekeeper<AccountId,Hash,NumberOfBlocks,LockStatus,\nStatusOfTimeRecord,ReasonCodeStruct,PostingPeriod,StartOrEndBlockNumber,\nNumberOfBreaks>": "Timekeeper",
 
+    /*
+     * Order + Task related types
+     */
+    OrderHeader: {
+        owner: 'AccountId',
+        fulfiller: 'AccountId',
+        approver: 'AccountId',
+        orderStatus: 'u16',
+        approvalStatus: 'u16',
+        isSell: 'u16',
+        bountyXTX: 'i128',
+        isClosed: "u16",
+        orderType: 'u16',
+        deadline: 'u64',
+        dueDate: 'u64',
+    },
+    'OrderHeader<AccountId,AccountId,AccountId,u16,u16,u16,i128,u16,u16,u64,u64>': 'OrderHeader',
+    OrderItem: {
+        product: 'Hash',
+        unitPrice: 'i128',
+        quantity: 'u128',
+        unitOfMeasure: 'u16',
+    },
+    'OrderItem<Hash,i128,u128,u16>': 'OrderItem',
+
     // deperecated
     "ProjectHashRef": "H256"
 }
