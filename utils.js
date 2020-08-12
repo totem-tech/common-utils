@@ -1,6 +1,17 @@
 import { Bond } from 'oo7'
+import React from 'react'
 import { blake2AsHex } from '@polkadot/util-crypto'
 import { ss58Decode } from './convert'
+
+// default icons used in Message component
+export const icons = {
+	basic: '',
+	error: 'exclamation circle',
+	loading: { name: 'circle notched', loading: true },
+	info: 'info',
+	success: 'check circle outline',
+	warning: 'lightning'
+}
 
 // trim texts
 export const clearClutter = x => x.split('\n').map(y => y.trim()).filter(Boolean).join(' ')
@@ -209,6 +220,25 @@ export const className = value => {
 		value = Object.keys(value).map(key => !!value[key] && key)
 	}
 	if (isArr(value)) return value.filter(Boolean).join(' ')
+}
+
+// deferred returns a function that invokes the callback function after certain delay/timeout
+// If the returned function is invoked again before timeout,
+// the invokation will be deferred further with the duration supplied in @delay
+//
+// Params:
+// @callback  function  : function to be invoked after deferred delay
+// @delay     number    : number of milliseconds to be delayed.
+//                        Default value: 50
+// @thisArg    object   : optional, makes sure callback is bounded to supplied object 
+export const deferred = (callback, delay, thisArg) => {
+	if (!isFn(callback)) return // nothing to do!!
+	let timeoutId
+	return function () {
+		const args = arguments
+		if (timeoutId) clearTimeout(timeoutId)
+		timeoutId = setTimeout(() => callback.apply(thisArg, args), delay || 50)
+	}
 }
 
 // objContains tests if an object contains all the supplied keys/properties
@@ -473,24 +503,6 @@ export const strFill = (str, maxLen = 2, filler = ' ', after = false) => {
 	if (count <= 0) return str
 	return arrReverse([filler.repeat(count), str], after).join('')
 }
-// deferred returns a function that invokes the callback function after certain delay/timeout
-// If the returned function is invoked again before timeout,
-// the invokation will be deferred further with the duration supplied in @delay
-//
-// Params:
-// @callback  function  : function to be invoked after deferred delay
-// @delay     number    : number of milliseconds to be delayed.
-//                        Default value: 50
-// @thisArg    object   : optional, makes sure callback is bounded to supplied object 
-export const deferred = (callback, delay, thisArg) => {
-	if (!isFn(callback)) return // nothing to do!!
-	let timeoutId
-	return function () {
-		const args = arguments
-		if (timeoutId) clearTimeout(timeoutId)
-		timeoutId = setTimeout(() => callback.apply(thisArg, args), delay || 50)
-	}
-}
 
 // textCapitalize capitalizes the first letter of the given string(s)
 //
@@ -535,14 +547,4 @@ export const textEllipsis = (text, maxLen, numDots, split = true) => {
 	const left = arr.slice(0, split ? partLen : maxLen).join('')
 	const right = !split ? '' : arr.slice(text.length - (isEven ? partLen : partLen + 1)).join('')
 	return left + dots + right
-}
-
-// default icons used in Message component
-export const icons = {
-	basic: '',
-	error: 'exclamation circle',
-	loading: { name: 'circle notched', loading: true },
-	info: 'info',
-	success: 'check circle outline',
-	warning: 'lightning'
 }

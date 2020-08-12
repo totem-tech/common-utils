@@ -141,7 +141,7 @@ export default {
         orderStatus: 'u16',
         approvalStatus: 'u16',
         isSell: 'u16',
-        bountyXTX: 'i128',
+        amountXTX: 'i128',
         isClosed: "u16",
         orderType: 'u16',
         deadline: 'u64',
