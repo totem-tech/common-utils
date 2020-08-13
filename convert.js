@@ -124,4 +124,6 @@ export default {
     hexToBytes,
     ss58Decode,
     ss58Encode,
+    strToU8a,
+    u8aToStr,
 }
