@@ -86,6 +86,17 @@ export default class DataStorage {
         return data
     }
 
+    /**
+     * @name map
+     * @summary map each item on the data to an Array. This is a shorhand for `Array.from(this.getAll()).map(cb)`
+     * @param {Function} callback callback function to execute for each item in the list. 3 arguments supplied:
+     *                              @item   Array: Each item will contain key and value in an array. Eg: [key, value]
+     *                              @index  Number
+     *                              @array  Array: The entire Map in a 2D Array. Eg: [[key, value], [key2, value2]]
+     * @returns {Array} array of items returned by callback
+     */
+    map = callback => this.toArray().map(callback)
+
     search(keyValues, matchExact, matchAll, ignoreCase, limit = 0) {
         const result = mapSearch(this.getAll(), keyValues, matchExact, matchAll, ignoreCase)
         const doLimit = isValidNumber(limit) && limit > 0 && result.size > limit
@@ -144,4 +155,8 @@ export default class DataStorage {
 
         return data
     }
+
+    toArray = () => Array.from(this.getAll())
+
+    toString = (replacer = null, spacing = 0) => JSON.stringify(this.toArray(), replacer, spacing)
 }
