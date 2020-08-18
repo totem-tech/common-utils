@@ -18,11 +18,26 @@ export const format = date => {
     return isStr(date) ? date.replace(/\T|\Z/g, ' ').substr(0, 16) : ''
 }
 
-/*
- * rate related stuff
- */
 export const BLOCK_DURATION_SECONDS = 15
 export const BLOCK_DURATION_REGEX = /^(\d{2}):[0-5][0-9]:[0-5](0|5)$/ // valid duration up to 99:59:55
+
+/**
+ * @name    blockNumberToTS
+ * @summary converts block number to date relative to the supplied @currentBlock
+ * 
+ * @param {Number}  block block number to get the timestamp of
+ * @param {Number}  currentBlock current block number
+ * @param {Boolean} asString whether to return formatted ISO date string or Date object
+ * 
+ * @returns {String|Date}
+ */
+export const blockNumberToTS = (block, currentBlock, asString = true) => {
+    const numSeconds = (block - currentBlock) * BLOCK_DURATION_SECONDS
+    const date = new Date()
+    // add or substract duration to the @date to get to the timestamp of the @block
+    date.setSeconds(date.getSeconds() + numSeconds)
+    return !asString ? date : format(date)
+}
 
 export const secondsToDuration = numSeconds => {
     numSeconds = parseInt(numSeconds || 0)
