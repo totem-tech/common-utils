@@ -72,7 +72,7 @@ export const isBond = x => isObj(x) && x.hasOwnProperty('tie') && x.hasOwnProper
 export const isDate = x => x instanceof Date && isValidNumber(x.getUTCMilliseconds())
 export const isDefined = x => x !== undefined && x !== null
 export const isFn = x => typeof x === 'function'
-export const isHash = x => x.startsWith('0x')
+export const isHash = x => isStr(x) && x.startsWith('0x')
 export const isInteger = x => isValidNumber(x) && `${x}`.split('.').length === 1
 export const isMap = x => x instanceof Map
 export const isObj = x => x !== null && !isArr(x) && !isMap(x) && typeof x === 'object'
