@@ -1,5 +1,3 @@
-import { Bond } from 'oo7'
-import React from 'react'
 import { blake2AsHex } from '@polkadot/util-crypto'
 import { ss58Decode } from './convert'
 
@@ -68,15 +66,16 @@ export const isArr = x => Array.isArray(x)
 export const isArr2D = x => isArr(x) && isArr(x[0])
 export const isAsyncFn = x => x instanceof (async () => { }).constructor
 export const isBool = x => typeof x === 'boolean'
-export const isBond = x => x instanceof Bond
+export const isBond = x => isObj(x) && x.hasOwnProperty('tie') && x.hasOwnProperty('untie')
 // Date object can sometimes be "Invalid Date" without any timestamp.
 // Date.getUTCMilliseconds() is used to make sure it's a valid Date
 export const isDate = x => x instanceof Date && isValidNumber(x.getUTCMilliseconds())
 export const isDefined = x => x !== undefined && x !== null
 export const isFn = x => typeof x === 'function'
 export const isHash = x => x.startsWith('0x')
+export const isInteger = x => isValidNumber(x) && `${x}`.split('.').length === 1
 export const isMap = x => x instanceof Map
-export const isObj = x => x !== null && !isArr(x) && typeof x === 'object'
+export const isObj = x => x !== null && !isArr(x) && !isMap(x) && typeof x === 'object'
 // Checks if argument is an Array of Objects. Each element type must be object, otherwise will return false.
 export const isObjArr = x => !isArr(x) ? false : !x.reduce((no, item) => no || !isObj(item), false)
 // Checks if argument is a Map of Objects. Each element type must be object, otherwise will return false.
@@ -90,6 +89,7 @@ export const hasValue = x => {
 	switch (typeof x) {
 		case 'string': return isStr(x) && !!x.trim()
 		case 'number': return isValidNumber(x)
+		// for both array and object
 		case 'object': return Object.keys(x).length > 0
 		case 'boolean':
 		default: return true // already defined

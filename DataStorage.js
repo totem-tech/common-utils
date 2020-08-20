@@ -95,7 +95,9 @@ export default class DataStorage {
      *                              @array  Array: The entire Map in a 2D Array. Eg: [[key, value], [key2, value2]]
      * @returns {Array} array of items returned by callback
      */
-    map = callback => this.toArray().map(callback)
+    map(callback) {
+        return this.toArray().map(callback)
+    }
 
     search(keyValues, matchExact, matchAll, ignoreCase, limit = 0) {
         const result = mapSearch(this.getAll(), keyValues, matchExact, matchAll, ignoreCase)
@@ -156,7 +158,11 @@ export default class DataStorage {
         return data
     }
 
-    toArray = () => Array.from(this.getAll())
+    toArray() {
+        return Array.from(this.getAll())
+    }
 
-    toString = (replacer = null, spacing = 0) => JSON.stringify(this.toArray(), replacer, spacing)
+    toString(replacer = null, spacing = 0) {
+        return JSON.stringify(this.toArray(), replacer, spacing)
+    }
 }
