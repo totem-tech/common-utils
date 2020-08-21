@@ -67,7 +67,7 @@ export const validate = (value, config) => {
         // validate value type
         switch (type) {
             case 'array':
-                if (isArr(value)) return messages.array
+                if (!isArr(value)) return messages.array
                 valueIsArr = true
                 break
             case 'boolean':
