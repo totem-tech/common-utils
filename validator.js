@@ -14,19 +14,9 @@ let messages = {
     numberMin: 'number is less than minimum required',
     object: 'value must be an object',
     objectKeys: 'missing one or more required properties',
-    string: 'value must be a string',
     required: 'missing required field',
-}
-
-/**
- * @name    setMessages
- * @summary Overrides default error messages with custom/translated error messages
- * 
- * @param   {Object} msgObj Object with custom/translated messages. Must contain the correct keys.
- */
-export const setMessages = msgObj => {
-    if (!isObj(msgObj)) return
-    messages = { ...messages, ...msgObj }
+    string: 'value must be a string',
+    type: 'invalid type',
 }
 
 // Accepted validation types.
@@ -41,6 +31,17 @@ export const TYPES = Object.freeze({
     object: 'object',
     string: 'string',
 })
+
+/**
+ * @name    setMessages
+ * @summary Overrides default error messages with custom/translated error messages
+ * 
+ * @param   {Object} msgObj Object with custom/translated messages. Must contain the correct keys.
+ */
+export const setMessages = msgObj => {
+    if (!isObj(msgObj)) return
+    messages = { ...messages, ...msgObj }
+}
 
 /**
  * @name    validate
@@ -93,6 +94,18 @@ export const validate = (value, config) => {
             case 'string':
                 if (!isStr(value)) return messages.string
                 break
+            default:
+                // unsupported type
+                if (isStr(type)) return messages.type
+                // validation for unlisted types by checking if the value is an instance of `type`
+                // (eg: ApiPromise, Bond, BN)
+                try {
+                    if (!(value instanceof type)) return messages.type
+                } catch (e) {
+                    // something went wrong when evaluating `value instanceof type`
+                    // this could mean that the value of `type` is not a valid class
+                    return `${e}`
+                }
         }
 
         // validate array/integer/number/string length
@@ -167,4 +180,11 @@ export const validateObj = (obj = {}, config = {}, failFast = true, includeName 
     } catch (err) {
         return err
     }
+}
+
+export default {
+    setMessages,
+    TYPES,
+    validate,
+    validateObj,
 }
