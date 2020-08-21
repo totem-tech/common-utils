@@ -66,7 +66,13 @@ export const isArr = x => Array.isArray(x)
 export const isArr2D = x => isArr(x) && isArr(x[0])
 export const isAsyncFn = x => x instanceof (async () => { }).constructor
 export const isBool = x => typeof x === 'boolean'
-export const isBond = x => isObj(x) && x.hasOwnProperty('tie') && x.hasOwnProperty('untie')
+export const isBond = x => {
+	try {
+		return isObj(x) && isFn(x.tie) && isFn(x.untie)
+	} catch (e) {
+		return false
+	}
+}
 // Date object can sometimes be "Invalid Date" without any timestamp.
 // Date.getUTCMilliseconds() is used to make sure it's a valid Date
 export const isDate = x => x instanceof Date && isValidNumber(x.getUTCMilliseconds())
