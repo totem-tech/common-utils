@@ -225,7 +225,11 @@ export const className = value => {
 		// convert into an array
 		value = Object.keys(value).map(key => !!value[key] && key)
 	}
-	if (isArr(value)) return value.filter(Boolean).join(' ')
+	if (!isArr(value)) return
+	return value
+		.filter(Boolean)
+		.map(x => !isObj(x) ? x : className(x))
+		.join(' ')
 }
 
 // deferred returns a function that invokes the callback function after certain delay/timeout
