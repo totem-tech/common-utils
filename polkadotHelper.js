@@ -201,7 +201,6 @@ export const signAndSend = async (api, address, tx, nonce) => {
     }
     nonces[address] = nonce - 20
     console.log('Polkadot: initiating transation', { nonce })
-    // let includedInBlock = false
     return await new Promise(async (resolve, reject) => {
         try {
             const signed = await tx.sign(account, { nonce })
@@ -209,19 +208,27 @@ export const signAndSend = async (api, address, tx, nonce) => {
                 const { events, status } = result
                 console.log('Polkadot: Transaction status', status.type)
 
-                // transaction was included in the block
-                // if (status.isInBlock) includedInBlock = true
-
                 // status.type = 'Future' means transaction will be executed in the future. 
                 // there is a nonce gap that need to be filled. 
                 if (!status.isFinalized && status.type !== 'Future') return
                 const hash = status.asFinalized.toHex()
-                const eventsArr = sanitise(events).map(x => x.event) // get rid of all the jargon
+                const errorEvents = events.map(({ event }) => ({
+                    method: event.method,
+                    message: (sanitise(event.meta).documentation || []).join(' '),
+                    section: event.section,
+                })).filter(({ method }) => `${method}`.startsWith('Error'))
+
+                if (errorEvents.length > 0) {
+                    const errMsg = errorEvents.map(x => `${x.method} (${x.section}): ${x.message}`).join('\n')
+                    console.log('Polkadot: Transaction failed!', { blockHash: hash, errorEvents })
+                    return reject(errMsg)
+                }
+
+                const eventsArr = sanitise(events)
+                    .map(x => x.event)
                     // exclude empty event data
                     .filter(event => event.data && event.data.length) || {}
                 console.log(`Polkadot: Completed at block hash: ${hash}`, { eventsArr })
-                // transaction finalized, but not included in a block => runtime rejected the TX
-                // if (!includedInBlock) return reject('Transaction was rejected by runtime')
                 resolve([hash, eventsArr])
             })
         } catch (err) {
