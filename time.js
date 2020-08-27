@@ -8,14 +8,25 @@ import { isDate, isStr, strFill } from "./utils";
 // prepends '0' if number is less than 10
 const fill = n => strFill(n, 2, '0')
 
-// formats string timestamp
-//
-// converts '2019-10-05T16:58:06.093Z' to '2019-10-05 16:58'
-export const format = date => {
+/**
+ * @name format
+ * @summary formats date to ISO Date string. Converts '2019-10-05T16:58:06.093Z' to '2019-10-05 16:58'
+ * 
+ * @param {Date|String} date Date object or UNIX timestamp ('2099-11-11T11:11:11.111Z')
+ * @param {Boolean}     seconds whether to inlcude seconds
+ * @param {Boolean}     ms whether to include milliseonds
+ * 
+ * @returns {String} formatted string
+ */
+export const format = (date, seconds = false, ms = false) => {
     if (isDate(date)) {
         date = date.toISOString()
     }
-    return isStr(date) ? date.replace(/\T|\Z/g, ' ').substr(0, 16) : ''
+    if (!isStr(date)) return ''
+    date = date.replace(/\T|\Z/g, ' ')
+    // return full date string
+    if (seconds && ms) return date
+    return date.substr(0, seconds ? 19 : 16)
 }
 
 export const BLOCK_DURATION_SECONDS = 15

@@ -206,12 +206,14 @@ export const signAndSend = async (api, address, tx, nonce) => {
             const signed = await tx.sign(account, { nonce })
             await signed.send(result => {
                 const { events, status } = result
+                const isFuture = status.type !== 'Future'
                 console.log('Polkadot: Transaction status', status.type)
 
                 // status.type = 'Future' means transaction will be executed in the future. 
-                // there is a nonce gap that need to be filled. 
-                if (!status.isFinalized && status.type !== 'Future') return
-                const hash = status.asFinalized.toHex()
+                // there is a transaction in the pool that hasn't finished execution. 
+                if (!status.isFinalized && isFuture) return
+                // if status is "Future" block hash is not assigned yet!
+                const hash = isFuture ? '' : status.asFinalized.toHex()
                 const errorEvents = events.map(({ event }) => ({
                     method: event.method,
                     message: (sanitise(event.meta).documentation || []).join(' '),
