@@ -199,7 +199,7 @@ export const signAndSend = async (api, address, tx, nonce) => {
     if (nonces[address] && nonces[address] >= nonce) {
         nonce = nonces[address] + 1
     }
-    nonces[address] = nonce - 20
+    nonces[address] = nonce
     console.log('Polkadot: initiating transation', { nonce })
     return await new Promise(async (resolve, reject) => {
         try {
