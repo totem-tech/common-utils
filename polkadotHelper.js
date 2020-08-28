@@ -191,9 +191,10 @@ export const sanitise = x => JSON.parse(JSON.stringify(x)) // get rid of jargon
 // @api         ApiRx: API instance created using PolkadotJS or @connect()
 // @address     string: account holder identity
 // @tx          TxRx: an already instantiated transaction created using the @api
+// @rxStatus    Subject: RxJS Subject to update the UI on status changes, if required
 //
 // Returns      promise 
-export const signAndSend = async (api, address, tx, nonce) => {
+export const signAndSend = async (api, address, tx, nonce, rxStatus) => {
     const account = _keyring.getPair(address)
     nonce = nonce || await query(api, api.query.system.accountNonce, address)
     if (nonces[address] && nonces[address] >= nonce) {
@@ -207,37 +208,41 @@ export const signAndSend = async (api, address, tx, nonce) => {
             await signed.send(result => {
                 const { events, status } = result
                 const isFuture = status.type !== 'Future'
+                let hash = ''
                 console.log('Polkadot: Transaction status', status.type)
+
+                // notify
+                rxStatus && rxStatus.next(result)
 
                 // status.type = 'Future' means transaction will be executed in the future. 
                 // there is a transaction in the pool that hasn't finished execution. 
                 if (!status.isFinalized && isFuture) return
-                // if status is "Future" block hash is not assigned yet!
-                const hash = isFuture ? '' : status.asFinalized.toHex()
-                const errorEvents = events.map(({ event }) => {
-                    if (!`${event.method}`.startsWith('Error')) return null
-                    return ({
-                        method: event.method,
-                        message: (sanitise(event.meta).documentation || []).join(' '),
-                        section: event.section,
-                    })
+                try {
+                    // if status is "Future" block hash is not assigned yet!
+                    hash = status.asFinalized.toHex()
+                } catch (e) { }// ignore error
+
+                // Extract custom errors from events
+                const eventErrors = events.map(({ event }) => {
+                    if (!`${event.method}`.startsWith('Error')) return
+                    const msg = (sanitise(event.meta).documentation || []).join(' ')
+                    return `${event.method} (${event.section}): ${msg}`
                 }).filter(Boolean)
 
-                if (errorEvents.length > 0) {
-                    const errMsg = errorEvents.map(x => `${x.method} (${x.section}): ${x.message}`).join('. \n')
-                    console.log('Polkadot: Transaction failed!', { blockHash: hash, errorEvents })
-                    return reject(errMsg)
+                if (eventErrors.length > 0) {
+                    console.log('Polkadot: Transaction failed!', { blockHash: hash, eventErrorMsg: eventErrors })
+                    return reject(eventErrors.join(' | '))
                 }
 
-                const eventsArr = sanitise(events)
-                    .map((x, i) => ({
-                        ...x.event,
-                        method: events[i].event.method,
-                        section: events[i].event.section,
-                    }))
+                const eventsArr = sanitise(events).map((x, i) => ({
+                    ...x.event,
+                    method: events[i].event.method,
+                    section: events[i].event.section,
+                }))
                     // exclude empty event data
                     .filter(event => event.data && event.data.length) || {}
                 console.log(`Polkadot: Completed at block hash: ${hash}`, { eventsArr })
+                rxStatus && rxStatus.complete()
                 resolve([hash, eventsArr])
             })
         } catch (err) {
