@@ -214,20 +214,27 @@ export const signAndSend = async (api, address, tx, nonce) => {
                 if (!status.isFinalized && isFuture) return
                 // if status is "Future" block hash is not assigned yet!
                 const hash = isFuture ? '' : status.asFinalized.toHex()
-                const errorEvents = events.map(({ event }) => ({
-                    method: event.method,
-                    message: (sanitise(event.meta).documentation || []).join(' '),
-                    section: event.section,
-                })).filter(({ method }) => `${method}`.startsWith('Error'))
+                const errorEvents = events.map(({ event }) => {
+                    if (!`${event.method}`.startsWith('Error')) return null
+                    return ({
+                        method: event.method,
+                        message: (sanitise(event.meta).documentation || []).join(' '),
+                        section: event.section,
+                    })
+                }).filter(Boolean)
 
                 if (errorEvents.length > 0) {
-                    const errMsg = errorEvents.map(x => `${x.method} (${x.section}): ${x.message}`).join('\n')
+                    const errMsg = errorEvents.map(x => `${x.method} (${x.section}): ${x.message}`).join('. \n')
                     console.log('Polkadot: Transaction failed!', { blockHash: hash, errorEvents })
                     return reject(errMsg)
                 }
 
                 const eventsArr = sanitise(events)
-                    .map(x => x.event)
+                    .map((x, i) => ({
+                        ...x.event,
+                        method: events[i].event.method,
+                        section: events[i].event.section,
+                    }))
                     // exclude empty event data
                     .filter(event => event.data && event.data.length) || {}
                 console.log(`Polkadot: Completed at block hash: ${hash}`, { eventsArr })
