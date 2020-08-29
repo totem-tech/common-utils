@@ -5,6 +5,7 @@ let messages = {
     array: 'value must be an array',
     boolean: 'value must be a boolean',
     date: 'value must be a valid date',
+    email: 'value must be a valid email address',
     hex: 'value must be a valid hexadecimal string',
     integer: 'value must be a valid integer (no decimals)',
     lengthMax: 'exceeded maximum length',
@@ -19,12 +20,14 @@ let messages = {
     type: 'invalid type',
 }
 
+const emailPattern = new RegExp(/^(("[\w-\s]+")|([\w-]+(?:\.[\w-]+)*)|("[\w-\s]+")([\w-]+(?:\.[\w-]+)*))(@((?:[\w-]+\.)*\w[\w-]{0,66})\.([a-z]{2,6}(?:\.[a-z]{2})?)$)|(@\[?((25[0-5]\.|2[0-4][0-9]\.|1[0-9]{2}\.|[0-9]{1,2}\.))((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]{1,2})\.){2}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]{1,2})\]?$)/i)
 // Accepted validation types.
 // Any type not listed here will be ignored.
 export const TYPES = Object.freeze({
     array: 'array',
     boolean: 'boolean',
     date: 'date',
+    email: 'email',
     hex: 'hex',
     integer: 'integer',
     number: 'number',
@@ -59,48 +62,51 @@ export const setMessages = msgObj => {
  * 
  * @returns {String|Null} null if no errors. Otherwise, error message.
  */
-export const validate = (value, config) => {
+export const validate = (value, config, customMessages) => {
+    const errorMsgs = customMessages || messages
     try {
         const { accept, keys, max, maxLength, min, minLength, required, type } = config || {}
-        if (!hasValue(value) && required) return messages.required
+        if (!hasValue(value) && required) return errorMsgs.required
         let valueIsArr = false
         // validate value type
         switch (type) {
             case 'array':
-                if (!isArr(value)) return messages.array
+                if (!isArr(value)) return errorMsgs.array
                 valueIsArr = true
                 break
             case 'boolean':
-                if (!isBool(value)) return messages.boolean
+                if (!isBool(value)) return errorMsgs.boolean
                 break
             case 'date':
                 // validates both ISO string and Date object
-                if (!isDate(new Date(value))) return messages.date
+                if (!isDate(new Date(value))) return errorMsgs.date
                 break
+            case 'email':
+                if (!isStr(value) || !emailPattern.test(value)) return errorMsgs.email
             case 'hex':
-                if (!isHash(value)) return messages.hex
+                if (!isHash(value)) return errorMsgs.hex
                 break
             case 'integer':
-                if (!isInteger(value)) return messages.integer
+                if (!isInteger(value)) return errorMsgs.integer
                 break
             case 'number':
-                if (!isValidNumber(value)) return messages.number
-                if (isValidNumber(min) && value < min) return messages.numberMin
-                if (isValidNumber(max) && value > max) return messages.numberMax
+                if (!isValidNumber(value)) return errorMsgs.number
+                if (isValidNumber(min) && value < min) return errorMsgs.numberMin
+                if (isValidNumber(max) && value > max) return errorMsgs.numberMax
                 break
             case 'object':
-                if (!isObj(value)) return messages.object
-                if (isArr(keys) && keys.length > 0 && !objContains(value, keys)) return messages.objectKeys
+                if (!isObj(value)) return errorMsgs.object
+                if (isArr(keys) && keys.length > 0 && !objContains(value, keys)) return errorMsgs.objectKeys
             case 'string':
-                if (!isStr(value)) return messages.string
+                if (!isStr(value)) return errorMsgs.string
                 break
             default:
                 // unsupported type
-                if (isStr(type)) return messages.type
+                if (isStr(type)) return errorMsgs.type
                 // validation for unlisted types by checking if the value is an instance of `type`
                 // (eg: ApiPromise, Bond, BN)
                 try {
-                    if (!(value instanceof type)) return messages.type
+                    if (!(value instanceof type)) return errorMsgs.type
                 } catch (e) {
                     // something went wrong when evaluating `value instanceof type`
                     // this could mean that the value of `type` is not a valid class
@@ -110,11 +116,11 @@ export const validate = (value, config) => {
 
         // validate array/integer/number/string length
         if (isValidNumber(maxLength) && (valueIsArr ? value : `${value}`).length > maxLength)
-            return messages.lengthMax
+            return errorMsgs.lengthMax
         if (isValidNumber(minLength) && (valueIsArr ? value : `${value}`).length < minLength)
-            return messages.lengthMin
+            return errorMsgs.lengthMin
 
-        if (isArr(accept) && accept.length && !accept.includes(value)) return messages.accept
+        if (isArr(accept) && accept.length && !accept.includes(value)) return errorMsgs.accept
 
 
         // valid according to the config
@@ -131,7 +137,7 @@ export const validate = (value, config) => {
  * @param   {Object}  obj         object with values to validate
  * @param   {Object}  config      configuration to validate specific keys in the object
  * @param   {Boolean} failFast    whether to return on first error
- * @param   {Boolean} includeName whether to include property name in the error
+ * @param   {Boolean} includeLabel whether to include property name in the error
  * 
  * @example
  * <BR>
@@ -159,8 +165,9 @@ export const validate = (value, config) => {
  * 
  * @returns {String|Object|Null} Null if no errors. If @failFast, String otherwise, Object with one or more errors.
  */
-export const validateObj = (obj = {}, config = {}, failFast = true, includeName = true) => {
-    if (!isObj(obj)) return messages.object
+export const validateObj = (obj = {}, config = {}, failFast = true, includeLabel = true, customMessages) => {
+    const errorMsgs = !isObj(customMessages) ? null : { ...messages, ...customMessages }
+    if (!isObj(obj)) return errorMsgs.object
     try {
         const keys = Object.keys(config)
         const errors = {}
@@ -169,10 +176,10 @@ export const validateObj = (obj = {}, config = {}, failFast = true, includeName 
             const key = keys[i]
             const value = obj[key]
             const keyConfig = config[key]
-            let error = validate(value, keyConfig)
+            let error = validate(value, keyConfig, errorMsgs)
             if (!error) continue
-            const { name } = keyConfig
-            error = !error ? null : `${includeName ? (name || key) + ': ' : ''}${error}`
+            const { label } = keyConfig
+            error = !error ? null : `${includeLabel ? (label || key) + ': ' : ''}${error}`
             if (failFast) return error
             errors[key] = error
         }

@@ -7,12 +7,22 @@ try {
     storage = localStorage
     isNode = false
 } catch (e) {
-    // for NodeJS server
-    const nls = require('node-localstorage')
-    const STORAGE_PATH = process.env.STORAGE_PATH || './server/data'
-    isNode = true
-    console.log({ STORAGE_PATH })
-    storage = new nls.LocalStorage(STORAGE_PATH, 500 * 1024 * 1024)
+    try {
+        if (!!window) {
+            // hack for iframe
+            // localStorage will not work!! (expected)
+            storage = { getItem: () => '', setItem: () => { } }
+
+        } else {
+            // for NodeJS server
+            const nls = require('node-localstorage')
+            console.log(process.env)
+            const STORAGE_PATH = process.env.STORAGE_PATH || './server/data'
+            isNode = true
+            console.log({ STORAGE_PATH })
+            storage = new nls.LocalStorage(STORAGE_PATH, 500 * 1024 * 1024)
+        }
+    } catch (e) { }
 }
 
 /**
