@@ -54,34 +54,33 @@ export default {
     "PostingPeriod": "u16",
     "PostingIndex": "u128",
     "ProjectHash": "Hash",
-    "ProjectHashRef": "H256",
     "ProjectStatus": "u16",
-    "buyOrSell": "u16",
-    "amount": "i128",
-    "openClosed": "bool",
-    "orderType": "u16",
-    "deadline": "u64",
-    "dueDate": "u64",
-    "OrderSubHeader": {
-        "buy_or_sell": "u16",
-        "amount": "i128",
-        "open_closed": "bool",
-        "order_type": "u16",
-        "deadline": "u64",
-        "due_date": "u64"
-    },
-    "Product": "Hash",
-    "UnitPrice": "i128",
-    "Quantity": "u128",
-    "UnitOfMeasure": "u16",
-    "ItemDetailsStruct": {
-        "Product": "Hash",
-        "UnitPrice": "i128",
-        "Quantity": "u128",
-        "UnitOfMeasure": "u16"
-    },
-    "ItemDetailsStruct<Hash,i128,u128,u16>": "ItemDetailsStruct",
-    "OrderItem": "ItemDetailsStruct",
+    // "buyOrSell": "u16",
+    // "amount": "i128",
+    // "openClosed": "bool",
+    // "orderType": "u16",
+    // "deadline": "u64",
+    // "dueDate": "u64",
+    // "OrderSubHeader": {
+    //     "buy_or_sell": "u16",
+    //     "amount": "i128",
+    //     "open_closed": "bool",
+    //     "order_type": "u16",
+    //     "deadline": "u64",
+    //     "due_date": "u64"
+    // },
+    // "Product": "Hash",
+    // "UnitPrice": "i128",
+    // "Quantity": "u128",
+    // "UnitOfMeasure": "u16",
+    // "ItemDetailsStruct": {
+    //     "Product": "Hash",
+    //     "UnitPrice": "i128",
+    //     "Quantity": "u128",
+    //     "UnitOfMeasure": "u16"
+    // },
+    // "ItemDetailsStruct<Hash,i128,u128,u16>": "ItemDetailsStruct",
+    // "OrderItem": "ItemDetailsStruct",
     "OrderStatus": "u16",
     "RandomHashedData": "Hash",
     "ReasonCode": "u16",
@@ -119,7 +118,7 @@ export default {
     "BannedStruct<BanStatus,ReasonCodeStruct>": "BannedStruct",
     "Timekeeper": {
         "worker": "AccountId",
-        "project_hash": "ProjectHashRef",
+        "project_hash": "Hash",
         "total_blocks": "NumberOfBlocks",
         "locked_status": "LockStatus",
         "locked_reason": "ReasonCodeStruct",
@@ -130,5 +129,33 @@ export default {
         "end_block": "StartOrEndBlockNumber",
         "nr_of_breaks": "NumberOfBreaks"
     },
-    "Timekeeper<AccountId,ProjectHashRef,NumberOfBlocks,LockStatus,\nStatusOfTimeRecord,ReasonCodeStruct,PostingPeriod,StartOrEndBlockNumber,\nNumberOfBreaks>": "Timekeeper"
+    "Timekeeper<AccountId,Hash,NumberOfBlocks,LockStatus,\nStatusOfTimeRecord,ReasonCodeStruct,PostingPeriod,StartOrEndBlockNumber,\nNumberOfBreaks>": "Timekeeper",
+
+    /*
+     * Order + Task related types
+     */
+    OrderHeader: {
+        owner: 'AccountId',
+        fulfiller: 'AccountId',
+        approver: 'AccountId',
+        orderStatus: 'u16',
+        approvalStatus: 'u16',
+        isSell: 'u16',
+        amountXTX: 'i128',
+        isClosed: 'bool',
+        orderType: 'u16',
+        deadline: 'u64',
+        dueDate: 'u64',
+    },
+    'OrderHeader<AccountId,AccountId,AccountId,u16,u16,u16,i128,bool,u16,u64,u64>': 'OrderHeader',
+    OrderItem: {
+        product: 'Hash',
+        unitPrice: 'i128',
+        quantity: 'u128',
+        unitOfMeasure: 'u16',
+    },
+    'OrderItem<Hash,i128,u128,u16>': 'OrderItem',
+
+    // deperecated
+    "ProjectHashRef": "H256"
 }
