@@ -83,6 +83,7 @@ export const validate = (value, config, customMessages) => {
                 break
             case 'email':
                 if (!isStr(value) || !emailPattern.test(value)) return errorMsgs.email
+                break
             case 'hex':
                 if (!isHash(value)) return errorMsgs.hex
                 break
