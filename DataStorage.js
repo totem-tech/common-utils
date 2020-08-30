@@ -8,21 +8,18 @@ try {
     isNode = false
 } catch (e) {
     try {
-        if (!!window) {
-            // hack for iframe
-            // localStorage will not work!! (expected)
-            storage = { getItem: () => '', setItem: () => { } }
+        // for NodeJS server
+        const nls = require('node-localstorage')
+        const STORAGE_PATH = process.env.STORAGE_PATH || './server/data'
+        isNode = true
+        storage = new nls.LocalStorage(STORAGE_PATH, 500 * 1024 * 1024)
+        storage && console.log({ STORAGE_PATH })
+    } catch (e) {
+        // hack for iframe
+        // localStorage will not work!! (expected)
+        storage = storage || { getItem: () => '', setItem: () => { } }
 
-        } else {
-            // for NodeJS server
-            const nls = require('node-localstorage')
-            console.log(process.env)
-            const STORAGE_PATH = process.env.STORAGE_PATH || './server/data'
-            isNode = true
-            console.log({ STORAGE_PATH })
-            storage = new nls.LocalStorage(STORAGE_PATH, 500 * 1024 * 1024)
-        }
-    } catch (e) { }
+    }
 }
 
 /**
