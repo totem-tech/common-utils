@@ -94,9 +94,9 @@ export default class DataStorage {
         if (!keys.length) return this
         keys.forEach(key => data.delete(key))
 
-        this.rxData.next(data)
         this.name && write(this.name, data)
         this.size = data.size
+        this.rxData.next(data)
         return this
     }
 
@@ -210,8 +210,8 @@ export default class DataStorage {
             data = existing // merged value
         }
 
-        this.rxData.next(data)
         this.name && write(this.name, data)
+        this.rxData.next(data)
         return this
     }
 
