@@ -135,7 +135,7 @@ export const keyDataFromEncoded = (encoded, asHex = false) => {
             ...encoded.slice(85)
         ])
     }
-    return asHex ? encoded : bytesToHex(encoded)
+    return !asHex ? encoded : bytesToHex(encoded)
 }
 
 export const keyInfoFromKeyData = (keyData = '') => {
