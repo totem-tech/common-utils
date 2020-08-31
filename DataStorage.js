@@ -94,9 +94,7 @@ export default class DataStorage {
         if (!keys.length) return this
         keys.forEach(key => data.delete(key))
 
-        if (!this.disableCache) {
-            this.rxData.next(data)
-        }
+        this.rxData.next(data)
         this.name && write(this.name, data)
         this.size = data.size
         return this
