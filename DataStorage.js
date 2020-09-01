@@ -6,6 +6,11 @@ try {
     // Use browser localStorage if available
     storage = localStorage
     isNode = false
+    if (storage === null) {
+        // hack for iframe
+        // localStorage will not work!! (expected)
+        storage = { getItem: () => '', setItem: () => { } }
+    }
 } catch (e) {
     try {
         // for NodeJS server
@@ -14,12 +19,7 @@ try {
         isNode = true
         storage = new nls.LocalStorage(STORAGE_PATH, 500 * 1024 * 1024)
         storage && console.log({ STORAGE_PATH })
-    } catch (e) {
-        // hack for iframe
-        // localStorage will not work!! (expected)
-        storage = storage || { getItem: () => '', setItem: () => { } }
-
-    }
+    } catch (e) { }
 }
 
 /**
@@ -35,7 +35,7 @@ const read = key => {
         const data = JSON.parse(storage.getItem(key) || '[]')
         return new Map(data)
     } catch (e) {
-        console.log(`Invalid JSON on ${isNode && key ? 'file' : 'localStorage key'}: ${key}`)
+        return new Map()
     }
 }
 /**
@@ -47,9 +47,11 @@ const read = key => {
  */
 const write = (key, value) => {
     // invalid key: ignore request
-    if (!isStr(key)) return false
-    value = Array.from(value.entries())
-    storage.setItem(key, JSON.stringify(value))
+    if (!isStr(key)) return
+    try {
+        value = Array.from(value.entries())
+        storage.setItem(key, JSON.stringify(value))
+    } catch (e) { }
 }
 
 export default class DataStorage {
@@ -76,7 +78,7 @@ export default class DataStorage {
             return
         }
         this.rxData = new BehaviorSubject(read(this.name))
-        this.size = this.rxData.value.size
+        this.size = this.rxData.value ? this.rxData.value.size : 0
     }
 
     /**
