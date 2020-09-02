@@ -14,6 +14,8 @@ const config = {
     // 140 XTX for a simple transaction.
     // 1 XTX for existential balance. 
     txFeeMin: 141,
+    txFeeBase: 1,
+    txFeePerByte: 1,
     errorMsgs: {
         connectionFailed: 'Connection failed',
         connectionTimeout: 'Connection timeout',
@@ -72,6 +74,29 @@ export const setDefaultConfig = (nodes, types, timeout, errorMsgs = {}) => {
     return config
 }
 
+/**
+ * @name        getTxFee
+ * @summary     estimate transaction fee for a specific transaction 
+ * @description `feeBase` and `feePerbyte` should already be set using `setDefaultConfig()`. 
+ *              Otherwise, value `1` will be used for both.
+ * 
+ * @param   {ApiPromise}    api        PolkadotJS API instance
+ * @param   {String}        address    identity that the @tx is going to be used iwth
+ * @param   {TxRx}          tx         transaction to estimate the fee of
+ * @param   {String}        uri        (optional) required if address is not already in the keyring
+ * 
+ * @returns {Number}    estimated transaction fee
+ */
+export const getTxFee = async (api, address, tx, uri) => {
+    const { txFeeBase = 1, txFeePerByte = 1 } = config
+    if (!keyring.contains(address)) keyring.add([uri])
+    const account = _keyring.getPair(address)
+    const nonce = await query(api, api.query.system.accountNonce, address)
+    const signedHex = sanitise(await tx.sign(account, { nonce }))
+    const numBytes = signedHex.length / 2 - 1
+    return txFeeBase + txFeePerByte * numBytes
+}
+
 export const keyring = {
     // add pair(s) to keyring 
     //
@@ -89,14 +114,13 @@ export const keyring = {
     // @address string/Uint8Array
     //
     // Returns boolean
-    contains: address => {
+    contains: address => !!keyring.getPair(address),
+
+    getPair: address => {
         try {
             // test if @secretKey is an address already added to the keyring
-            _keyring.getPair(address)
-            return true
-        } catch (_) {
-            return false
-        }
+            return _keyring.getPair(address)
+        } catch (_) { }
     },
 
     // reference to the keyring
@@ -109,7 +133,6 @@ export const keyring = {
     // 
     // returns boolean: indicates success/failure
     remove: address => keyring.contains(address) && !_keyring.removePair(address),
-
 }
 
 // query makes storage API calls using PolkadotJS. All values returned will be sanitised.
@@ -292,9 +315,10 @@ export const transfer = async (toAddress, amount, secretKey, publicKey, api) => 
 export default {
     keyring,
     connect,
-    setDefaultConfig,
-    transfer,
+    getTxFee,
     query,
     sanitise,
+    setDefaultConfig,
     signAndSend,
+    transfer,
 }
