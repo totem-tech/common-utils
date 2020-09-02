@@ -440,10 +440,15 @@ export const mapSearch = (map, keyValues, matchExact, matchAll, ignoreCase) => {
 }
 
 // Returns a new map sorted by key. Must be a map of objects
-export const mapSort = (map, key, reverse) => !isObjMap(map) ? map : new Map(arrReverse(
-	Array.from(map).sort((a, b) => a[1][key] > b[1][key] ? 1 : -1),
-	reverse
-))
+export const mapSort = (map, key, reverse) => {
+	if (!isMap(map)) return map
+	const arr2d = Array.from(map)
+	if (!arr2d[0] || !isObj(arr2d[0][1])) return map
+	return new Map(arrReverse(
+		arr2d.sort((a, b) => a[1][key] > b[1][key] ? 1 : -1),
+		reverse
+	))
+}
 
 // Search Array or Map
 export const search = (data, keywords, keys) => {
@@ -492,9 +497,11 @@ export const searchRanked = (searchKeys = ['text']) => (options, searchQuery) =>
 }
 
 // Sort Array or Map
-export const sort = (data, key, reverse, sortOriginal) => isArr(data) ? arrSort(data, key, reverse, sortOriginal) : (
-	isMap(data) ? mapSort(data, key, reverse) : data
-)
+export const sort = (data, key, reverse, sortOriginal) => {
+	const sortFunc = isArr(data) ? arrSort : (isMap(data) ? mapSort : null)
+	if (!sortFunc) return []
+	return sortFunc(data, key, reverse, sortOriginal)
+}
 
 /**
  * @name 	strFill
