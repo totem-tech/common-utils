@@ -91,14 +91,19 @@ export const isStr = x => typeof x === 'string'
 export const isUint8Arr = arr => arr instanceof Uint8Array
 export const isValidNumber = x => typeof x == 'number' && !isNaN(x) && isFinite(x)
 export const hasValue = x => {
-	if (!isDefined(x)) return false
-	switch (typeof x) {
-		case 'string': return isStr(x) && !!x.trim()
-		case 'number': return isValidNumber(x)
-		// for both array and object
-		case 'object': return Object.keys(x).length > 0
-		case 'boolean':
-		default: return true // already defined
+	try {
+		if (!isDefined(x)) return false
+		switch (typeof x) {
+			case 'string': return isStr(x) && !!x.trim()
+			case 'number': return isValidNumber(x)
+			// for both array and object
+			case 'object':
+				return Object.keys(x).length > 0
+			case 'boolean':
+			default: return true // already defined
+		}
+	} catch (_) {
+		return false
 	}
 }
 
