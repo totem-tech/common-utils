@@ -66,7 +66,8 @@ export const validate = (value, config, customMessages) => {
     const errorMsgs = customMessages || messages
     try {
         const { accept, keys, max, maxLength, min, minLength, required, type } = config || {}
-        if (!hasValue(value) && required) return errorMsgs.required
+        // if doesn't have any value (undefined/null) and not `required`, assume valid
+        if (!hasValue(value)) return required ? errorMsgs.required : null
         let valueIsArr = false
         // validate value type
         switch (type) {
