@@ -1,20 +1,23 @@
-import { isStr, isBool, isValidNumber, hasValue, isInteger, isObj, isArr, objContains, isHash, isDate } from './utils'
+import { isStr, isBool, isValidNumber, hasValue, isInteger, isObj, isArr, objContains, isHash, isDate, arrUnique, isAddress } from './utils'
 
 let messages = {
     accept: 'value not acceptable',
     array: 'valid array required',
+    arrayUnique: 'array must not contain duplicate values',
     boolean: 'boolean value required',
-    date: 'a valid date required',
-    email: 'a valid email address required',
-    hex: 'a valid hexadecimal string required',
-    integer: 'a valid integer required (no decimals)',
+    date: 'valid date required',
+    email: 'valid email address required',
+    hex: 'valid hexadecimal string required',
+    identity: 'valid identity required',
+    integer: 'valid integer required (no decimals)',
     lengthMax: 'maximum length exceeded',
     lengthMin: 'minimum length required',
-    number: 'a valid number required',
+    number: 'valid number required',
     numberMax: 'number exceeds maximum allowed',
     numberMin: 'number is less than minimum required',
     object: 'valid object required',
     objectKeys: 'missing one or more required fields',
+    reject: 'value is rejected',
     required: 'required field',
     string: 'valid string required',
     type: 'invalid type',
@@ -32,6 +35,7 @@ export const TYPES = Object.freeze({
     date: 'date',
     email: 'email',
     hex: 'hex',
+    identity: 'identity',
     integer: 'integer',
     number: 'number',
     object: 'object',
@@ -68,7 +72,7 @@ export const setMessages = msgObj => {
 export const validate = (value, config, customMessages = {}) => {
     const errorMsgs = { ...messages, ...customMessages }
     try {
-        const { accept, keys, max, maxLength, min, minLength, required, type } = config || {}
+        const { accept, keys, max, maxLength, min, minLength, reject, required, type, unique } = config || {}
         // if doesn't have any value (undefined/null) and not `required`, assume valid
         if (!hasValue(value)) return required ? errorMsgs.required : null
         let valueIsArr = false
@@ -76,6 +80,7 @@ export const validate = (value, config, customMessages = {}) => {
         switch (type) {
             case 'array':
                 if (!isArr(value)) return errorMsgs.array
+                if (unique && arrUnique(value).length < value.length) return errorMsgs.arrayUnique
                 valueIsArr = true
                 break
             case 'boolean':
@@ -90,6 +95,9 @@ export const validate = (value, config, customMessages = {}) => {
                 break
             case 'hex':
                 if (!isHash(value)) return errorMsgs.hex
+                break
+            case 'identity':
+                if (!isAddress(value)) return errorMsgs.identity
                 break
             case 'integer':
                 if (!isInteger(value)) return errorMsgs.integer
@@ -120,7 +128,28 @@ export const validate = (value, config, customMessages = {}) => {
         if (isValidNumber(minLength) && (valueIsArr ? value : `${value}`).length < minLength)
             return `${errorMsgs.lengthMin}: ${minLength}`
 
-        if (isArr(accept) && accept.length && !accept.includes(value)) return errorMsgs.accept
+        // valid only if value `accept` array includes `value`
+        if (isArr(accept) && accept.length) {
+            const valid = true
+            if (!valueIsArr) {
+                valid = accept.includes(value)
+            } else {
+                // all items in the `value` array must be in the `accept` array
+                value.every(v => accept.includes(v))
+            }
+            if (!valid) return errorMsgs.accept
+        }
+        // valid only if value `reject` array does not include the `value`
+        if (isArr(reject) && reject.length && reject.includes(value)) {
+            const valid = true
+            if (!valueIsArr) {
+                valid = !reject.includes(value)
+            } else {
+                // none of the items in the `value` array can be in the `reject` array
+                value.every(v => !reject.includes(v))
+            }
+            if (!valid) return errorMsgs.reject
+        }
 
         // valid according to the config
         return null
@@ -175,9 +204,9 @@ export const validateObj = (obj = {}, config = {}, failFast = true, includeLabel
             const key = keys[i]
             const value = obj[key]
             const keyConfig = config[key]
-            let error = validate(value, keyConfig, errorMsgs)
+            const { customMessages: keyMsgs, label } = keyConfig
+            let error = validate(value, keyConfig, { ...errorMsgs, ...keyMsgs })
             if (!error) continue
-            const { label } = keyConfig
             error = !error ? null : `${includeLabel ? (label || key) + ' => ' : ''}${error}`
             if (failFast) return error
             errors[key] = error
