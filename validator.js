@@ -128,26 +128,15 @@ export const validate = (value, config, customMessages = {}) => {
         if (isValidNumber(minLength) && (valueIsArr ? value : `${value}`).length < minLength)
             return `${errorMsgs.lengthMin}: ${minLength}`
 
-        // valid only if value `accept` array includes `value`
+        // valid only if value `accept` array includes `value` or items in `value` array
         if (isArr(accept) && accept.length) {
-            const valid = true
-            if (!valueIsArr) {
-                valid = accept.includes(value)
-            } else {
-                // all items in the `value` array must be in the `accept` array
-                value.every(v => accept.includes(v))
-            }
+            // if `value` is array all items in it must be in the `accept` array
+            const valid = !valueIsArr ? accept.includes(value) : value.every(v => accept.includes(v))
             if (!valid) return errorMsgs.accept
         }
-        // valid only if value `reject` array does not include the `value`
+        // valid only if value `reject` array does not include the `value` or items in `value` array
         if (isArr(reject) && reject.length && reject.includes(value)) {
-            const valid = true
-            if (!valueIsArr) {
-                valid = !reject.includes(value)
-            } else {
-                // none of the items in the `value` array can be in the `reject` array
-                value.every(v => !reject.includes(v))
-            }
+            const valid = !valueIsArr ? !reject.includes(value) : value.every(v => !reject.includes(v))
             if (!valid) return errorMsgs.reject
         }
 
