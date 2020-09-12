@@ -2,6 +2,10 @@ import { isDefined, isStr, mapSearch, isMap, isValidNumber, mapSort, isArr } fro
 import { BehaviorSubject, Subject } from 'rxjs'
 
 let storage, isNode
+// use this to force all instances of DataStorage where caching is enabled to update data from LocalStorage
+// ONLY USE IN EXTREME CASES such as restoring a backup.
+// Usage: rxForeUpdateCache.next(true)
+export const rxForeUpdateCache = new Subject()
 try {
     // Use browser localStorage if available
     storage = localStorage
@@ -79,6 +83,13 @@ export default class DataStorage {
         }
         this.rxData = new BehaviorSubject(read(this.name))
         this.size = this.rxData.value ? this.rxData.value.size : 0
+        // update cached data from localStorage throughout the application only when triggered
+        rxForeUpdateCache.subscribe(ok => {
+            if (ok !== true) return
+            const data = read(this.name)
+            this.size = data.size
+            this.rxData.next(data)
+        })
     }
 
     /**
