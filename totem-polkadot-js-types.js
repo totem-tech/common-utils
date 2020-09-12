@@ -142,7 +142,7 @@ export default {
         approvalStatus: 'u16',
         isSell: 'u16',
         amountXTX: 'i128',
-        isClosed: 'bool',
+        isMarket: 'bool',
         orderType: 'u16',
         deadline: 'u64',
         dueDate: 'u64',
@@ -155,7 +155,25 @@ export default {
         unitOfMeasure: 'u16',
     },
     'OrderItem<Hash,i128,u128,u16>': 'OrderItem',
+    TXKeysL: {
+        recordId: 'Hash',
+        parentId: 'Hash',
+        bonsaiToken: 'Hash',
+        txID: 'Hash',
+    },
+    'TXKeysL<Hash,Hash,Hash,Hash>': 'TXKeysL',
+    TXKeysM: {
+        recordId: 'Hash',
+        bonsaiToken: 'Hash',
+        txID: 'Hash',
+    },
+    'TXKeysM<Hash,Hash,Hash>': 'TXKeysM',
+    TXKeysS: {
+        bonsaiToken: 'Hash',
+        txID: 'Hash',
+    },
+    'TXKeysS<Hash,Hash>': 'TXKeysS',
 
     // deperecated
-    "ProjectHashRef": "H256"
+    "ProjectHashRef": "H256",
 }
