@@ -77,6 +77,7 @@ export const isBond = x => {
 // Date.getUTCMilliseconds() is used to make sure it's a valid Date
 export const isDate = x => x instanceof Date && isValidNumber(x.getUTCMilliseconds())
 export const isDefined = x => x !== undefined && x !== null
+export const isError = x => x instanceof Error
 export const isFn = x => typeof x === 'function'
 export const isHash = x => isStr(x) && x.startsWith('0x')
 export const isInteger = x => isValidNumber(x) && `${x}`.split('.').length === 1
