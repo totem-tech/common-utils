@@ -6,6 +6,7 @@ let messages = {
     arrayUnique: 'array must not contain duplicate values',
     boolean: 'boolean value required',
     date: 'valid date required',
+    decimals: 'number exceeds maximum allowed decimals',
     email: 'valid email address required',
     hex: 'valid hexadecimal string required',
     identity: 'valid identity required',
@@ -72,7 +73,7 @@ export const setMessages = msgObj => {
 export const validate = (value, config, customMessages = {}) => {
     const errorMsgs = { ...messages, ...customMessages }
     try {
-        const { accept, keys, max, maxLength, min, minLength, reject, required, type, unique } = config || {}
+        const { accept, decimals, keys, max, maxLength, min, minLength, reject, required, type, unique } = config || {}
         // if doesn't have any value (undefined/null) and not `required`, assume valid
         if (!hasValue(value)) return required ? errorMsgs.required : null
         let valueIsArr = false
@@ -106,6 +107,14 @@ export const validate = (value, config, customMessages = {}) => {
                 if (!isValidNumber(value)) return errorMsgs.number
                 if (isValidNumber(min) && value < min) return errorMsgs.numberMin
                 if (isValidNumber(max) && value > max) return errorMsgs.numberMax
+                if (isValidNumber(decimals) && decimals >= 0) {
+                    if (decimals === 0) {
+                        if (!isInteger(value)) return errorMsgs.integer
+                        break
+                    }
+                    const len = (value.toString().split('.')[1] || '').length
+                    if (len > decimals) return `${errorMsgs.decimals}: ${decimals}`
+                }
                 break
             case 'object':
                 if (!isObj(value)) return errorMsgs.object
