@@ -53,11 +53,11 @@ export default function PromisE(promise) {
  * @name    PromisE.all
  * @summary a wrapper for Promise.all with the benefits of `PromisE`
  * 
- * @param   {...Promise} promises
+ * @param   {Array|...Promise} promises
  * 
  * @returns {PromisE} 
  */
-PromisE.all = (...promises) => PromisE(Promise.all(promises))
+PromisE.all = (...promises) => PromisE(Promise.all(promises.flat()))
 
 /**
  * @name    PromisE.delay
@@ -124,7 +124,7 @@ PromisE.deferred = () => {
  * 
  * @returns {PromisE}
  */
-PromisE.all = (...promises) => PromisE(Promise.race(promises))
+PromisE.race = (...promises) => PromisE(Promise.race(promises))
 
 /**
  * @name    PromisE.timeout
@@ -152,12 +152,11 @@ PromisE.all = (...promises) => PromisE(Promise.race(promises))
  *
  * @returns {PromisE}
  */
-PromisE.timeout = function () {
-    const args = [...arguments]
-    const timeout = args.slice(-1) || 0
+PromisE.timeout = (...args) => {
+    const timeout = args.slice(-1) || 10000
     // use all arguments except last one
-    const promiseArgs = args.slice(0, args.length - 1)
-    const promise = promiseArgs.length === 1 ? PromisE(promiseArgs[0]) : PromisE.all.apply(null, [...promiseArgs])
+    const promiseArgs = args.slice(0, -1)
+    const promise = promiseArgs.length === 1 ? PromisE(promiseArgs[0]) : PromisE.all(promiseArgs)
     const timeoutPromise = new PromisE((_, reject) =>
         // only reject if it's still pending
         setTimeout(() => promise.pending && reject('Timed out'), timeout)
