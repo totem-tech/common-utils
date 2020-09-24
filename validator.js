@@ -18,7 +18,9 @@ let messages = {
     numberMin: 'number is less than minimum required',
     object: 'valid object required',
     objectKeys: 'missing one or more required fields',
-    reject: 'value is rejected',
+    regex: 'ivnalid string pattern',
+    regexError: 'regex validation failed',
+    reject: 'value not acceptable',
     required: 'required field',
     string: 'valid string required',
     type: 'invalid type',
@@ -73,7 +75,21 @@ export const setMessages = msgObj => {
 export const validate = (value, config, customMessages = {}) => {
     const errorMsgs = { ...messages, ...customMessages }
     try {
-        const { accept, decimals, keys, max, maxLength, min, minLength, reject, required, type, unique } = config || {}
+        const {
+            accept,
+            decimals,
+            keys,
+            max,
+            maxLength,
+            min,
+            minLength,
+            regex,
+            reject,
+            required,
+            type,
+            unique,
+        } = config || {}
+
         // if doesn't have any value (undefined/null) and not `required`, assume valid
         if (!hasValue(value)) return required ? errorMsgs.required : null
         let valueIsArr = false
@@ -120,6 +136,12 @@ export const validate = (value, config, customMessages = {}) => {
                 if (!isObj(value)) return errorMsgs.object
                 if (isArr(keys) && keys.length > 0 && !objContains(value, keys)) return errorMsgs.objectKeys
                 break
+            case 'regex':
+                try {
+                    if (regex && isFn(regex.test) && !regex.test(value)) return errorMsgs.regex
+                } catch (err) {
+                    return `${errorMsgs.regexError}: ${err.message}`
+                }
             case 'string':
                 if (!isStr(value)) return errorMsgs.string
                 break
