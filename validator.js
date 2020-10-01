@@ -149,7 +149,7 @@ export const validate = (value, config, customMessages = {}) => {
                 // unsupported type
                 if (isStr(type)) return errorMsgs.type
                 // validation for unlisted types by checking if the value is an instance of `type`
-                // (eg: ApiPromise, Bond, BN)
+                // (eg: ApiPromise, BN)
                 if (!(value instanceof type)) return errorMsgs.type
         }
 
