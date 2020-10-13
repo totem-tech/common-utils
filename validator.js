@@ -218,7 +218,7 @@ export const validateObj = (obj = {}, config = {}, failFast = true, includeLabel
     if (!isObj(obj)) return errorMsgs.object
     try {
         const keys = Object.keys(config)
-        const errors = {}
+        let errors = {}
 
         for (let i = 0; i < keys.length; i++) {
             const key = keys[i]
@@ -226,6 +226,16 @@ export const validateObj = (obj = {}, config = {}, failFast = true, includeLabel
             const keyConfig = config[key]
             const { customMessages: keyMsgs, label } = keyConfig
             let error = validate(value, keyConfig, { ...errorMsgs, ...keyMsgs })
+            const isObjType = !error && keyConfig.type === TYPES.object && isObj(keyConfig.config) && isObj(value)
+            if (isObjType) {
+                error = validateObj(value, keyConfig.config, failFast, includeLabel, keyMsgs)
+                if (!failFast && error) {
+                    // error is an object
+                    Object.keys(error).forEach(propKey => {
+                        errors[`${key}.${propKey}`] = error[propKey]
+                    })
+                }
+            }
             if (!error) continue
             error = !error ? null : `${includeLabel ? (label || key) + ' => ' : ''}${error}`
             if (failFast) return error
