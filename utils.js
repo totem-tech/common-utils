@@ -55,8 +55,8 @@ export const generateHash = (seed, algo = 'blake2', bitLength = 256) => {
 // checks if supplied is a valid ss58 address string
 export const isAddress = x => {
 	try {
-		ss58Decode(x)
-		return true
+		const decoded = ss58Decode(x)
+		return !!decoded
 	} catch (e) {
 		return false
 	}
