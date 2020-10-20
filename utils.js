@@ -212,12 +212,7 @@ export const arrSort = (arr, key, reverse = false, sortOriginal = false) => {
 }
 
 // arrUnique returns unique values in an array
-export const arrUnique = (arr = []) => Object.values(
-	arr.reduce((itemsObj, item) => {
-		itemsObj[item] = item
-		return itemsObj
-	}, {})
-)
+export const arrUnique = (arr = []) => [...new Set(arr)]
 
 // className formats supplied value into CSS class name compatible string for React
 //
@@ -231,7 +226,7 @@ export const className = value => {
 		// convert into an array
 		value = Object.keys(value).map(key => !!value[key] && key)
 	}
-	if (!isArr(value)) return
+	if (!isArr(value)) return ''
 	return value
 		.filter(Boolean)
 		.map(x => !isObj(x) ? x : className(x))
@@ -250,8 +245,7 @@ export const className = value => {
 export const deferred = (callback, delay, thisArg) => {
 	if (!isFn(callback)) return // nothing to do!!
 	let timeoutId
-	return function () {
-		const args = arguments
+	return (...args) => {
 		if (timeoutId) clearTimeout(timeoutId)
 		timeoutId = setTimeout(() => callback.apply(thisArg, args), delay || 50)
 	}

@@ -1,4 +1,6 @@
-import { isStr, isBool, isValidNumber, hasValue, isInteger, isObj, isArr, objContains, isHash, isDate, arrUnique, isAddress } from './utils'
+import {
+   arrUnique, isAddress, isArr, isBool, isDate, isHash, isInteger, isObj, isStr, isValidNumber, hasValue, objHasKeys
+} from './utils'
 
 let messages = {
     accept: 'value not acceptable',
@@ -26,7 +28,7 @@ let messages = {
     type: 'invalid type',
 
     // non-TYPE specific
-    unexpectedError: 'unexpected validation error occured'
+    unexpectedError: 'unexpected validation error occured',
 }
 
 const emailPattern = new RegExp(/^(("[\w-\s]+")|([\w-]+(?:\.[\w-]+)*)|("[\w-\s]+")([\w-]+(?:\.[\w-]+)*))(@((?:[\w-]+\.)*\w[\w-]{0,66})\.([a-z]{2,9}(?:\.[a-z]{2})?)$)|(@\[?((25[0-5]\.|2[0-4][0-9]\.|1[0-9]{2}\.|[0-9]{1,2}\.))((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]{1,2})\.){2}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]{1,2})\]?$)/i)
@@ -79,6 +81,7 @@ export const validate = (value, config, customMessages = {}) => {
             accept,
             decimals,
             keys,
+            keysRequireValue: keyReqVal, 
             max,
             maxLength,
             min,
@@ -134,7 +137,7 @@ export const validate = (value, config, customMessages = {}) => {
                 break
             case 'object':
                 if (!isObj(value)) return errorMsgs.object
-                if (isArr(keys) && keys.length > 0 && !objContains(value, keys)) return errorMsgs.objectKeys
+                if (isArr(keys) && keys.length > 0 && !objHasKeys(value, keys), keyReqVal) return errorMsgs.objectKeys
                 break
             case 'regex':
                 try {
