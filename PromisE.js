@@ -104,7 +104,7 @@ PromisE.deferred = () => {
         ids = []
         cb.apply(null, arguments)
     }
-    return promise => new Promise((resolve, reject) => {
+    return promise => new PromisE((resolve, reject) => {
         const id = Symbol()
         ids.push(id)
         try {
