@@ -1,5 +1,17 @@
 import {
-   arrUnique, isAddress, isArr, isBool, isDate, isHash, isInteger, isObj, isStr, isValidNumber, hasValue, objHasKeys
+    arrUnique,
+    isAddress,
+    isArr,
+    isBool,
+    isDate,
+    isHash,
+    isHex,
+    isInteger,
+    isObj,
+    isStr,
+    isValidNumber,
+    hasValue,
+    objHasKeys,
 } from './utils'
 
 let messages = {
@@ -10,6 +22,7 @@ let messages = {
     date: 'valid date required',
     decimals: 'number exceeds maximum allowed decimals',
     email: 'valid email address required',
+    hash: 'valid cryptographic hash string required',
     hex: 'valid hexadecimal string required',
     identity: 'valid identity required',
     integer: 'valid integer required (no decimals)',
@@ -113,8 +126,11 @@ export const validate = (value, config, customMessages = {}) => {
             case 'email':
                 if (!isStr(value) || !emailPattern.test(value)) return errorMsgs.email
                 break
+            case 'hash': 
+                if (!isHash(value)) return errorMsgs.hash
+                break
             case 'hex':
-                if (!isHash(value)) return errorMsgs.hex
+                if (!isHex(value)) return errorMsgs.hex
                 break
             case 'identity':
                 if (!isAddress(value)) return errorMsgs.identity

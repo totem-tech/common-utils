@@ -1,6 +1,8 @@
 import { blake2AsHex } from '@polkadot/util-crypto'
 import { ss58Decode } from './convert'
 
+export const HEX_REGEX = /^0x[0-9a-f]+$/i
+export const HASH_REGEX = /^0x[0-9a-f]{64}$/i
 // default icons used in Message component
 export const icons = {
 	basic: '',
@@ -79,7 +81,8 @@ export const isDate = x => x instanceof Date && isValidNumber(x.getUTCMillisecon
 export const isDefined = x => x !== undefined && x !== null
 export const isError = x => x instanceof Error
 export const isFn = x => typeof x === 'function'
-export const isHash = x => isStr(x) && x.startsWith('0x')
+export const isHash = x => HASH_REGEX.test(`${x}`)
+export const isHex = x => HEX_REGEX.test(`${x}`)
 export const isInteger = x => isValidNumber(x) && `${x}`.split('.').length === 1
 export const isMap = x => x instanceof Map
 export const isObj = x => x !== null && !isArr(x) && !isMap(x) && typeof x === 'object'
