@@ -92,6 +92,7 @@ export const isObjArr = x => !isArr(x) ? false : !x.reduce((no, item) => no || !
 export const isObjMap = x => !isMap(x) ? false : !Array.from(x).reduce((no, item) => no || !isObj(item[1]), false)
 export const isPromise = x => x instanceof Promise
 export const isStr = x => typeof x === 'string'
+export const isSubjectLike = x => isObj(x) && isFn(x.subscribe)
 export const isUint8Arr = arr => arr instanceof Uint8Array
 export const isValidNumber = x => typeof x == 'number' && !isNaN(x) && isFinite(x)
 export const hasValue = x => {

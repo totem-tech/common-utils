@@ -88,7 +88,7 @@ export const setMessages = msgObj => {
  * @returns {String|Null} null if no errors. Otherwise, error message.
  */
 export const validate = (value, config, customMessages = {}) => {
-    const errorMsgs = { ...messages, ...customMessages }
+    const errorMsgs = { ...messages, ...customMessages,  }
     try {
         const {
             accept,
@@ -243,11 +243,11 @@ export const validateObj = (obj = {}, config = {}, failFast = true, includeLabel
             const key = keys[i]
             const value = obj[key]
             const keyConfig = config[key]
-            const { customMessages: keyMsgs, label } = keyConfig
-            let error = validate(value, keyConfig, { ...errorMsgs, ...keyMsgs })
+            const { customMessages: keySpecificErrorMsgs, label } = keyConfig
+            let error = validate(value, keyConfig, { ...errorMsgs, ...keySpecificErrorMsgs })
             const isObjType = !error && keyConfig.type === TYPES.object && isObj(keyConfig.config) && isObj(value)
             if (isObjType) {
-                error = validateObj(value, keyConfig.config, failFast, includeLabel, keyMsgs)
+                error = validateObj(value, keyConfig.config, failFast, includeLabel, keySpecificErrorMsgs)
                 if (!failFast && error) {
                     // error is an object
                     Object.keys(error).forEach(propKey => {
