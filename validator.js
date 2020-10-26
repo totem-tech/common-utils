@@ -52,6 +52,7 @@ export const TYPES = Object.freeze({
     boolean: 'boolean',
     date: 'date',
     email: 'email',
+    hash: 'hash',
     hex: 'hex',
     identity: 'identity',
     integer: 'integer',
