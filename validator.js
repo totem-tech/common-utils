@@ -131,7 +131,7 @@ export const validate = (value, config, customMessages = {}) => {
                 // Eg: 2020-02-30 is auto corrected to 2021-03-02)
                 if (isStr(value) && date.toISOString().split('T')[0] !== value.replace(' ', 'T').split('T')[0])
                     return errorMsgs.date
-                if (max && new Date(max) > date) return `${errorMsgs.dateMax} ${max}`
+                if (max && new Date(max) < date) return `${errorMsgs.dateMax} ${max}`
                 if (min && new Date(min) > date) return `${errorMsgs.dateMin} ${min}`
                 break
             case 'email':
