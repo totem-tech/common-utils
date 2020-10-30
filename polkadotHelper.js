@@ -1,7 +1,7 @@
 import { ApiPromise, WsProvider } from '@polkadot/api'
 import Keyring from '@polkadot/keyring/'
 import createPair from '@polkadot/keyring/pair'
-import { isFn, isArr, isDefined, isObj, isStr, isValidNumber, isArr2D } from '../utils/utils'
+import { isFn, isArr, isDefined, isObj, isStr, isValidNumber, isArr2D } from './utils'
 
 const TYPE = 'sr25519'
 const _keyring = new Keyring({ type: TYPE })

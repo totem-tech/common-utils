@@ -1,5 +1,6 @@
 import { blake2AsHex } from '@polkadot/util-crypto'
-import { ss58Decode } from './convert'
+// import { ss58Decode } from './convert'
+import {decodeAddress, encodeAddress, setSS58Format } from '@polkadot/util-crypto'
 
 export const HEX_REGEX = /^0x[0-9a-f]+$/i
 export const HASH_REGEX = /^0x[0-9a-f]{64}$/i
@@ -57,7 +58,7 @@ export const generateHash = (seed, algo = 'blake2', bitLength = 256) => {
 // checks if supplied is a valid ss58 address string
 export const isAddress = x => {
 	try {
-		const decoded = ss58Decode(x)
+		const decoded = decodeAddress(x)
 		return !!decoded
 	} catch (e) {
 		return false
