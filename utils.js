@@ -65,7 +65,7 @@ export const isAddress = x => {
 }
 export const isArr = x => Array.isArray(x)
 // isArr2D checks if argument is a 2-dimentional array
-export const isArr2D = x => isArr(x) && isArr(x[0])
+export const isArr2D = x => isArr(x) && x.every(isArr)
 export const isAsyncFn = x => x instanceof (async () => { }).constructor
 export const isBool = x => typeof x === 'boolean'
 export const isBond = x => {
@@ -85,12 +85,13 @@ export const isHash = x => HASH_REGEX.test(`${x}`)
 export const isHex = x => HEX_REGEX.test(`${x}`)
 export const isInteger = x => isValidNumber(x) && `${x}`.split('.').length === 1
 export const isMap = x => x instanceof Map
-export const isObj = x => x !== null && !isArr(x) && !isMap(x) && typeof x === 'object'
+export const isObj = x => !!x && typeof x === 'object' && x.constructor === Object
 // Checks if argument is an Array of Objects. Each element type must be object, otherwise will return false.
 export const isObjArr = x => !isArr(x) ? false : !x.reduce((no, item) => no || !isObj(item), false)
 // Checks if argument is a Map of Objects. Each element type must be object, otherwise will return false.
 export const isObjMap = x => !isMap(x) ? false : !Array.from(x).reduce((no, item) => no || !isObj(item[1]), false)
 export const isPromise = x => x instanceof Promise
+export const isSet = x => x instanceof Set
 export const isStr = x => typeof x === 'string'
 export const isSubjectLike = x => isObj(x) && isFn(x.subscribe)
 export const isUint8Arr = arr => arr instanceof Uint8Array
@@ -103,6 +104,8 @@ export const hasValue = x => {
 			case 'number': return isValidNumber(x)
 			// for both array and object
 			case 'object':
+				if (isArr(x)) return x.length > 0
+				if (isMap(x) || isSet(x)) return x.size > 0
 				return Object.keys(x).length > 0
 			case 'boolean':
 			default: return true // already defined
