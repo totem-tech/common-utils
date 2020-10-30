@@ -41,6 +41,7 @@ let messages = {
     required: 'required field',
     string: 'valid string required',
     type: 'invalid type',
+    url: 'invalid URL',
 
     // non-TYPE specific
     unexpectedError: 'unexpected validation error occured',
@@ -61,6 +62,7 @@ export const TYPES = Object.freeze({
     number: 'number',
     object: 'object',
     string: 'string',
+    url: 'url',
 })
 
 /**
@@ -174,6 +176,16 @@ export const validate = (value, config, customMessages = {}) => {
                 }
             case 'string':
                 if (!isStr(value)) return errorMsgs.string
+                break
+            case 'url': 
+                try {
+                    const url = new URL(value)
+                    // catch any auto-correction by `new URL()`. 
+                    // Eg: spaces in the domain name being replaced by`%20` or missing `/` in protocol being auto added
+                    if (url.href !== value) return errorMsgs.url
+                } catch (e) {
+                    return errorMsgs.url
+                }
                 break
             default:
                 // unsupported type
