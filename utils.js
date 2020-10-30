@@ -1,6 +1,9 @@
 import { blake2AsHex } from '@polkadot/util-crypto'
-import { ss58Decode } from './convert'
+// import { ss58Decode } from './convert'
+import {decodeAddress, encodeAddress, setSS58Format } from '@polkadot/util-crypto'
 
+export const HEX_REGEX = /^0x[0-9a-f]+$/i
+export const HASH_REGEX = /^0x[0-9a-f]{64}$/i
 // default icons used in Message component
 export const icons = {
 	basic: '',
@@ -55,15 +58,15 @@ export const generateHash = (seed, algo = 'blake2', bitLength = 256) => {
 // checks if supplied is a valid ss58 address string
 export const isAddress = x => {
 	try {
-		ss58Decode(x)
-		return true
+		const decoded = decodeAddress(x)
+		return !!decoded
 	} catch (e) {
 		return false
 	}
 }
 export const isArr = x => Array.isArray(x)
 // isArr2D checks if argument is a 2-dimentional array
-export const isArr2D = x => isArr(x) && isArr(x[0])
+export const isArr2D = x => isArr(x) && x.every(isArr)
 export const isAsyncFn = x => x instanceof (async () => { }).constructor
 export const isBool = x => typeof x === 'boolean'
 export const isBond = x => {
@@ -77,17 +80,21 @@ export const isBond = x => {
 // Date.getUTCMilliseconds() is used to make sure it's a valid Date
 export const isDate = x => x instanceof Date && isValidNumber(x.getUTCMilliseconds())
 export const isDefined = x => x !== undefined && x !== null
+export const isError = x => x instanceof Error
 export const isFn = x => typeof x === 'function'
-export const isHash = x => isStr(x) && x.startsWith('0x')
+export const isHash = x => HASH_REGEX.test(`${x}`)
+export const isHex = x => HEX_REGEX.test(`${x}`)
 export const isInteger = x => isValidNumber(x) && `${x}`.split('.').length === 1
 export const isMap = x => x instanceof Map
-export const isObj = x => x !== null && !isArr(x) && !isMap(x) && typeof x === 'object'
+export const isObj = x => !!x && typeof x === 'object' && !isArr(x) && !isMap(x) && !isSet(x)
 // Checks if argument is an Array of Objects. Each element type must be object, otherwise will return false.
 export const isObjArr = x => !isArr(x) ? false : !x.reduce((no, item) => no || !isObj(item), false)
 // Checks if argument is a Map of Objects. Each element type must be object, otherwise will return false.
 export const isObjMap = x => !isMap(x) ? false : !Array.from(x).reduce((no, item) => no || !isObj(item[1]), false)
 export const isPromise = x => x instanceof Promise
+export const isSet = x => x instanceof Set
 export const isStr = x => typeof x === 'string'
+export const isSubjectLike = x => isObj(x) && isFn(x.subscribe)
 export const isUint8Arr = arr => arr instanceof Uint8Array
 export const isValidNumber = x => typeof x == 'number' && !isNaN(x) && isFinite(x)
 export const hasValue = x => {
@@ -98,6 +105,8 @@ export const hasValue = x => {
 			case 'number': return isValidNumber(x)
 			// for both array and object
 			case 'object':
+				if (isArr(x)) return x.length > 0
+				if (isMap(x) || isSet(x)) return x.size > 0
 				return Object.keys(x).length > 0
 			case 'boolean':
 			default: return true // already defined
@@ -211,12 +220,7 @@ export const arrSort = (arr, key, reverse = false, sortOriginal = false) => {
 }
 
 // arrUnique returns unique values in an array
-export const arrUnique = (arr = []) => Object.values(
-	arr.reduce((itemsObj, item) => {
-		itemsObj[item] = item
-		return itemsObj
-	}, {})
-)
+export const arrUnique = (arr = []) => [...new Set(arr)]
 
 // className formats supplied value into CSS class name compatible string for React
 //
@@ -230,7 +234,7 @@ export const className = value => {
 		// convert into an array
 		value = Object.keys(value).map(key => !!value[key] && key)
 	}
-	if (!isArr(value)) return
+	if (!isArr(value)) return ''
 	return value
 		.filter(Boolean)
 		.map(x => !isObj(x) ? x : className(x))
@@ -249,8 +253,7 @@ export const className = value => {
 export const deferred = (callback, delay, thisArg) => {
 	if (!isFn(callback)) return // nothing to do!!
 	let timeoutId
-	return function () {
-		const args = arguments
+	return (...args) => {
 		if (timeoutId) clearTimeout(timeoutId)
 		timeoutId = setTimeout(() => callback.apply(thisArg, args), delay || 50)
 	}
@@ -271,18 +274,25 @@ export const objContains = (obj = {}, keys = []) => {
 	return true
 }
 
-// objCopy copies top level properties and returns another object
-//
-// Params:
-// @source  object
-// @dest    object (optional)
-// @force	boolean (optional) force create new object
-export const objCopy = (source, dest, force) => !isObj(source) ? dest || {} : (
-	Object.keys(source).reduce((obj, key) => {
-		obj[key] = source[key]
-		return obj
-	}, !force ? (dest || {}) : objCopy(dest, {}))
-)
+/**
+ * @name	objCopy
+ * @summary recursively copies properties of an object to another object
+ * 
+ * @param	{Object}	source				source object
+ * @param	{Object}	dest				destination object
+ * @param	{Array}		preventOverride		prevent overriding @source property value is in this list
+ */
+export const objCopy = (source = {}, dest = {}, preventOverride = [undefined]) => {
+	Object.keys(source).forEach(key => {
+		if (preventOverride.includes(source[key])) return
+		dest[key] = isArr(source[key])
+			? JSON.parse(JSON.stringify(source[key]))
+			: isObj(source[key])
+				? objCopy(source[key], dest[key], preventOverride)
+				: source[key]
+	})
+	return dest
+}
 
 // objClean produces a clean object with only the supplied keys and their respective values
 //
@@ -342,7 +352,10 @@ export const objHasKeys = (obj = {}, keys = [], requireValue = false) => {
 export const objReadOnly = (obj = {}, strict = false, silent = false) => new Proxy(obj, {
 	setProperty: (self, key, value) => {
 		// prevents adding new or updating existing property
-		if (strict === true) {
+		const isStrict = !isFn(strict)
+			? strict === true
+			: strict(self, key, value)
+		if (isStrict) {
 			if (silent) return true
 			throw new TypeError(`Assignment to constant ${Array.isArray(obj) ? 'array' : 'object'} key: ${key}`)
 		} else if (!self.hasOwnProperty(key)) {
@@ -466,17 +479,18 @@ export const search = (data, keywords, keys) => {
 	return fn(data, keyValues, false, false, true, false)
 }
 
-// Semantic UI Dropdown search defaults to only "text" option property.
-// This enables search by any option property (`searchKeys`).
-//
-// Params:
-// @searchKeys	array of strings
-//
-// Returns function: a callback function
-// 					Callback params:
-//					@options 		array of objects
-//					@searchQuery	string
-//					returns array of objects
+/**
+ * @name			searchRanked
+ * @summary 		enhanced search for Dropdown
+ * @description		Semantic UI Dropdown search defaults to only "text" option property.
+ * 					See FormInput for usage.
+ * @param {Array}	searchKeys default: ['text']
+ * 
+ * @returns	{Function}	a callback function. Params:
+ *						@options 		array of objects
+ *						@searchQuery	string
+ *						returns array of objects
+ */
 export const searchRanked = (searchKeys = ['text']) => (options, searchQuery) => {
 	if (!options || options.length === 0) return []
 	const uniqueValues = {}
@@ -485,8 +499,11 @@ export const searchRanked = (searchKeys = ['text']) => (options, searchQuery) =>
 	const search = key => {
 		const matches = options.map((option, i) => {
 			try {
+				if (!option || !hasValue(option[key])) return
 				// catches errors caused by the use of some special characters with .match() below
-				let x = (option[key] || '').toLowerCase().match(searchQuery)
+				let x = JSON.stringify(option[key])
+					.toLowerCase()
+					.match(searchQuery)
 				if (!x || uniqueValues[options[i].value]) return
 				const matchIndex = x.index
 				uniqueValues[options[i].value] = 1

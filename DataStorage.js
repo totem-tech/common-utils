@@ -1,5 +1,5 @@
-import { isDefined, isStr, mapSearch, isMap, isValidNumber, mapSort, isArr } from './utils'
 import { BehaviorSubject, Subject } from 'rxjs'
+import { isDefined, isStr, mapSearch, isMap, isValidNumber, mapSort, isArr, isFn } from './utils'
 
 let storage, isNode
 // use this to force all instances of DataStorage where caching is enabled to update data from LocalStorage
@@ -69,23 +69,25 @@ export default class DataStorage {
      *  - `disableCache = false`: data is never preserved in-memory and every read/write 
      *      operation will be directly from/to the appropriate storage
      *
-     * @param {String}  name filename (NodeJS) or property name (browser LocalStorage).
-     * @param {Boolean} disableCache (optional) Whether to keep data in-memory. Default: false
+     * @param {String}    name filename (NodeJS) or property name (browser LocalStorage).
+     * @param {Boolean}   disableCache (optional) Whether to keep data in-memory. Default: false
+     * @param {Function}  onChange (optional) callback to be invoked on change of data.
+     *                      See Subject/BehaviorSubject.subscribe for more details.
+     * @param {Map}       initialValue (optional) Default: new Map()
      */
-    constructor(name, disableCache = false) {
+    constructor(name, disableCache = false, initialValue, onChange) {
+        let data = (name && read(name)) || initialValue
+        data = !isMap(data) ? new Map() : data
         this.name = name
         this.disableCache = name && disableCache
-        if (this.disableCache) {
-            // only updates whenever this.set() or this.setAll() is invoked (directly or indirectly)
-            this.rxData = new Subject()
-            this.size = 0
-            return
-        }
-        this.rxData = new BehaviorSubject(read(this.name))
-        this.size = this.rxData.value ? this.rxData.value.size : 0
+        this.rxData = this.disableCache ? new Subject() : new BehaviorSubject(data)
+        this.size = data.size
+        isFn(onChange) && this.rxData.subscribe(onChange)
+        if (this.disableCache) return
+
         // update cached data from localStorage throughout the application only when triggered
         rxForeUpdateCache.subscribe(ok => {
-            if (ok !== true) return
+            if (this.disableCache || ok !== true) return
             const data = read(this.name)
             this.size = data.size
             this.rxData.next(data)

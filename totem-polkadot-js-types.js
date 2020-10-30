@@ -19,15 +19,24 @@ export default {
     "EventRecord": "EventRecordTo76", // from PolkadotJS types
     // "Event": "Vec<EventRecord>", // Comments in Riot Channel
     // "Storage": "Vec<StorageKey>", // Comments in Riot Channel
-    "BalanceLockV1": {
-        "id": "[u8;8]",
-        "amount": "u64",
-        "until": "u64",
-        "reasons": "i8"
-    }, // Added for compatibility v1 
-    "BalanceLockV1<[u8;8],u64,u64,i8>": "BalanceLockV1", // Added for compatibility v1
-    "Locks": "Vec<BalanceLockV1<Vec<u8>,u64,u64,i8>>", // Added for compatibility v1
-    "LockIdentifier": "[u8;8]", // Added for compatibility v1
+    WithdrawReasons: {
+        _set: {
+            TransactionPayment: 1,
+            Transfer: 2,
+            Reserve: 4,
+            Fee: 8,
+            Tip: 16,
+        }
+    },
+    "LockIdentifier": "[u8; 8]", // Added for compatibility v1
+    BalanceLockV1: {
+        id: 'LockIdentifier',
+        amount: 'Balance',
+        until: 'BlockNumber',
+        reasons: 'WithdrawReasons'
+    },
+    "BalanceLockV1<[u8; 8],u64,u64,i8>": "BalanceLockV1", // Added for compatibility v1
+    // "Locks": "Vec<BalanceLockV1<Vec<u8>,u64,u64,i8>>", // Added for compatibility v1
     "AcceptAssignedStatus": "bool",
     "Account": "u64",
     "AccountOf": "Account",

@@ -1,6 +1,6 @@
-import { isArr, isBond, isStr, isObj, isUint8Arr } from '../utils/utils'
 import { hexToString, hexToU8a, stringToU8a, u8aToString, u8aToHex } from '@polkadot/util'
 import { checkAddress, decodeAddress, encodeAddress, setSS58Format } from '@polkadot/util-crypto'
+import { isArr, isStr, isObj, isUint8Arr } from './utils'
 
 // returns @fallbackValue if function call throws error
 const fallbackIfFails = (func, args = [], fallbackValue = null) => {
@@ -27,10 +27,12 @@ export const ss58Encode = address => fallbackIfFails(encodeAddress, [address])
 
 export const ss58Decode = address => fallbackIfFails(decodeAddress, [address])
 
-export const hexToBytes = (hex, bitLength) => isUint8Arr(hex) ? hex : fallbackIfFails(hexToU8a, [
-    isStr(hex) && !hex.startsWith('0x') ? '0x' + hex : hex,
-    bitLength
-])
+export const hexToBytes = (hex, bitLength) => isUint8Arr(hex)
+    ? hex
+    : fallbackIfFails(hexToU8a, [
+        isStr(hex) && !hex.startsWith('0x') ? '0x' + hex : hex,
+        bitLength
+    ])
 
 export const bytesToHex = bytes => fallbackIfFails(u8aToHex, [bytes])
 export const decodeUTF8 = stringToU8a // ToDo: deprecate
