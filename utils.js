@@ -273,18 +273,25 @@ export const objContains = (obj = {}, keys = []) => {
 	return true
 }
 
-// objCopy copies top level properties and returns another object
-//
-// Params:
-// @source  object
-// @dest    object (optional)
-// @force	boolean (optional) force create new object
-export const objCopy = (source, dest, force) => !isObj(source) ? dest || {} : (
-	Object.keys(source).reduce((obj, key) => {
-		obj[key] = source[key]
-		return obj
-	}, !force ? (dest || {}) : objCopy(dest, {}))
-)
+/**
+ * @name	objCopy
+ * @summary recursively copies properties of an object to another object
+ * 
+ * @param	{Object}	source				source object
+ * @param	{Object}	dest				destination object
+ * @param	{Array}		preventOverride		prevent overriding @source property value is in this list
+ */
+export const objCopy = (source = {}, dest = {}, preventOverride = [undefined]) => {
+	Object.keys(source).forEach(key => {
+		if (preventOverride.includes(source[key])) return
+		if (isObj(source[key])) {
+			dest[key] = objCopy(source[key], dest[key], preventOverride)
+			return
+		}
+		dest[key] = source[key]
+	})
+	return dest
+}
 
 // objClean produces a clean object with only the supplied keys and their respective values
 //
