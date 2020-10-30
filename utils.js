@@ -351,7 +351,10 @@ export const objHasKeys = (obj = {}, keys = [], requireValue = false) => {
 export const objReadOnly = (obj = {}, strict = false, silent = false) => new Proxy(obj, {
 	setProperty: (self, key, value) => {
 		// prevents adding new or updating existing property
-		if (strict === true) {
+		const isStrict = !isFn(strict)
+			? strict === true
+			: string(self, key, value)
+		if (isStrict) {
 			if (silent) return true
 			throw new TypeError(`Assignment to constant ${Array.isArray(obj) ? 'array' : 'object'} key: ${key}`)
 		} else if (!self.hasOwnProperty(key)) {
