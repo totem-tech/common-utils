@@ -4,7 +4,6 @@
 
 import { isDate, isStr, strFill } from "./utils";
 
-
 // prepends '0' if number is less than 10
 const fill = n => strFill(n, 2, '0')
 
@@ -63,5 +62,3 @@ export const durationToSeconds = duration => {
     const [hours = 0, minutes = 0, seconds = 0] = duration.split(':')
     return parseInt(seconds) + parseInt(minutes) * 60 + parseInt(hours) * 60 * 60
 }
-
-window.strFill = strFill

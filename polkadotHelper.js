@@ -13,9 +13,7 @@ const config = {
     // This is a temporary solution until upgraded to PolkadotJS V2.
     // 140 XTX for a simple transaction.
     // 1 XTX for existential balance. 
-    txFeeMin: 141,
-    txFeeBase: 1,
-    txFeePerByte: 1,
+    txFeeMin: 141, // unused/deprecated
     errorMsgs: {
         connectionFailed: 'Connection failed',
         connectionTimeout: 'Connection timeout',
@@ -88,13 +86,24 @@ export const setDefaultConfig = (nodes, types, timeout, errorMsgs = {}) => {
  * @returns {Number}    estimated transaction fee
  */
 export const getTxFee = async (api, address, tx, uri) => {
-    const { txFeeBase = 1, txFeePerByte = 1 } = config
     if (!keyring.contains(address)) keyring.add([uri])
     const account = _keyring.getPair(address)
-    const nonce = await query(api, api.query.system.accountNonce, address)
+    const [
+        nonce,
+        creationFee,
+        baseFee,
+        byteFee,
+        existentialDeposit,
+    ] = await query(api, api.queryMulti, [[
+        [api.query.system.accountNonce, address],
+        [api.query.balances.creationFee],
+        [api.query.balances.transactionBaseFee],
+        [api.query.balances.transactionByteFee],
+        [api.query.balances.existentialDeposit],
+    ]])
     const signedHex = sanitise(await tx.sign(account, { nonce }))
     const numBytes = signedHex.length / 2 - 1
-    return txFeeBase + txFeePerByte * numBytes
+    return existentialDeposit + creationFee + baseFee + byteFee * numBytes
 }
 
 export const keyring = {
