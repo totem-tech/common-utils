@@ -15,6 +15,7 @@ import {
     naclVerify,
     randomAsU8a,
 } from '@polkadot/util-crypto'
+import { isUint8Arr } from "./utils"
 import {
     bytesToHex,
     hexToBytes,
@@ -22,7 +23,6 @@ import {
     u8aToStr,
     strToU8a,
 } from "./convert"
-import { isUint8Arr } from "./utils"
 
 /**
  * @name newNonce ununsed

@@ -1,5 +1,6 @@
 import { blake2AsHex } from '@polkadot/util-crypto'
-import { ss58Decode } from './convert'
+// import { ss58Decode } from './convert'
+import {decodeAddress, encodeAddress, setSS58Format } from '@polkadot/util-crypto'
 
 export const HEX_REGEX = /^0x[0-9a-f]+$/i
 export const HASH_REGEX = /^0x[0-9a-f]{64}$/i
@@ -57,7 +58,7 @@ export const generateHash = (seed, algo = 'blake2', bitLength = 256) => {
 // checks if supplied is a valid ss58 address string
 export const isAddress = x => {
 	try {
-		const decoded = ss58Decode(x)
+		const decoded = decodeAddress(x)
 		return !!decoded
 	} catch (e) {
 		return false
@@ -85,7 +86,7 @@ export const isHash = x => HASH_REGEX.test(`${x}`)
 export const isHex = x => HEX_REGEX.test(`${x}`)
 export const isInteger = x => isValidNumber(x) && `${x}`.split('.').length === 1
 export const isMap = x => x instanceof Map
-export const isObj = x => !!x && typeof x === 'object' && x.constructor === Object
+export const isObj = x => !!x && typeof x === 'object' && !isArr(x) && !isMap(x) && !isSet(x)
 // Checks if argument is an Array of Objects. Each element type must be object, otherwise will return false.
 export const isObjArr = x => !isArr(x) ? false : !x.reduce((no, item) => no || !isObj(item), false)
 // Checks if argument is a Map of Objects. Each element type must be object, otherwise will return false.

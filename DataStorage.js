@@ -1,5 +1,5 @@
-import { isDefined, isStr, mapSearch, isMap, isValidNumber, mapSort, isArr, isFn } from './utils'
 import { BehaviorSubject, Subject } from 'rxjs'
+import { isDefined, isStr, mapSearch, isMap, isValidNumber, mapSort, isArr, isFn } from './utils'
 
 let storage, isNode
 // use this to force all instances of DataStorage where caching is enabled to update data from LocalStorage

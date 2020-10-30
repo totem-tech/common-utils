@@ -1,6 +1,6 @@
-import { isArr, isStr, isObj, isUint8Arr } from '../utils/utils'
 import { hexToString, hexToU8a, stringToU8a, u8aToString, u8aToHex } from '@polkadot/util'
 import { checkAddress, decodeAddress, encodeAddress, setSS58Format } from '@polkadot/util-crypto'
+import { isArr, isStr, isObj, isUint8Arr } from './utils'
 
 // returns @fallbackValue if function call throws error
 const fallbackIfFails = (func, args = [], fallbackValue = null) => {
