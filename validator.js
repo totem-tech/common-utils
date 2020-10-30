@@ -20,6 +20,8 @@ let messages = {
     arrayUnique: 'array must not contain duplicate values',
     boolean: 'boolean value required',
     date: 'valid date required',
+    dateMax: 'date date cannot be after',
+    dateMin: 'date cannot be before',
     decimals: 'number exceeds maximum allowed decimals',
     email: 'valid email address required',
     hash: 'valid cryptographic hash string required',
@@ -122,7 +124,15 @@ export const validate = (value, config, customMessages = {}) => {
                 break
             case 'date':
                 // validates both ISO string and Date object
-                if (!isDate(new Date(value))) return errorMsgs.date
+                const date = new Date(value)
+                const isValidDate = isDate(date)
+                if (!isValidDate) return errorMsgs.date
+                // makes sure auto correction didnt occur when using `new Date()`. 
+                // Eg: 2020-02-30 is auto corrected to 2021-03-02)
+                if (isStr(value) && date.toISOString().split('T')[0] !== value.replace(' ', 'T').split('T')[0])
+                    return errorMsgs.date
+                if (max && new Date(max) < date) return `${errorMsgs.dateMax} ${max}`
+                if (min && new Date(min) > date) return `${errorMsgs.dateMin} ${min}`
                 break
             case 'email':
                 if (!isStr(value) || !emailPattern.test(value)) return errorMsgs.email
