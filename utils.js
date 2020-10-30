@@ -353,7 +353,7 @@ export const objReadOnly = (obj = {}, strict = false, silent = false) => new Pro
 		// prevents adding new or updating existing property
 		const isStrict = !isFn(strict)
 			? strict === true
-			: string(self, key, value)
+			: strict(self, key, value)
 		if (isStrict) {
 			if (silent) return true
 			throw new TypeError(`Assignment to constant ${Array.isArray(obj) ? 'array' : 'object'} key: ${key}`)
