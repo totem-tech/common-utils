@@ -284,11 +284,11 @@ export const objContains = (obj = {}, keys = []) => {
 export const objCopy = (source = {}, dest = {}, preventOverride = [undefined]) => {
 	Object.keys(source).forEach(key => {
 		if (preventOverride.includes(source[key])) return
-		if (isObj(source[key])) {
-			dest[key] = objCopy(source[key], dest[key], preventOverride)
-			return
-		}
-		dest[key] = source[key]
+		dest[key] = isArr(source[key])
+			? JSON.parse(JSON.stringify(source[key]))
+			: isObj(source[key])
+				? objCopy(source[key], dest[key], preventOverride)
+				: source[key]
 	})
 	return dest
 }
