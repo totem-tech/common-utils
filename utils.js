@@ -1,6 +1,7 @@
-import { blake2AsHex } from '@polkadot/util-crypto'
+import { blake2AsHex, keccakAsHex } from '@polkadot/util-crypto'
 // import { ss58Decode } from './convert'
-import {decodeAddress, encodeAddress, setSS58Format } from '@polkadot/util-crypto'
+import { decodeAddress, encodeAddress, setSS58Format } from '@polkadot/util-crypto'
+import { isAddress as isETHAddress2 } from 'web3-utils'
 
 export const HEX_REGEX = /^0x[0-9a-f]+$/i
 export const HASH_REGEX = /^0x[0-9a-f]{64}$/i
@@ -40,12 +41,23 @@ export const downloadFile = (content, fileName, contentType) => {
 	a.click()
 }
 
-export const generateHash = (seed, algo = 'blake2', bitLength = 256) => {
-	switch (algo) {
+/**
+ * @name	generateHash
+ * @summary generate hash using supplied data
+ * 
+ * @param	{String}	seed data to generate hash of
+ * @param	{String}	algo supported algorithms: blake2 (default), keccak
+ * @param	{Number}	bitLength 
+ */
+export const generateHash = (seed, algo, bitLength = 256) => {
+	seed = isUint8Arr(seed) ? seed : (
+		isStr(seed) ? seed : JSON.stringify(seed)
+	)
+	switch (`${algo}`.toLowerCase()) {
+		case 'keccak':
+			return keccakAsHex(seed)
 		case 'blake2':
-			seed = isUint8Arr(seed) ? seed : (
-				isStr(seed) ? seed : JSON.stringify(seed)
-			)
+		default:
 			return blake2AsHex(seed, bitLength)
 		// ToDo: add support for other algo from Polkadot/utils-crypto
 	}
@@ -55,14 +67,28 @@ export const generateHash = (seed, algo = 'blake2', bitLength = 256) => {
 /*
  * Data validation
  */
-// checks if supplied is a valid ss58 address string
-export const isAddress = x => {
-	try {
-		const decoded = decodeAddress(x)
-		return !!decoded
-	} catch (e) {
-		return false
-	}
+/**
+ * @name    isAddress
+ * @summary validates if supplied is a valid address
+ * 
+ * @param    {String}	address 
+ * @param    {String}	type            (optional) Supported: Polkadot (default), ETH
+ * @param    {Number}	chainId			(optional) chainId for ETH address, ss58Format for Polkadot. Default: 0
+ * @param    {Boolean}	ignoreChecksum	(optional) for Polkadot only. Default: false
+ */
+export const isAddress = (address, type, chainId = 0, ignoreChecksum = false) => {
+    try {
+        switch (`${type}`.toLowerCase()) {
+            case 'ethereum':
+				return isETHAddress2(address, chainId || 0)
+			case 'polkadot':
+            default:
+                // assume Polkadot/totem address
+                return !!decodeAddress(address, ignoreChecksum, chainId)
+        }
+    } catch (e) {
+        return false
+    }
 }
 export const isArr = x => Array.isArray(x)
 // isArr2D checks if argument is a 2-dimentional array
@@ -81,6 +107,7 @@ export const isBond = x => {
 export const isDate = x => x instanceof Date && isValidNumber(x.getUTCMilliseconds())
 export const isDefined = x => x !== undefined && x !== null
 export const isError = x => x instanceof Error
+export const isETHAddress = isETHAddress2
 export const isFn = x => typeof x === 'function'
 export const isHash = x => HASH_REGEX.test(`${x}`)
 export const isHex = x => HEX_REGEX.test(`${x}`)

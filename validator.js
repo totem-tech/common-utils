@@ -146,7 +146,8 @@ export const validate = (value, config, customMessages = {}) => {
                 if (!isHex(value)) return errorMsgs.hex
                 break
             case 'identity':
-                if (!isAddress(value)) return errorMsgs.identity
+                const { chainType, chainId, ignoreChecksum } = config || {}
+                if (!isAddress(value,chainType, chainId, ignoreChecksum)) return errorMsgs.identity
                 break
             case 'integer':
                 if (!isInteger(value)) return errorMsgs.integer
