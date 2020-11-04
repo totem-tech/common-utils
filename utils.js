@@ -2,6 +2,7 @@ import { blake2AsHex, keccakAsHex } from '@polkadot/util-crypto'
 // import { ss58Decode } from './convert'
 import { decodeAddress, encodeAddress, setSS58Format } from '@polkadot/util-crypto'
 import { isAddress as isETHAddress2 } from 'web3-utils'
+import escapeStringRegexp from 'escape-string-regexp'
 
 export const HEX_REGEX = /^0x[0-9a-f]+$/i
 export const HASH_REGEX = /^0x[0-9a-f]{64}$/i
@@ -521,7 +522,7 @@ export const search = (data, keywords, keys) => {
 export const searchRanked = (searchKeys = ['text']) => (options, searchQuery) => {
 	if (!options || options.length === 0) return []
 	const uniqueValues = {}
-	searchQuery = (searchQuery || '').toLowerCase().trim()
+	searchQuery = escapeStringRegexp(`${searchQuery || ''}`).toLowerCase().trim()
 	if (!searchQuery) return options
 	const search = key => {
 		const matches = options.map((option, i) => {
