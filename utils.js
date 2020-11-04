@@ -520,18 +520,17 @@ export const search = (data, keywords, keys) => {
  *						returns array of objects
  */
 export const searchRanked = (searchKeys = ['text']) => (options, searchQuery) => {
+	if (!searchQuery) return options
 	if (!options || options.length === 0) return []
 	const uniqueValues = {}
-	searchQuery = escapeStringRegexp(`${searchQuery || ''}`).toLowerCase().trim()
+	const regex = new RegExp(escapeStringRegexp(searchQuery), 'i')
 	if (!searchQuery) return options
 	const search = key => {
 		const matches = options.map((option, i) => {
 			try {
 				if (!option || !hasValue(option[key])) return
 				// catches errors caused by the use of some special characters with .match() below
-				let x = JSON.stringify(option[key])
-					.toLowerCase()
-					.match(searchQuery)
+				let x = JSON.stringify(option[key]).match(regex)
 				if (!x || uniqueValues[options[i].value]) return
 				const matchIndex = x.index
 				uniqueValues[options[i].value] = 1
