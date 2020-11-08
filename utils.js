@@ -610,7 +610,7 @@ export const textEllipsis = (text, maxLen, numDots, split = true) => {
 	const isEven = textLen % 2 === 0
 	const arr = text.split('')
 	const dots = new Array(numDots).fill('.').join('')
-	const left = arr.slice(0, split ? partLen : maxLen).join('')
+	const left = arr.slice(0, split ? partLen : maxLen - numDots).join('')
 	const right = !split ? '' : arr.slice(text.length - (isEven ? partLen : partLen + 1)).join('')
 	return left + dots + right
 }
