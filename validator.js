@@ -14,10 +14,9 @@ import {
     objHasKeys,
 } from './utils'
 
-let messages = {
+export let messages = {
     accept: 'value not acceptable',
     array: 'valid array required',
-    arrayUnique: 'array must not contain duplicate values',
     boolean: 'boolean value required',
     date: 'valid date required',
     dateMax: 'date date cannot be after',
@@ -28,19 +27,20 @@ let messages = {
     hex: 'valid hexadecimal string required',
     identity: 'valid identity required',
     integer: 'valid integer required (no decimals)',
+    requiredKeys: 'missing one or more required fields',
     lengthMax: 'maximum length exceeded',
     lengthMin: 'minimum length required',
     number: 'valid number required',
     numberMax: 'number exceeds maximum allowed',
     numberMin: 'number is less than minimum required',
     object: 'valid object required',
-    objectKeys: 'missing one or more required fields',
     regex: 'ivnalid string pattern',
     regexError: 'regex validation failed',
     reject: 'value not acceptable',
     required: 'required field',
     string: 'valid string required',
     type: 'invalid type',
+    unique: 'array must not contain duplicate values',
     url: 'invalid URL',
 
     // non-TYPE specific
@@ -99,7 +99,7 @@ export const validate = (value, config, customMessages = {}) => {
             accept,
             decimals,
             keys,
-            keysRequireValue: keyReqVal, 
+            requiredKeys, 
             max,
             maxLength,
             min,
@@ -108,7 +108,7 @@ export const validate = (value, config, customMessages = {}) => {
             reject,
             required,
             type,
-            unique,
+            unique = false,
         } = config || {}
 
         // if doesn't have any value (undefined/null) and not `required`, assume valid
@@ -118,7 +118,7 @@ export const validate = (value, config, customMessages = {}) => {
         switch (type) {
             case 'array':
                 if (!isArr(value)) return errorMsgs.array
-                if (unique && arrUnique(value).length < value.length) return errorMsgs.arrayUnique
+                if (unique && arrUnique(value).length < value.length) return errorMsgs.unique
                 valueIsArr = true
                 break
             case 'boolean':
@@ -167,7 +167,11 @@ export const validate = (value, config, customMessages = {}) => {
                 break
             case 'object':
                 if (!isObj(value)) return errorMsgs.object
-                if (isArr(keys) && keys.length > 0 && !objHasKeys(value, keys), keyReqVal) return errorMsgs.objectKeys
+                if (
+                    isArr(keys)
+                    && keys.length > 0
+                    && !objHasKeys(value, keys), requiredKeys
+                ) return errorMsgs.requiredKeys
                 break
             case 'regex':
                 try {
@@ -291,6 +295,7 @@ export const validateObj = (obj = {}, config = {}, failFast = true, includeLabel
 }
 
 export default {
+    messages,
     setMessages,
     TYPES,
     validate,
