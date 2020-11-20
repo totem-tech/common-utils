@@ -22,10 +22,27 @@ export const format = (date, seconds = false, ms = false) => {
         date = date.toISOString()
     }
     if (!isStr(date)) return ''
-    date = date.replace(/\T|\Z/g, ' ')
-    // return full date string
-    if (seconds && ms) return date
-    return date.substr(0, seconds ? 19 : 16)
+    const xDate = new Date(date)
+    let formatted = [
+        xDate.getFullYear(),
+        xDate.getMonth(),
+        xDate.getDate(),
+    ]
+        .map(fill)
+        .join('-')
+
+    formatted += ' ' + [
+        xDate.getHours(),
+        xDate.getMinutes(),
+        seconds && xDate.getSeconds(),
+    ]
+        .filter(Boolean)
+        .map(fill)
+        .join(':')
+    
+    return !seconds || !ms
+        ? formatted
+        : `${formatted}.${xDate.getMilliseconds()}`
 }
 
 export const BLOCK_DURATION_SECONDS = 15

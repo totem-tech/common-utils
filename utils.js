@@ -555,6 +555,7 @@ export const sort = (data, key, reverse, sortOriginal) => {
 /**
  * @name 	strFill
  * @summary pre/post-fill a string
+ * 
  * @param {String}	str text to pre/post-fill 
  * @param {Number}	maxLen maximum total length of result string. Default: 2
  * @param {String}	filler string to fill
