@@ -84,8 +84,10 @@ export const isAddress = (address, type, chainId = 0, ignoreChecksum = false) =>
 				return isETHAddress2(address, chainId || 0)
 			case 'polkadot':
             default:
-                // assume Polkadot/totem address
-                return !!decodeAddress(address, ignoreChecksum, chainId)
+				// assume Polkadot/Totem address
+				const account = decodeAddress(address, ignoreChecksum, chainId)
+				// must be 32 bytes length
+                return !!account && account.length === 32
         }
     } catch (e) {
         return false
