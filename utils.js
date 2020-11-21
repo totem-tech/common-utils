@@ -96,6 +96,8 @@ export const isAddress = (address, type, chainId = 0, ignoreChecksum = false) =>
 export const isArr = x => Array.isArray(x)
 // isArr2D checks if argument is a 2-dimentional array
 export const isArr2D = x => isArr(x) && x.every(isArr)
+// checks if convertible to an array by using `Array.from(x)`
+export const isArrLike = x => isSet(x) || isMap(x) || isArr(x)
 export const isAsyncFn = x => x instanceof (async () => { }).constructor
 export const isBool = x => typeof x === 'boolean'
 export const isBond = x => {
