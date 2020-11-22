@@ -113,6 +113,7 @@ export const validate = (value, config, customMessages = {}) => {
 
         // if doesn't have any value (undefined/null) and not `required`, assume valid
         if (!hasValue(value)) return required ? errorMsgs.required : null
+        
         let valueIsArr = false
         // validate value type
         switch (type) {
@@ -147,7 +148,13 @@ export const validate = (value, config, customMessages = {}) => {
                 break
             case 'identity':
                 const { chainType, chainId, ignoreChecksum } = config || {}
-                if (!isAddress(value,chainType, chainId, ignoreChecksum)) return errorMsgs.identity
+                const isIdentityValid = isAddress(
+                    value,
+                    chainType,
+                    chainId,
+                    ignoreChecksum,
+                )
+                if (!isIdentityValid) return errorMsgs.identity
                 break
             case 'integer':
                 if (!isInteger(value)) return errorMsgs.integer
@@ -261,9 +268,10 @@ export const validate = (value, config, customMessages = {}) => {
  * @returns {String|Object|Null} Null if no errors. If @failFast, String otherwise, Object with one or more errors.
  */
 export const validateObj = (obj = {}, config = {}, failFast = true, includeLabel = true, customMessages = {}) => {
-    const errorMsgs = { ...messages, ...customMessages }
-    if (!isObj(obj)) return errorMsgs.object
     try {
+        const errorMsgs = { ...messages, ...customMessages }
+        if (!isObj(obj)) return errorMsgs.object
+
         const keys = Object.keys(config)
         let errors = {}
 
@@ -271,24 +279,49 @@ export const validateObj = (obj = {}, config = {}, failFast = true, includeLabel
             const key = keys[i]
             const value = obj[key]
             const keyConfig = config[key]
-            const { customMessages: keySpecificErrorMsgs, label } = keyConfig
-            let error = validate(value, keyConfig, { ...errorMsgs, ...keySpecificErrorMsgs })
-            const isObjType = !error && keyConfig.type === TYPES.object && isObj(keyConfig.config) && isObj(value)
-            if (isObjType) {
-                error = validateObj(value, keyConfig.config, failFast, includeLabel, keySpecificErrorMsgs)
-                if (!failFast && error) {
-                    // error is an object
-                    Object.keys(error).forEach(propKey => {
+            const {
+                config: childConf,
+                customMessages: keyErrMsgs,
+                label,
+                type,
+            } = keyConfig
+            let error = validate(
+                value,
+                keyConfig,
+                {
+                    // combine error messages
+                    ...errorMsgs,
+                    ...keyErrMsgs,
+                },
+            )
+            const validateChildProps = !error
+                && type === TYPES.object
+                && isObj(childConf)
+                && isObj(value)
+            if (validateChildProps) {
+                // property is an object type and contains validation confirguration for it's own properties
+                error = validateObj(
+                    value,
+                    childConf,
+                    failFast,
+                    includeLabel,
+                    keyErrMsgs,
+                )
+                // error is an object. 
+                error && !failFast && Object.keys(error)
+                    .forEach(propKey => 
                         errors[`${key}.${propKey}`] = error[propKey]
-                    })
-                }
+                    )
             }
             if (!error) continue
-            error = !error ? null : `${includeLabel ? (label || key) + ' => ' : ''}${error}`
+            if (includeLabel) error = `${label || key} => ${error}`
             if (failFast) return error
+
+            // combine all errors into a single object
             errors[key] = error
         }
-        return Object.keys(errors).length ? errors : null //(all supplied valid according to config)
+
+        return Object.keys(errors).length ? errors : null // all valid according to config
     } catch (err) {
         return err
     }
