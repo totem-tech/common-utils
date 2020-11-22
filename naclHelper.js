@@ -80,7 +80,7 @@ export const decrypt = (sealed = '', nonce = '', senderPublicKey = '', receiverS
         hexToBytes(receiverSecretKey),
     )
     if (!decrypted) return decrypted
-    return !asString ? decrypt : u8aToStr(decrypted)
+    return !asString ? decrypted : u8aToStr(decrypted)
 }
 
 /**
