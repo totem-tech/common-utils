@@ -1,5 +1,13 @@
 import { isAsyncFn, isPromise, isFn } from "./utils"
-
+let AbortController2, fetch2
+try {
+    AbortController2 = AbortController
+    fetch2 = fetch
+} catch (err) {
+    // only require in nodejs
+    AbortController2 = require('abort-controller')
+    fetch2 = require('node-fetch')
+}
 /** 
  * @name PromisE
  * @summary attempts to solve a simple problem of Promise status (resolved/rejected) not being accessible externally.
@@ -59,16 +67,6 @@ export default function PromisE(promise) {
  */
 PromisE.all = (...promises) => PromisE(Promise.all(promises.flat()))
 
-/**
- * @name    PromisE.delay
- * @summary simply a setTimeout as a promise
- * 
- * @param   {Number} delay
- * 
- * @returns {PromisE}
- */
-PromisE.delay = delay => PromisE(resolve => setTimeout(resolve, delay))
-
 /** 
  * @name PromisE.deferred
  * @summary the adaptation of the `deferred()` function tailored for Promises.
@@ -115,6 +113,32 @@ PromisE.deferred = () => {
     })
 }
 
+/**
+ * @name    PromisE.delay
+ * @summary simply a setTimeout as a promise
+ * 
+ * @param   {Number} delay
+ * 
+ * @returns {PromisE}
+ */
+PromisE.delay = delay => PromisE(resolve => setTimeout(resolve, delay))
+
+// if timed out err.name will be 'AbortError''
+PromisE.fetch = async (url, options = {}, timeout, asJson = true) => {
+    const abortCtrl = timeout && new AbortController2()
+    if (abortCtrl) {
+        options.signal = abortCtrl.signal
+        setTimeout(() => abortCtrl.abort(), timeout)
+    }
+    fetch2.Promise = PromisE
+    try {
+        const result = await fetch(url, options)
+        return asJson ? await result.json() : result
+    } catch (err) {
+        if (err.name === 'AbortError') throw 'Request timed out'
+        throw err
+    }
+}
 
 /** 
  * @name    PromisE.race

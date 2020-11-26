@@ -416,10 +416,10 @@ export const objReadOnly = (obj = {}, strict = false, silent = false) => new Pro
  * 
  * @returns	{String}
  */
-export const objToUrlParams = (obj = {}) => Object.keys(obj)
+export const objToUrlParams = (obj = {}, excludeUndefined = true) => Object.keys(obj)
     .map(key => {
 		const value = obj[key]
-		if (value === undefined) return
+		if (excludeUndefined && value === undefined) return
 		const valueEscaped = !isArr(value)
 			? escape(value)
 			// prevents escaping comma when joining array
@@ -428,7 +428,17 @@ export const objToUrlParams = (obj = {}) => Object.keys(obj)
 
 	})
 	.filter(Boolean)
-    .join('&')
+	.join('&')
+	
+export const objToFormData = (obj = {}, excludeUndefined = true) => {
+	const formData = new FormData()
+	Object.keys(obj).forEach(key => { 
+		const value = obj[key]
+		if (excludeUndefined && value === undefined) return
+		formData.append(key, value)
+	})
+	return formData
+}
 
 // objWithoutKeys creates a new object excluding specified keys
 // 

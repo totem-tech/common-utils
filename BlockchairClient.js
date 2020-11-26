@@ -1,5 +1,5 @@
-import axios from 'axios'
-import { isAddress, isArr, isObj, objToUrlParams } from "./utils"
+import PromisE from './PromisE'
+import { isAddress, isArr, isObj, objToFormData, objToUrlParams } from "./utils"
 
 let messages = {
     invalidEthereumAddress: 'Invalid Ethereum address',
@@ -31,8 +31,17 @@ export default class BlockchairClient {
      * @returns {Object}
      */
     async getAPIKeyStats() {
-        const url = `${this.baseUrl}/premium/stats?key=${this.apiKey || ''}`
-        return await handleBCResponse(axios.get(url))
+        const url = `${this.baseUrl}/premium/stats`
+        return await handleBCResult(
+            PromisE.fetch(
+                url,
+                {
+                    data: objToFormData({ key: this.apiKey }),
+                    method: 'post',
+                },
+                this.timeout,
+            )
+        )
     }
 
     /**
@@ -61,12 +70,15 @@ export default class BlockchairClient {
      * ```
      */
     async getBalance(addresses = [], chain = 'bitcoin') {
-        const params = objToUrlParams({
-            addresses,
-            key: this.apiKey,
-        })
-        const url = `${this.baseUrl}/${chain}/addresses/balances?${params}`
-        return await handleBCResponse(axios.get(url))
+        const options = {
+            data: objToFormData({
+                addresses,
+                key: this.apiKey,
+            }),
+            method: 'post',
+        }
+        const url = `${this.baseUrl}/${chain}/addresses/balances`
+        return await handleBCResult(PromisE.fetch(url, options), this.timeout)
     }
 
     /**
@@ -139,21 +151,24 @@ export default class BlockchairClient {
         ))
         if (!isAddressesValid) throw messages.invalidEthereumAddress
 
-        const config = { timeout: this.timeout }
-        const params = objToUrlParams({
-            key: this.apiKey,
-            limit,
-            offset,
-        })
+        const options = {
+            data: objToFormData({
+                key: this.apiKey,
+                limit,
+                offset,
+            }),
+            method: 'post',
+        }
+        
         const network = mainnet ? '' : 'testnet/'
         const url = `${this.baseUrl}/ethereum/erc-20/${network}${tokenAddress}/dashboards/address`
-
         let results = await Promise.all(
             addresses.map(address =>
-                handleBCResponse(
-                    axios.get(
-                        `${url}/${address}?${params}`,
-                        config,
+                handleBCResult(
+                    PromisE.fetch(
+                        `${url}/${address}`,
+                        options,
+                        this.timeout,
                     )
                 )
             )
@@ -166,7 +181,7 @@ export default class BlockchairClient {
 
 /**
  * @name    handleBCRensponse
- * @summary encapsulation to simplify `Blockchair` requests made with `Axios`
+ * @summary simplifies `Blockchair` requests made
  *          by resolving to `data` returned by Blockchair
  *          and throwing with `context.error` if available
  * 
@@ -174,7 +189,7 @@ export default class BlockchairClient {
  * 
  * @returns {Promise}
  */
-const handleBCResponse = async (promise) => {
+const handleBCResult = async (promise) => {
     try {
         const result = await promise
         const { data } = result
@@ -200,4 +215,4 @@ const handleBCResponse = async (promise) => {
  * 
  * @returns {Object} all error messages after merge
  */
-export const setErrorMessages = (obj = {}) => messages = {...messages, obj}
+export const setErrorMessages = (obj = {}) => messages = { ...messages, obj }
