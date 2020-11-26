@@ -31,16 +31,12 @@ export default class BlockchairClient {
      * @returns {Object}
      */
     async getAPIKeyStats() {
-        const url = `${this.baseUrl}/premium/stats`
-        return await handleBCResult(
-            PromisE.fetch(
-                url,
-                {
-                    data: objToFormData({ key: this.apiKey }),
-                    method: 'post',
-                },
-                this.timeout,
-            )
+        const params = objToUrlParams({ key: this.apiKey })
+        const url = `${this.baseUrl}/premium/stats?${params}`
+        return await blockchairFetch(
+            url,
+            { method: 'get' },
+            this.timeout,
         )
     }
 
@@ -71,14 +67,18 @@ export default class BlockchairClient {
      */
     async getBalance(addresses = [], chain = 'bitcoin') {
         const options = {
-            data: objToFormData({
+            body: objToFormData({
                 addresses,
                 key: this.apiKey,
             }),
             method: 'post',
         }
         const url = `${this.baseUrl}/${chain}/addresses/balances`
-        return await handleBCResult(PromisE.fetch(url, options), this.timeout)
+        return await blockchairFetch(
+            url,
+            options,
+            this.timeout,
+        )
     }
 
     /**
@@ -86,14 +86,16 @@ export default class BlockchairClient {
      * @summary     get Ethereum ERC20 token balance, transaction history etc information for account holder
      * @description See https://blockchair.com/api/docs#link_504
      * 
-     * @param   {String|Array}  addresses       token holder address
-     * @param   {String}        tokenAddress    token contract address
-     * @param   {Number}        limit           (optional) maximum number of recent transactions to retrieve. 
-     *                                              Default: 100
-     * @param   {Number}        offset          (optional) number of recent transactions to skip.
-     *                                              Default: 0
-     * @param   {Boolean}       mainnet         (optional) whether to make the request on mainnet or testnet.
-     *                                              Default: true
+     * @param {Array|String} addresses    token holder address
+     * @param {String}       tokenAddress token contract address
+     * @param {Number}       limit        (optional) maximum number of recent transactions to retrieve. 
+     *                                        Default: 100
+     * @param {Number}       offset       (optional) number of recent transactions to skip.
+     *                                        Default: 0
+     * @param {Boolean}      mainnet      (optional) whether to make the request on mainnet or testnet.
+     *                                        Default: true
+     * @param {Boolean}      combine      (optional) whether to combine multi-query results into a single object.
+     *                                        Default: true
      * 
      * @returns {Object}
      * 
@@ -142,7 +144,7 @@ export default class BlockchairClient {
      *  // }
      * ```
      */
-    async getERC20HolderInfo(addresses, tokenAddress, limit = 100, offset = 0, mainnet = true) {
+    async getERC20HolderInfo(addresses, tokenAddress, limit = 100, offset = 0, mainnet = true, combine = true) {
         const isMultiQuery = isArr(addresses)
         addresses = !isMultiQuery ? [addresses] : addresses
         const isAddressesValid = addresses.every(address => isAddress(
@@ -151,58 +153,54 @@ export default class BlockchairClient {
         ))
         if (!isAddressesValid) throw messages.invalidEthereumAddress
 
-        const options = {
-            data: objToFormData({
-                key: this.apiKey,
-                limit,
-                offset,
-            }),
-            method: 'post',
-        }
+        const options = { method: 'get' }
+        const params = objToUrlParams({
+            key: this.apiKey,
+            limit,
+            offset,
+        })
         
         const network = mainnet ? '' : 'testnet/'
         const url = `${this.baseUrl}/ethereum/erc-20/${network}${tokenAddress}/dashboards/address`
         let results = await Promise.all(
             addresses.map(address =>
-                handleBCResult(
-                    PromisE.fetch(
-                        `${url}/${address}`,
-                        options,
-                        this.timeout,
-                    )
+                blockchairFetch(
+                    `${url}/${address}?${params}`,
+                    options,
+                    this.timeout,
                 )
             )
         )
-        results = results.reduce((obj, next) => ({ ...obj, ...next }), {})
-        if (!isMultiQuery) return results[addresses[0]]
-        return results
+        if (!isMultiQuery) return results[0]
+        if (!combine) return results
+        return results.reduce((obj, next) => ({
+            ...obj,
+            ...(next && next.data),
+        }), {})
     }
 }
 
 /**
- * @name    handleBCRensponse
- * @summary simplifies `Blockchair` requests made
- *          by resolving to `data` returned by Blockchair
- *          and throwing with `context.error` if available
+ * @name    blockchairFetch
+ * @summary simplifies `Blockchair` requests and  catches `context.error` if available
  * 
- * @param   {Promise} promise Blockchair API request promise using Axios
+ * @param   {...}   args arguments supported by `PromisE.fetch`
  * 
- * @returns {Promise}
+ * @returns {*}
  */
-const handleBCResult = async (promise) => {
+const blockchairFetch = async (...args) => {
     try {
-        const result = await promise
-        const { data } = result
-        if (data && data.context && data.context.error) throw result
-        if (data && data.data) return data.data
+        const result = await PromisE.fetch(...args)
+        const { context } = result
+        if (context && context.error) throw result
         return result
     } catch (err) {
         // capture Blockchair error message if available
-        const { response: { data } } = err
-        const hasContextError = isObj(data)
-            && data.context
-            && data.context.error
-        if (hasContextError) throw data.context.error
+        const { context } = err
+        const hasContextError = isObj(context)
+            && context
+            && context.error
+        if (hasContextError) throw context.error
         throw err
     }
 }

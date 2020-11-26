@@ -4,6 +4,14 @@ import { decodeAddress, encodeAddress, setSS58Format } from '@polkadot/util-cryp
 import { isAddress as isETHAddress2 } from 'web3-utils'
 import escapeStringRegexp from 'escape-string-regexp'
 
+let FormData2
+try {
+	FormData2 = FormData
+} catch (_) {
+	// for nodejs only
+	FormData2 = require('form-data')
+}
+
 export const HEX_REGEX = /^0x[0-9a-f]+$/i
 export const HASH_REGEX = /^0x[0-9a-f]{64}$/i
 // default icons used in Message component
@@ -431,10 +439,11 @@ export const objToUrlParams = (obj = {}, excludeUndefined = true) => Object.keys
 	.join('&')
 	
 export const objToFormData = (obj = {}, excludeUndefined = true) => {
-	const formData = new FormData()
+	let formData = new FormData2()
 	Object.keys(obj).forEach(key => { 
-		const value = obj[key]
+		let value = obj[key]
 		if (excludeUndefined && value === undefined) return
+		if (isArr(value)) value = value.join()
 		formData.append(key, value)
 	})
 	return formData

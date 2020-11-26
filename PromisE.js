@@ -1,4 +1,4 @@
-import { isAsyncFn, isPromise, isFn } from "./utils"
+import { isAsyncFn, isPromise, isFn, isObj } from "./utils"
 let AbortController2, fetch2
 try {
     AbortController2 = AbortController
@@ -124,7 +124,10 @@ PromisE.deferred = () => {
 PromisE.delay = delay => PromisE(resolve => setTimeout(resolve, delay))
 
 // if timed out err.name will be 'AbortError''
-PromisE.fetch = async (url, options = {}, timeout, asJson = true) => {
+PromisE.fetch = async (url, options, timeout, asJson = true) => {
+    options = isObj(options) ? options : {}
+    options.method = options.method || 'get'
+    
     const abortCtrl = timeout && new AbortController2()
     if (abortCtrl) {
         options.signal = abortCtrl.signal
