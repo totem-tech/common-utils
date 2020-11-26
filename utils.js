@@ -408,6 +408,28 @@ export const objReadOnly = (obj = {}, strict = false, silent = false) => new Pro
 	deleteProperty: () => false
 })
 
+/**
+ * @name	objToUrlParams
+ * @summary	constructs URL param string from an object, excluding any `undefined` values
+ * 
+ * @param	{Object} obj
+ * 
+ * @returns	{String}
+ */
+export const objToUrlParams = (obj = {}) => Object.keys(obj)
+    .map(key => {
+		const value = obj[key]
+		if (value === undefined) return
+		const valueEscaped = !isArr(value)
+			? escape(value)
+			// prevents escaping comma when joining array
+			: value.map(escape).join()
+		return `${key}=${valueEscaped}`
+
+	})
+	.filter(Boolean)
+    .join('&')
+
 // objWithoutKeys creates a new object excluding specified keys
 // 
 // Params:
