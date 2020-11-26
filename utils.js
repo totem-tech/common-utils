@@ -73,9 +73,11 @@ export const generateHash = (seed, algo, bitLength = 256) => {
  * @summary validates if supplied is a valid address
  * 
  * @param    {String}	address 
- * @param    {String}	type            (optional) Supported: Polkadot (default), ETH
- * @param    {Number}	chainId			(optional) chainId for ETH address, ss58Format for Polkadot. Default: 0
- * @param    {Boolean}	ignoreChecksum	(optional) for Polkadot only. Default: false
+ * @param    {String}	type            (optional) valid types: polkadot (default), ethereum
+ * @param    {Number}	chainId			(optional) chainId for Ethereum address, ss58Format for Polkadot.
+ * 											Default: 0
+ * @param    {Boolean}	ignoreChecksum	(optional) for Polkadot only.
+ * 											Default: false
  */
 export const isAddress = (address, type, chainId = 0, ignoreChecksum = false) => {
     try {
@@ -92,6 +94,10 @@ export const isAddress = (address, type, chainId = 0, ignoreChecksum = false) =>
     } catch (e) {
         return false
     }
+}
+isAddress.validTypes = {
+	ethereum: 'ethereum',
+	polkadot: 'polkadot',
 }
 export const isArr = x => Array.isArray(x)
 // isArr2D checks if argument is a 2-dimentional array
