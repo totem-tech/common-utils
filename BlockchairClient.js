@@ -18,7 +18,7 @@ export const getBalance_chains = {
     zcash: 'zcash',
 }
 export default class BlockchairClient {
-    constructor(apiKey, baseUrl = 'https://api.blockchair.com', timeout = 10000) {
+    constructor(apiKey, timeout = 10000, baseUrl = 'https://api.blockchair.com') {
         this.baseUrl = baseUrl
         this.apiKey = apiKey
         this.timeout = timeout
