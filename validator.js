@@ -12,6 +12,7 @@ import {
     isValidNumber,
     hasValue,
     objHasKeys,
+    isFn,
 } from './utils'
 
 export let messages = {
@@ -34,7 +35,7 @@ export let messages = {
     numberMax: 'number exceeds maximum allowed',
     numberMin: 'number is less than minimum required',
     object: 'valid object required',
-    regex: 'ivnalid string pattern',
+    regex: 'invalid string pattern',
     regexError: 'regex validation failed',
     reject: 'value not acceptable',
     required: 'required field',
@@ -180,12 +181,6 @@ export const validate = (value, config, customMessages = {}) => {
                     && !objHasKeys(value, keys), requiredKeys
                 ) return errorMsgs.requiredKeys
                 break
-            case 'regex':
-                try {
-                    if (regex && isFn(regex.test) && !regex.test(value)) return errorMsgs.regex
-                } catch (err) {
-                    return `${errorMsgs.regexError}: ${err.message}`
-                }
             case 'string':
                 if (!isStr(value)) return errorMsgs.string
                 break
@@ -224,6 +219,8 @@ export const validate = (value, config, customMessages = {}) => {
             const valid = !valueIsArr ? !reject.includes(value) : value.every(v => !reject.includes(v))
             if (!valid) return errorMsgs.reject
         }
+
+        if (regex && isFn(regex.test) && !regex.test(value)) return errorMsgs.regex
 
         // valid according to the config
         return null
