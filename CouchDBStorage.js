@@ -1,6 +1,5 @@
-import nano from 'nano'
 import uuid from 'uuid'
-import { isObj, isStr, isArr, arrUnique, isMap } from './utils/utils'
+import { isObj, isStr, isArr, arrUnique, isMap } from './utils'
 
 let connection
 // getConnection returns existing connection, if available.
@@ -11,6 +10,7 @@ let connection
 //
 // Returns  object
 export const getConnection = (url) => {
+    const nano = require('nano')
     connection = connection || nano(url)
     return connection
 }
