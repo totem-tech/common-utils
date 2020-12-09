@@ -2,10 +2,15 @@ import { isAsyncFn, isPromise, isFn, isObj } from "./utils"
 let AbortController2, fetch2
 try {
     AbortController2 = AbortController
-    fetch2 = fetch
+    console.log({AbortController})
 } catch (err) {
-    // only require in nodejs
+    // required if nodejs
     AbortController2 = require('abort-controller')
+}
+try {
+    fetch2 = fetch
+} catch (_) {
+    // required if nodejs
     fetch2 = require('node-fetch')
 }
 /** 

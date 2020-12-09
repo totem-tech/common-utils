@@ -1,20 +1,43 @@
 import uuid from 'uuid'
+import PromisE from './PromisE'
 import { isObj, isStr, isArr, arrUnique, isMap } from './utils'
 
+// globab connection for use with multiple databases
 let connection
-// getConnection returns existing connection, if available.
-// Otherwise, creates a new connection using the supplied URL.
-//
-// Params:
-// @url     string
-//
-// Returns  object
-export const getConnection = (url) => {
+/**
+ * @name    getConnection
+ * @summary getConnection returns existing connection, if available.
+ *          Otherwise, creates a new connection using the supplied URL.
+ * 
+ * @param   {String}    url 
+ * @param   {Boolean}   global whether to use global connection
+ * 
+ * @returns {Objecct}   CouchDB connection
+ */
+export const getConnection = (url, global = true) => {
+    if (global && connection) return connection
+
     const nano = require('nano')
-    connection = connection || nano(url)
+    const con = nano(url)
+    if (!global) return con
+
+    connection = con
     return connection
 }
 
+/**
+ * @name        CouchDBStorage
+ * @summary     a wrapper for `nano` NPM module for reading from and writing to CouchDB
+ * @description connection is only initialized only when first request is made or `getDB()` method is called.
+ * 
+ * @param   {String|Object|Null}    connectionOrUrl Possible values:
+ *                                      1. string: CouchDB connection URL including username and password
+ *                                      2. object: existing connection
+ *                                      3. null:   will use global `connection` if available.
+ * @param   {String}                dbName          database name
+ * 
+ * @returns {CouchDBStorage}
+ */
 export default class CouchDBStorage {
     constructor(connectionOrUrl, dbName) {
         this.connectionOrUrl = connectionOrUrl
@@ -22,60 +45,97 @@ export default class CouchDBStorage {
         this.dbName = dbName
     }
 
+    /**
+     * @name    getDB
+     */
     async getDB() {
-        if (this.dbPromise) {
-            // if initialization is already in progress wait for it
-            return await this.dbPromise
-        }
         if (this.db) return this.db
-        const c = this.connectionOrUrl
-        const con = c && isStr(c) ? nano(c) : c || connection
+        // if initialization is already in progress wait for it
+        if (this.dbPromise && !this.dbPromise.rejected) return await this.dbPromise
+        const cou = this.connectionOrUrl
+        const dbName = this.dbName
+        const con = cou && isStr(cou)
+            ? getConnection(cou)
+            : cou || connection
         // database already initialized
         if (!isObj(con)) throw new Error('CouchDB: invalid connection')
-        if (!this.dbName) throw new Error('CouchDB: missing database name')
+        if (!dbName) throw new Error('CouchDB: missing database name')
 
-        this.dbPromise = (async () => {
+        this.dbPromise = new PromisE (async () => {
             // retrieve a list of all database names
             const dbNames = await con.db.list()
             // database already exists, use it
-            if (dbNames.includes(this.dbName)) return con.use(this.dbName)
+            if (dbNames.includes(dbName)) return con.use(dbName)
 
             // database doesn't exist, create it
-            await con.db.create(this.dbName)
-            console.log('CouchDB: new database created. Name:', this.dbName)
+            await con.db.create(dbName)
+            console.log('CouchDB: new database created. Name:', dbName)
             this.dbPromise = null
-            return con.use(this.dbName)
-        })()
+            return con.use(dbName)
+        })
         return await this.dbPromise
     }
 
-    // delete removes one or more documents
-    //
-    // Params:
-    // @ids     string/array of strings
+    /**
+     * @name    delete
+     * @summary delete documents
+     * 
+     * @param   {String|Object|Map|Array} ids   Possible values:
+     *                        1. String: document `_id`
+     *                        2. Object: document with `_id` property. Will be ignored if does not include `_id`.
+     *                        3. Map: collection of (2) with `_id` as key 
+     *                        4. Array: collection of (1) or (2) or both.
+     * @returns {*}
+     */
     async delete(ids = []) {
-        if (!isArr(ids)) {
-            // invalid id supplied => ignore.
-            if (!isStr(ids)) return
-            // @ids is a string => convert to array
-            ids = [ids]
-        }
-        ids = arrUnique(ids.filter(id => isStr(id)))
+        ids = isArr(ids)
+            ? ids
+            : !isMap(ids)
+                ? [ids]
+                // convert documents Map to array
+                : Array.from(ids)
+                    .map(([_id, doc]) => ({ ...doc, _id }))
+        let documents = ids.filter(x => isObj(x) && !!x._id && x._rev)
+        ids = arrUnique(ids.filter(id => !!id && isStr(id)))
+        // nothing do to!
+        if (!ids.length && !documents.length) return
 
-        let documents = (await this.getAll(ids, false))
+        documents = [
+            ...documents,
+            ...(ids.length ? await this.getAll(ids, false) : []),
+        ]
             // exclude already deleted or not found documents
             .filter(x => x && !x._deleted)
             // add `_deleted` flag to mark the document for deletion
             .map(d => ({ ...d, _deleted: true }))
-        return documents.length === 0 ? [] : await this.setAll(documents)
+        // nothing to delete
+        if (!documents.length) return []
+        // save documents for deletion
+        return await this.setAll(documents)
     }
 
-    // find the first item matching criteria
+    /**
+     * @name    find
+     * @summary find the first item matching criteria
+     * 
+     * @param   {Object} selector   CouchDB selector for mango query
+     * @param   {Object} extraProps (optional) extra properties to be supplied to mango query. Eg: for sorting.
+     * 
+     * @returns {Object} document if available otherwise, undefined
+     */
     async find(selector, extraProps) {
         const docs = await this.search(selector, 1, 0, false, extraProps)
         return docs[0]
     }
 
+    /**
+     * @name    get
+     * @summary get document by ID without throwing error if ID doesn't exists.
+     * 
+     * @param   {String} id document ID. (the `_id` property)
+     * 
+     * @returns {Object} document if available otherwise, undefined
+     */
     async get(id) {
         const db = await this.getDB()
         // prevents throwing an error when document not found.
@@ -85,43 +145,72 @@ export default class CouchDBStorage {
         } catch (e) { }
     }
 
-    // get all or specific documents from a database
-    // 
-    // Params:
-    // @ids     array: use null/falsy to retrieve all items
-    // @asMap   boolean: whether to return the list of documents as a Map or Array
-    // @limit   number: if @ids is falsy, specifiy how many items to retrieve. 
-    //                  (if not specified, CouchDB will return 25 items by default)
-    // @skip    number: number of items to skip. Use for pagination
-    //
-    // Returns array/map: depends on @asMap
+    /**
+     * @name    getAll
+     * @summary get all or specific documents from a database.
+     * 
+     * @param   {Array|Null} ids    (optional) If document IDs supplied will retrieve all relevant documents in one go.
+     *                              Otherwise, will retrieve paginated documents by using `skip` and `limit`. 
+     * @param   {Boolean}    asMap  whether to return result as an `Array` or `Map`.
+     *                              Default: true
+     * @param   {Number}     limit  (optional) maximum number of items to retrieve in one go.
+     *                              Ignored if `ids` supplied.
+     *                              Default: 25
+     * @param   {Number}     skip   (optional) for pagination, number of items to skip.
+     *                              Ignored if `ids` supplied.
+     *                              Default: 0
+     * @returns {Map|Array}
+     */
     async getAll(ids = [], asMap = true, limit = 25, skip = 0) {
         const db = await this.getDB()
         // if ids supplied only retrieve only those otherwise, retrieve all (paginated)
-        let rows
-        if (!ids || ids.length === 0) {
-            rows = (await this.searchRaw({}, limit, skip)).docs
-        } else {
-            rows = (await db.fetch({ keys: ids }))
+        const paginate = !ids || ids.length === 0
+        const rows = paginate
+            ? (await this.searchRaw({}, limit, skip)).docs
+            : (await db.fetch({ keys: ids }))
                 .rows.map(x => x.doc)
                 // ignore not found documents
                 .filter(Boolean)
-        }
-        if (!asMap) return rows
-        return new Map(rows.map(x => [x._id, x]))
+        return asMap
+            ? new Map(rows.map(x => [x._id, x]))
+            : rows
     }
 
-    // search documents within the database
+    /**
+     * @name    search
+     * @summary search for documents using CouchDB mango query
+     * 
+     * @param   {Object}  selector   For documentation visit:
+     *                               https://docs.couchdb.org/en/stable/api/database/find.html#selector-syntax
+     * @param   {Number}  limit      (optional) number of items to retrieve 
+     *                               Default: 100
+     * @param   {Number}  skip       (optional) number of items to skip
+     *                               Default: 0 (unlimited)
+     * @param   {Boolean} asMap      (optional) whether to return result as an `Array` or `Map`
+     *                               Default: true
+     * @param   {Object}  extraProps (optional) extra properties to be supplied to to the mango query
+     * 
+     * @returns {Map|Array}
+     */
     async search(selector = {}, limit = 0, skip = 0, asMap = true, extraProps) {
         if (!isObj(selector) || Object.keys(selector).length === 0) return asMap ? new Map() : []
         const result = await this.searchRaw(selector, limit, skip, extraProps)
-        return !asMap ? result.docs : new Map(result.docs.map(doc => [doc._id, doc]))
+        return !asMap
+            ? result.docs
+            : new Map(result.docs.map(doc => [doc._id, doc]))
     }
 
-    //
-    // Params:
-    // @selector    string/object   
-    //https://docs.couchdb.org/en/stable/api/database/find.html#find-selectors
+    /**
+     * @name    searchRaw
+     * @summary sugar for `db.find()`
+     * 
+     * @param   {Object} selector 
+     * @param   {Number} limit 
+     * @param   {Number} skip 
+     * @param   {Object} extraProps 
+     * 
+     * @returns {Array}
+     */
     async searchRaw(selector = {}, limit = 0, skip = 0, extraProps = {}) {
         const db = await this.getDB()
         const query = {
@@ -161,19 +250,24 @@ export default class CouchDBStorage {
         return await db.insert(value, id)
     }
 
-    // setAll adds or updates one or more documents in single request
-    //
-    // Params:
-    // @docs            array/map
-    // @ignoreExisting  boolean: whether to ignore existing documents
-    //
-    // Returns
+    /**
+     * @name    setAll 
+     * @summary bulk add or update documents in single request
+     *
+     * Params:
+     * @param   {Array|Map} docs            documents to add or update
+     * @param   {Boolean}   ignoreIfExists  (optional) if true, will prevent overriding existing documents.
+     *                                      Default: false
+     *
+     * @returns {*}
+     */
     async setAll(docs, ignoreIfExists = false) {
         if (isMap(docs)) {
-            // convert map to array
+            // convert Map to Array
             docs = Array.from(docs).map(([_id, item]) => ({ ...item, _id }))
         }
-        if (docs.length === 0) return
+        if (!docs.length) return
+
         const db = await this.getDB()
         for (let i = 0; i < docs.length; i++) {
             const item = docs[i]
