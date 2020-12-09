@@ -2,7 +2,6 @@ import { isAsyncFn, isPromise, isFn, isObj } from "./utils"
 let AbortController2, fetch2
 try {
     AbortController2 = AbortController
-    console.log({AbortController})
 } catch (err) {
     // required if nodejs
     AbortController2 = require('abort-controller')
@@ -18,7 +17,7 @@ try {
  * @summary attempts to solve a simple problem of Promise status (resolved/rejected) not being accessible externally.
  * Also compatible with async functions
  *
- * @param {Promise|Function|*}  promise
+ * @param {Promise|Function|*}  promise AsyncFunction is not supported in NodeJS with Webpack!
  *
  * @example Examples:
  * <BR>

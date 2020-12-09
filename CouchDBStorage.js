@@ -16,13 +16,12 @@ let connection
  */
 export const getConnection = (url, global = true) => {
     if (global && connection) return connection
-
     const nano = require('nano')
     const con = nano(url)
-    if (!global) return con
-
-    connection = con
-    return connection
+    if (global) {
+        connection = con
+    }
+    return con
 }
 
 /**
@@ -46,12 +45,14 @@ export default class CouchDBStorage {
     }
 
     /**
-     * @name    getDB
+     * @name        getDB
+     * @summary     Connect to CouchDB and then create new or re-use existing `db` instance
+     * @description Will create new database, if does not exist.
      */
     async getDB() {
         if (this.db) return this.db
         // if initialization is already in progress wait for it
-        if (this.dbPromise && !this.dbPromise.rejected) return await this.dbPromise
+        if (this.dbPromise) return await this.dbPromise
         const cou = this.connectionOrUrl
         const dbName = this.dbName
         const con = cou && isStr(cou)
@@ -61,18 +62,23 @@ export default class CouchDBStorage {
         if (!isObj(con)) throw new Error('CouchDB: invalid connection')
         if (!dbName) throw new Error('CouchDB: missing database name')
 
-        this.dbPromise = new PromisE (async () => {
-            // retrieve a list of all database names
-            const dbNames = await con.db.list()
-            // database already exists, use it
-            if (dbNames.includes(dbName)) return con.use(dbName)
-
-            // database doesn't exist, create it
-            await con.db.create(dbName)
-            console.log('CouchDB: new database created. Name:', dbName)
-            this.dbPromise = null
-            return con.use(dbName)
-        })
+        this.dbPromise = new PromisE((resolve, reject) => (async ()=> {
+            try {
+                // retrieve a list of all database names
+                const dbNames = await con.db.list()
+                // database already exists, use it
+                if (!dbNames.includes(dbName)) {
+                    // database doesn't exist, create it
+                    console.log('CouchDB: new database created. Name:', dbName)
+                    await con.db.create(dbName)
+                }
+                this.dbPromise = null
+                resolve(con.use(dbName))
+            } catch (err) {
+                reject(err)
+            }
+        })())
+        
         return await this.dbPromise
     }
 
@@ -137,7 +143,9 @@ export default class CouchDBStorage {
      * @returns {Object} document if available otherwise, undefined
      */
     async get(id) {
+        this.name === 'users' && console.log('getDB')
         const db = await this.getDB()
+        this.name === 'users' && console.log({db})
         // prevents throwing an error when document not found.
         // instead returns undefined.
         try {
