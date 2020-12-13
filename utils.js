@@ -1,16 +1,14 @@
 import { blake2AsHex, keccakAsHex } from '@polkadot/util-crypto'
-// import { ss58Decode } from './convert'
-import { decodeAddress, encodeAddress, setSS58Format } from '@polkadot/util-crypto'
-import { isAddress as isETHAddress2 } from 'web3-utils'
-import escapeStringRegexp from 'escape-string-regexp'
-
-let FormData2
-try {
-	FormData2 = FormData
-} catch (_) {
-	// for nodejs only
-	FormData2 = require('form-data')
-}
+import { ss58Decode } from './convert'
+/*
+ * List of optional node-modules and the functions used by them:
+ * Module Name          : Function Name
+ * ---------------------------
+ * @polkadot/util-crypto: isAddress
+ * escapeStringRegexp   : escapeStringRegexp, searchRanked
+ * form-data   			: objToFormData
+ * web3-utils  			: isAddress, isETHAddress
+*/
 
 export const HEX_REGEX = /^0x[0-9a-f]+$/i
 export const HASH_REGEX = /^0x[0-9a-f]{64}$/i
@@ -48,6 +46,11 @@ export const downloadFile = (content, fileName, contentType) => {
 	a.href = URL.createObjectURL(file)
 	a.download = fileName
 	a.click()
+}
+
+export const escapeStringRegexp = (str) => {
+	const fn = require('escape-string-regexp')
+	return fn(str)
 }
 
 /**
@@ -90,12 +93,12 @@ export const generateHash = (seed, algo, bitLength = 256) => {
 export const isAddress = (address, type, chainId = 0, ignoreChecksum = false) => {
     try {
         switch (`${type}`.toLowerCase()) {
-            case 'ethereum':
-				return isETHAddress2(address, chainId || 0)
+			case 'ethereum':
+				return isETHAddress(address, chainId || 0)
 			case 'polkadot':
-            default:
+			default:
 				// assume Polkadot/Totem address
-				const account = decodeAddress(address, ignoreChecksum, chainId)
+				const account = ss58Decode(address, ignoreChecksum, chainId)
 				// must be 32 bytes length
                 return !!account && account.length === 32
         }
@@ -126,7 +129,10 @@ export const isBond = x => {
 export const isDate = x => x instanceof Date && isValidNumber(x.getUTCMilliseconds())
 export const isDefined = x => x !== undefined && x !== null
 export const isError = x => x instanceof Error
-export const isETHAddress = isETHAddress2
+export const isETHAddress = (address, chainId) => {
+	const { isAddress } = require('web3-utils')
+	return isAddress(address, chainId)
+}
 export const isFn = x => typeof x === 'function'
 export const isHash = x => HASH_REGEX.test(`${x}`)
 export const isHex = x => HEX_REGEX.test(`${x}`)
@@ -439,7 +445,14 @@ export const objToUrlParams = (obj = {}, excludeUndefined = true) => Object.keys
 	.join('&')
 	
 export const objToFormData = (obj = {}, excludeUndefined = true) => {
-	let formData = new FormData2()
+	let formData
+	try {
+		formData = new FormData()
+	} catch (_) {
+		// for nodejs only
+		const FormData = require('form-data')
+		formData = new FormData()
+	}
 	Object.keys(obj).forEach(key => { 
 		let value = obj[key]
 		if (excludeUndefined && value === undefined) return
@@ -573,16 +586,20 @@ export const search = (data, keywords, keys) => {
 export const searchRanked = (searchKeys = ['text']) => (options, searchQuery) => {
 	if (!searchQuery) return options
 	if (!options || options.length === 0) return []
+	
 	const uniqueValues = {}
 	const regex = new RegExp(escapeStringRegexp(searchQuery), 'i')
 	if (!searchQuery) return options
+
 	const search = key => {
 		const matches = options.map((option, i) => {
 			try {
 				if (!option || !hasValue(option[key])) return
+				
 				// catches errors caused by the use of some special characters with .match() below
 				let x = JSON.stringify(option[key]).match(regex)
 				if (!x || uniqueValues[options[i].value]) return
+
 				const matchIndex = x.index
 				uniqueValues[options[i].value] = 1
 				return { index: i, matchIndex }
@@ -590,6 +607,7 @@ export const searchRanked = (searchKeys = ['text']) => (options, searchQuery) =>
 				console.log(e)
 			}
 		}).filter(r => !!r)
+
 		return arrSort(matches, 'matchIndex').map(x => options[x.index])
 	}
 

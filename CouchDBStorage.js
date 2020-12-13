@@ -1,5 +1,6 @@
 import uuid from 'uuid'
 import PromisE from './PromisE'
+import nano from 'nano'
 import { isObj, isStr, isArr, arrUnique, isMap } from './utils'
 
 // globab connection for use with multiple databases
@@ -16,11 +17,8 @@ let connection
  */
 export const getConnection = (url, global = true) => {
     if (global && connection) return connection
-    const nano = require('nano')
     const con = nano(url)
-    if (global) {
-        connection = con
-    }
+    if (global) connection = con
     return con
 }
 

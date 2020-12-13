@@ -1,17 +1,12 @@
 import { isAsyncFn, isPromise, isFn, isObj } from "./utils"
-let AbortController2, fetch2
-try {
-    AbortController2 = AbortController
-} catch (err) {
-    // required if nodejs
-    AbortController2 = require('abort-controller')
-}
-try {
-    fetch2 = fetch
-} catch (_) {
-    // required if nodejs
-    fetch2 = require('node-fetch')
-}
+/*
+ * List of optional node-modules and the functions used by them:
+ * Module Name          : Function Name
+ * ------------------------------------
+ * abort-controller: PromisE.fetch
+ * node-fetch      : PromisE.fetch
+*/
+
 /** 
  * @name PromisE
  * @summary attempts to solve a simple problem of Promise status (resolved/rejected) not being accessible externally.
@@ -131,13 +126,27 @@ PromisE.delay = delay => PromisE(resolve => setTimeout(resolve, delay))
 PromisE.fetch = async (url, options, timeout, asJson = true) => {
     options = isObj(options) ? options : {}
     options.method = options.method || 'get'
+    let fetch2
+
+    try {
+        fetch2 = fetch
+    } catch (_) {
+        // required if nodejs
+        fetch2 = require('node-fetch')
+    }
+    fetch2.Promise = PromisE
     
-    const abortCtrl = timeout && new AbortController2()
-    if (abortCtrl) {
+    if (timeout) {
+        let abortCtrl
+        try {
+            abortCtrl = new AbortController()
+        } catch (err) {
+            abortCtrl = require('abort-controller')()
+        }
         options.signal = abortCtrl.signal
         setTimeout(() => abortCtrl.abort(), timeout)
     }
-    fetch2.Promise = PromisE
+    
     try {
         const result = await fetch(url, options)
         return asJson ? await result.json() : result

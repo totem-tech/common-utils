@@ -1,5 +1,6 @@
 import { BehaviorSubject, Subject } from 'rxjs'
 import { isDefined, isStr, mapSearch, isMap, isValidNumber, mapSort, isArr, isFn } from './utils'
+/* For NodeJS (non-browser applications) the following node module is required: node-localstorage */
 
 let storage, isNode
 // use this to force all instances of DataStorage where caching is enabled to update data from LocalStorage
