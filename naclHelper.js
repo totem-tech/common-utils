@@ -98,7 +98,7 @@ export const encryptionKeypair = (keyData, asHex = true) => {
  * @name    keyDateFromEncoded
  * @summary converts PolkadotJS keyring's `encoded` hex string to oo7-substrate style `keyData`, if required
  * 
- * @param   {String|Uint8Array} encoded hex string or bytes array
+ * @param   {String|Uint8Array} encoded hex string or bytes array. (Encoded: 117 bytes, KeyData: 96 bytes)
  * @param   {Boolean}           asHex   (optional) Default: false
  * 
  * @returns Uint8Array/String
@@ -151,15 +151,63 @@ export const keyInfoFromKeyData = (keyData = '', ss58Format = 0, asHex = false) 
 }
 
 /**
- * @name newNonce
- * @description generate a new random nonce of specific size
+ * @name    newNonce
+ * @summary generate a new random 24 bytes nonce
  * 
- * @param {Number} length default 24
- * @returns {Array} [Uint8Array, String]
+ * @param   {Boolean}   (optional) Default: true
+ * 
+ * @returns {Uint8Array|String}
  */
-export const newNonce = (length = 24, asHex = true) => {
+export const newNonce = (asHex = true) => randomBytes(24, asHex)
+
+/**
+ * @name    newSignature
+ * @summary generate a new signature using keypair and a message
+ * 
+ * @param   {String}    message 
+ * @param   {String}    publicKey 
+ * @param   {String}    secretKey   
+ * @param   {Boolean}   asHex       (optional) Default: true
+ * 
+ * @returns {String|Uint8Array} String Hex if `asHex = true`, otherwise, Uint8Array
+ */
+export const newSignature = (message, publicKey, secretKey, asHex = true) => {
+    const signature = naclSign(
+        message,
+        {
+            publicKey: hexToBytes(publicKey),
+            secretKey: hexToBytes(secretKey),
+        }
+    )
+    return !asHex ? signature : bytesToHex(signature)
+}
+
+/**
+ * @name    randomBytes
+ * @summary generate random bytes for use as nonce or bytes for keypair generation
+ * 
+ * @param   {Number} length 
+ * @param   {Boolean} asHex 
+ * 
+ * @returns {Uint8Array|String}
+ * 
+ * @example
+ * ```javascript
+ * // generate random bytes to be used to generate encryption or signing keypair
+ * const keyData = randomBytes(96, true)  // equivalent to oo7-substrate's `keyData`
+ * const encryptKP = encryptionKeypair(keyData, true)
+ * console.log({ keyData, encryptKP })
+ * 
+ * const encoded = randomBytes(117) // equivalent to PolkadotJS keyring's `encoded`
+ * const signKP = signingKeyPair(encoded, true)
+ * console.log({ encoded, signKP})
+ * ```
+ */
+export const randomBytes = (length, asHex = true) => {
     const bytes = randomAsU8a(length)
-    return !asHex ? bytes : bytesToHex(bytes)
+    return !asHex
+        ? bytes
+        : bytesToHex(bytes)
 }
 
 /**
@@ -208,28 +256,6 @@ export const secretBoxEncrypt = (message, secret, nonce, asHex = true) => {
     return !asHex
         ? encrypted
         : bytesToHex(encrypted)
-}
-
-/**
- * @name    newSignature
- * @summary generate a new signature using keypair and a message
- * 
- * @param   {String}    message 
- * @param   {String}    publicKey 
- * @param   {String}    secretKey   
- * @param   {Boolean}   asHex       (optional) Default: true
- * 
- * @returns {String|Uint8Array} String Hex if `asHex = true`, otherwise, Uint8Array
- */
-export const newSignature = (message, publicKey, secretKey, asHex = true) => {
-    const signature = naclSign(
-        message,
-        {
-            publicKey: hexToBytes(publicKey),
-            secretKey: hexToBytes(secretKey),
-        }
-    )
-    return !asHex ? signature : bytesToHex(signature)
 }
 
 /**
