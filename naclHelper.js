@@ -238,7 +238,8 @@ export const secretBoxDecrypt = (encrypted, nonce, secret, asString = true) => {
 
 /**
  * @name    naclEncrypt
- * @summary encrypt a message using TweetNaclJS SecretBox (AKA secret key) encryption
+ * @summary encrypt a message using TweetNaclJS SecretBox (AKA secret key) encryption.
+ *          All strings in the params are expected to be valid hex.
  * 
  * @param   {String|Uint8Array} message message to encrypt
  * @param   {String|Uint8Array} secret  secret key
@@ -249,6 +250,7 @@ export const secretBoxDecrypt = (encrypted, nonce, secret, asString = true) => {
  * @returns {Object}    `{ encrypted, nonce }`
  */
 export const secretBoxEncrypt = (message, secret, nonce, asHex = true) => {
+    nonce = nonce || newNonce(false) // generate new nonce
     const result = naclEncrypt1(
         isUint8Arr(message)
             ? message
@@ -257,9 +259,11 @@ export const secretBoxEncrypt = (message, secret, nonce, asHex = true) => {
                     ? message
                     : JSON.stringify(message) // convert to string
             ),
-        hexToBytes(secret),
-        !nonce
-            ? undefined // new nonce will be generated
+        isUint8Arr(secret)
+            ? secret
+            : hexToBytes(secret),
+        isUint8Arr(nonce)
+            ? nonce
             : hexToBytes(nonce),
     )
     if (!asHex) return result
