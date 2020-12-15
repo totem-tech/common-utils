@@ -291,11 +291,16 @@ export const signingKeyPair = (keyData, asHex = true) => {
 export const verifySignature = naclVerify
 
 export default {
-    encrypt,
     decrypt,
-    newSignature,
-    verifySignature,
-    keyInfoFromKeyData,
+    encrypt,
     encryptionKeypair,
+    keyDataFromEncoded,
+    keyInfoFromKeyData,
+    newNonce,
+    newSignature,
+    randomBytes,
+    secretBoxDecrypt,
+    secretBoxEncrypt,
     signingKeyPair,
+    verifySignature,
 }
