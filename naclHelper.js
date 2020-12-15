@@ -53,20 +53,22 @@ export const decrypt = (sealed = '', nonce = '', senderPublicKey = '', receiverS
  * @name encrypt
  * @description encrypt a message using TweetNacl Box seal encryption
  *
- * @param {String} message data to encrypt. String|Uint8Array
- * @param {String} senderSecretKey String|Uint8Array
- * @param {String} receiverPublicKey String|Uint8Array
- * @param {String} nonce (optional) String|Uint8Array
- * @param {Boolean} asHex whether to convert to hex or reutrn Uint8Array
+ * @param   {String|Uint8Array} message data to encrypt. String|Uint8Array
+ * @param   {String|Uint8Array} senderSecretKey
+ * @param   {String|Uint8Array} receiverPublicKey 
+ * @param   {String|Uint8Array} nonce (optional) if undefined, will generate new nonce
+ * @param   {Boolean}           asHex whether to convert to hex or reutrn Uint8Array
  *
- * @returns Object {sealed, nonce}
+ * @returns Object `{sealed, nonce}`
  */
 export const encrypt = (message, senderSecretKey, receiverPublicKey, nonce, asHex = true) => {
     const result = naclSeal(
-        isUint8Arr(message) ? message : strToU8a(message),
+        isUint8Arr(message)
+            ? message
+            : strToU8a(message),
         hexToBytes(senderSecretKey),
         hexToBytes(receiverPublicKey),
-        nonce, // Nonce: auto generated with 24 bit length
+        hexToBytes(nonce), // Nonce: auto generated with 24 bit length
     )
     return !asHex ? result : {
         sealed: bytesToHex(result.sealed),
