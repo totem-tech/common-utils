@@ -21,12 +21,14 @@ const fallbackIfFails = (func, args = [], fallbackValue = null) => {
  * @summary convert identity/address from bytes to string
  * 
  * @param   {Uint8Array} address 
+ * @param   {Number}     ss58Format (optional) use to generate address for any supported parachain identity.
+ *                                  Default: 0 (Polkadot)
  * 
- * @returns {String} null if invalid address supplied
+ * @returns {String}     null if invalid address supplied
  */
-export const ss58Encode = address => {
+export const ss58Encode = (address, ss58Format = 0) => {
     const { encodeAddress } = require('@polkadot/util-crypto')
-    return fallbackIfFails(encodeAddress, [address])
+    return fallbackIfFails(encodeAddress, [address, ss58Format])
 }
 
 /**
@@ -60,7 +62,9 @@ export const hexToBytes = (hex, bitLength) => {
 
     const { hexToU8a } = require('@polkadot/util')
     return fallbackIfFails(hexToU8a, [
-        isStr(hex) && !hex.startsWith('0x') ? '0x' + hex : hex,
+        isStr(hex) && !hex.startsWith('0x')
+            ? '0x' + hex
+            : hex,
         bitLength
     ])
 }
