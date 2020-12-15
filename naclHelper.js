@@ -221,9 +221,15 @@ export const randomBytes = (length, asHex = true) => {
  */
 export const secretBoxDecrypt = (encrypted, nonce, secret, asString = true) => {
     const decrypted = naclDecrypt1(
-        encrypted,
-        nonce,
-        secret,
+        isUint8Arr(encrypted)
+            ? encrypted
+            : hexToBytes(encrypted),
+        isUint8Arr(nonce)
+            ? nonce
+            : hexToBytes(nonce),
+        isUint8Arr(secret)
+            ? secret
+            : hexToBytes(secret),
     )
     return !asString
         ? decrypted
@@ -236,12 +242,14 @@ export const secretBoxDecrypt = (encrypted, nonce, secret, asString = true) => {
  * 
  * @param   {String|Uint8Array} message message to encrypt
  * @param   {String|Uint8Array} secret  secret key
- * @param   {String|Uint8Array} nonce   (optional)
+ * @param   {String|Uint8Array} nonce   (optional) if falsy, a new nonce will be generated
  * @param   {Boolean}           asHex   (optional) whether to return encrypted message as bytes or hex string
  *                                      Default: true
+ * 
+ * @returns {Object}    `{ encrypted, nonce }`
  */
 export const secretBoxEncrypt = (message, secret, nonce, asHex = true) => {
-    const encrypted = naclEncrypt1(
+    const result = naclEncrypt1(
         isUint8Arr(message)
             ? message
             : strToU8a( // convert to Uint8Array
@@ -250,12 +258,15 @@ export const secretBoxEncrypt = (message, secret, nonce, asHex = true) => {
                     : JSON.stringify(message) // convert to string
             ),
         hexToBytes(secret),
-        hexToBytes(nonce),
+        !nonce
+            ? undefined // new nonce will be generated
+            : hexToBytes(nonce),
     )
-
-    return !asHex
-        ? encrypted
-        : bytesToHex(encrypted)
+    if (!asHex) return result
+    return {
+        encrypted: bytesToHex(result.encrypted),
+        nonce: bytesToHex(result.nonce),
+    }
 }
 
 /**
