@@ -15,7 +15,7 @@ import {
     naclVerify,
     randomAsU8a,
 } from '@polkadot/util-crypto'
-import { isUint8Arr } from "./utils"
+import { isStr, isUint8Arr } from "./utils"
 import {
     bytesToHex,
     hexToBytes,
@@ -23,7 +23,6 @@ import {
     u8aToStr,
     strToU8a,
 } from "./convert"
-import { isStr } from '../../../totem-ui/src/utils/utils'
 
 /**
  * @name decrypt
