@@ -15,7 +15,7 @@ import {
     naclVerify,
     randomAsU8a,
 } from '@polkadot/util-crypto'
-import { isStr, isUint8Arr } from "./utils"
+import { isHex, isStr, isUint8Arr } from "./utils"
 import {
     bytesToHex,
     hexToBytes,
@@ -67,7 +67,9 @@ export const encrypt = (message, senderSecretKey, receiverPublicKey, nonce, asHe
             : strToU8a(message),
         hexToBytes(senderSecretKey),
         hexToBytes(receiverPublicKey),
-        hexToBytes(nonce), // Nonce: auto generated with 24 bit length
+        !!nonce
+            ? hexToBytes(nonce)
+            : newNonce(false),
     )
     return !asHex ? result : {
         sealed: bytesToHex(result.sealed),
