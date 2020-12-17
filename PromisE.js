@@ -124,32 +124,15 @@ PromisE.delay = delay => PromisE(resolve => setTimeout(resolve, delay))
 
 // if timed out err.name will be 'AbortError''
 PromisE.fetch = async (url, options, timeout, asJson = true) => {
-    options = isObj(options) ? options : {}
-    options.method = options.method || 'get'
-    let fetch2
+    try {
+        options = isObj(options) ? options : {}
+        options.method = options.method || 'get'
+        if (timeout) options.signal = aborter(timeout)
 
-    try {
-        fetch2 = fetch
-    } catch (_) {
-        // required if nodejs
-        fetch2 = require('node-fetch')
-    }
-    fetch2.Promise = PromisE
-    
-    if (timeout) {
-        let abortCtrl
-        try {
-            abortCtrl = new AbortController()
-        } catch (err) {
-            abortCtrl = require('abort-controller')()
-        }
-        options.signal = abortCtrl.signal
-        setTimeout(() => abortCtrl.abort(), timeout)
-    }
-    
-    try {
-        const result = await fetch2(url, options)
-        return asJson ? await result.json() : result
+        const result = await fetcher(url, options)
+        return asJson
+            ? await result.json()
+            : result
     } catch (err) {
         if (err.name === 'AbortError') throw 'Request timed out'
         throw err
@@ -207,4 +190,23 @@ PromisE.timeout = (...args) => {
     resultPromise.timeout = timeoutPromise
     resultPromise.promise = promise
     return resultPromise
+}
+
+const aborter = timeout => {
+    const AbortController = require('abort-controller')
+    const abortCtrl = new AbortController()
+    setTimeout(() => abortCtrl.abort(), timeout)
+    return abortCtrl
+}
+const fetcher = async (url, options) => {
+    let fetch2
+    try {
+        fetch2 = fetch
+    } catch (_) {
+        // required if nodejs
+        fetch2 = require('node-fetch')
+    }
+    fetch2.Promise = PromisE
+
+    return fetch2(url, options)
 }
