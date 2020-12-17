@@ -148,7 +148,7 @@ PromisE.fetch = async (url, options, timeout, asJson = true) => {
     }
     
     try {
-        const result = await fetch(url, options)
+        const result = await fetch2(url, options)
         return asJson ? await result.json() : result
     } catch (err) {
         if (err.name === 'AbortError') throw 'Request timed out'
