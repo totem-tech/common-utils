@@ -23,7 +23,10 @@ try {
         const STORAGE_PATH = process.env.STORAGE_PATH || './server/data'
         isNode = true
         storage = new nls.LocalStorage(STORAGE_PATH, 500 * 1024 * 1024)
-        storage && console.log({ STORAGE_PATH })
+        if (storage) {
+            const absolutePath = require('path').resolve(STORAGE_PATH)
+            console.log({ STORAGE_PATH, absolutePath })
+        }
     } catch (e) { }
 }
 
