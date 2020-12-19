@@ -45,7 +45,7 @@ export const format = (date, seconds = false, ms = false) => {
         : `${formatted}.${xDate.getMilliseconds()}`
 }
 
-export const BLOCK_DURATION_SECONDS = 15
+export const BLOCK_DURATION_SECONDS = 14
 export const BLOCK_DURATION_REGEX = /^(\d{2}):[0-5][0-9]:[0-5][0-9]$/ // valid duration up to 99:59:55 
 //old: /^(\d{2}):[0-5][0-9]:[0-5](0|5)$/
 
