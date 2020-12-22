@@ -90,6 +90,8 @@ export const u8aToStr = value => {
  *                    Any Map or Set will be converted to Array first using `Array.from(value)`.
  */
 export const strToU8a = value => {
+    if (isUint8Arr(value)) return value
+    
     const { stringToU8a } = require('@polkadot/util')
     const str = isArrLike(value)
         ? JSON.stringify(Array.from(value))

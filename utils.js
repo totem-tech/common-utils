@@ -332,7 +332,8 @@ export const objContains = (obj = {}, keys = []) => {
  * 
  * @param	{Object}	source				source object
  * @param	{Object}	dest				destination object
- * @param	{Array}		preventOverride		prevent overriding @source property value is in this list
+ * @param	{Array}		preventOverride		(optional) prevent overriding `@source` property values in this list.
+ * 											Default: [undefined]
  */
 export const objCopy = (source = {}, dest = {}, preventOverride = [undefined]) => {
 	Object.keys(source).forEach(key => {

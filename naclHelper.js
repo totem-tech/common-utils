@@ -15,7 +15,7 @@ import {
     naclVerify,
     randomAsU8a,
 } from '@polkadot/util-crypto'
-import { isArr, isHex, isObj, isStr, isUint8Arr } from "./utils"
+import { isArr, isHex, isObj, isStr, isUint8Arr, objCopy } from "./utils"
 import {
     bytesToHex,
     hexToBytes,
@@ -62,9 +62,7 @@ export const decrypt = (sealed = '', nonce = '', senderPublicKey = '', recipient
  */
 export const encrypt = (message, senderSecretKey, recipientPublicKey, nonce, asHex = true) => {
     const result = naclSeal(
-        isUint8Arr(message)
-            ? message
-            : strToU8a(message),
+        strToU8a(message),
         hexToBytes(senderSecretKey),
         hexToBytes(recipientPublicKey),
         !!nonce
@@ -90,11 +88,12 @@ export const encrypt = (message, senderSecretKey, recipientPublicKey, nonce, asH
  * 
  * 
  * @returns {Object} ```json
- *                      {
- *                          sealed: String,
- *                          nonce: String,  
- *                          isBox: Boolean, // indicates whether encrypted using SecretBox or Box
- *                      }
+ *     {
+ *         sealed: String, // if isBox === true
+ *         encrypted: string, // if isBox === false
+ *         nonce: String,  
+ *         isBox: Boolean, // indicates whether encrypted using SecretBox or Box
+ *     }
  * ```
  * 
  * 
@@ -104,7 +103,7 @@ export const encrypt = (message, senderSecretKey, recipientPublicKey, nonce, asH
  *     first: 'some text',
  *     second: 1,
  *     third: 'ignored property',
- *     nonce: 'special property will not be encrypted even if included in `keys` array',
+ *     nonce: 'special property will not be encrypted unless specifically included in `keys` array',
  * }
  * 
  * // secondary object for recursive encryption
@@ -130,62 +129,72 @@ export const encrypt = (message, senderSecretKey, recipientPublicKey, nonce, asH
  * // generate random recipient's encryption keypair
  * const keyPairRecipient = encryptionKeypair(randomBytes(117))
  * 
- * // encrypt
- * const { sealed, nonce, isBox } = encryptObj(
+ * // encrypt using Box encryption
+ * const boxResult = encryptObj(
  *     obj,
  *     keys,
- *     keyPair.secretkey,
+ *     keyPair.secretKey,
  *     keyPairRecipient.publicKey,
  * )
  * 
+ * // encrypt using SecretBox/Secretkey encryption
+ * const secretBoxResult = encryptObj(
+ *     obj,
+ *     keys,
+ *     keyPair.secretKey,
+ * )
+ * 
  * // if sealed is nul encryption has failed
- * console.log({ sealed, nonce, isBox })
+ * console.log({ boxResult, secretBoxResult })
  * ```
  */
 export const encryptObj = (obj, keys, secretKey, recipientPublicKey, nonce) => {
-    const sealed = { ...obj }
+    obj = objCopy(obj, {})
     const isBox = isHex(recipientPublicKey) || isUint8Arr(recipientPublicKey)
     const encryptFn = isBox
         ? encrypt
         : secretBoxEncrypt
     // generate nonce if not supplied
-    nonce = bytesToHex(nonce) || newNonce(true) 
-    Object.keys(sealed)
-        .filter(key => key !== 'nonce' && (!isArr(keys) || keys.includes(key)))
-        .forEach(key => {
-            const value = sealed[key]
-            let result
-            if (isObj(value)) {
-                const childKeyPrefix = `${key}.`
-                const childKeys = keys
-                    .filter(k => k.startsWith(childKeyPrefix))
-                    .map(k => k.split(childKeyPrefix).join(''))
-                result = encryptObject(
-                    value,
-                    childKeys.length > 0
-                        ? childKeys // encrypt only specified child keys
-                        : null,     // encrypt all child keys
-                    secretKey,
-                    recipientPublicKey,
-                    nonce,
-                )
-            } else {
-                result = encryptFn(
-                    value,
-                    secretKey,
-                    // only include recipient public key if not secretBox encrption
-                    ...[isBox && recipientPublicKey].filter(Boolean),
-                    nonce,
-                    true,
-                )
-            }
-            sealed[key] = result.sealed
-        })
-    return {
-        sealed,
-        nonce,
-        isBox,
-    }
+    nonce = nonce && bytesToHex(nonce) || newNonce(true) 
+    const filteredKeys = Object.keys(obj)
+        .filter(key => !isArr(keys)
+            ? key !== 'nonce'
+            : keys.includes(key)
+        )
+    filteredKeys.forEach(key => {
+        const value = obj[key]
+        let keyResult
+        if (isObj(value)) {
+            const childKeyPrefix = `${key}.`
+            const childKeys = keys
+                .filter(k => k.startsWith(childKeyPrefix))
+                .map(k => k.split(childKeyPrefix).join(''))
+            keyResult = encryptObj(
+                value,
+                childKeys.length > 0
+                    ? childKeys // encrypt only specified child keys
+                    : null,     // encrypt all child keys
+                secretKey,
+                recipientPublicKey,
+                nonce,
+            )
+        } else {
+            keyResult = encryptFn(
+                value,
+                secretKey,
+                // only include recipient public key if not secretBox encrption
+                ...[isBox && recipientPublicKey].filter(Boolean),
+                nonce,
+                true,
+            )
+        }
+        obj[key] = isBox
+            ? keyResult.sealed
+            : keyResult.encrypted
+    })
+    const result = { nonce, isBox }
+    result[isBox ? 'sealed' : 'encrypted'] = obj
+    return result
 }
 
 /**
@@ -219,9 +228,7 @@ export const encryptionKeypair = (keyData, asHex = true) => {
  */
 export const keyDataFromEncoded = (encoded, asHex = false) => {
     // convert to Uint8Array if required
-    encoded = isUint8Arr(encoded)
-        ? encoded
-        : hexToBytes(encoded)
+    encoded = hexToBytes(encoded)
     
     // Convert PolkadotJS keyring's `encoded` to oo7-substrate `keyData`
     if (encoded.length > 96) {
@@ -335,15 +342,9 @@ export const randomBytes = (length, asHex = true) => {
  */
 export const secretBoxDecrypt = (encrypted, nonce, secret, asString = true) => {
     const decrypted = naclDecrypt1(
-        isUint8Arr(encrypted)
-            ? encrypted
-            : hexToBytes(encrypted),
-        isUint8Arr(nonce)
-            ? nonce
-            : hexToBytes(nonce),
-        isUint8Arr(secret)
-            ? secret
-            : hexToBytes(secret),
+        hexToBytes(encrypted),
+        hexToBytes(nonce),
+        hexToBytes(secret),
     )
     return !asString
         ? decrypted
@@ -366,21 +367,11 @@ export const secretBoxDecrypt = (encrypted, nonce, secret, asString = true) => {
 export const secretBoxEncrypt = (message, secret, nonce, asHex = true) => {
     nonce = nonce || newNonce(false) // generate new nonce
     const result = naclEncrypt1(
-        isUint8Arr(message)
-            ? message
-            : strToU8a( // convert to Uint8Array
-                isStr(message)
-                    ? message
-                    : JSON.stringify(message) // convert to string
-            ),
-        isUint8Arr(secret)
-            ? secret
-            : hexToBytes(secret),
-        isUint8Arr(nonce)
-            ? nonce
-            : hexToBytes(nonce),
+        strToU8a(message),
+        hexToBytes(secret),
+        hexToBytes(nonce),
     )
-    if (!asHex) return result
+    if (!asHex || !result.encrypted) return result
     return {
         encrypted: bytesToHex(result.encrypted),
         nonce: bytesToHex(result.nonce),
@@ -411,9 +402,9 @@ export const signingKeyPair = (keyData, asHex = true) => {
  * @name    verifySignature
  * @summary verify if a signature is valid
  *
- * @param   {String|Uint8Array} message String|Uint8Array
- * @param   {String|Uint8Array} signature String|Uint8Array
- * @param   {String|Uint8Array} publicKey String|Uint8Array
+ * @param   {String|Uint8Array} message 
+ * @param   {String|Uint8Array} signature
+ * @param   {String|Uint8Array} publicKey
  *
  * @returns {Boolean}
  */
