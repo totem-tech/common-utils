@@ -1,4 +1,4 @@
-import { isArr, isStr, isUint8Arr } from './utils'
+import { isArr, isArrLike, isHex, isObj, isStr, isUint8Arr } from './utils'
 /*
  * List of optional node-modules and the functions used by them:
  * Module Name          : Function Name
@@ -58,6 +58,7 @@ export const ss58Decode = (address, ignoreChecksum, ss58Format) => {
  * @returns {Uint8Array}
  */
 export const hexToBytes = (hex, bitLength) => {
+    // no need to convert
     if (isUint8Arr(hex)) return hex
 
     const { hexToU8a } = require('@polkadot/util')
@@ -70,6 +71,9 @@ export const hexToBytes = (hex, bitLength) => {
 }
 
 export const bytesToHex = bytes => {
+    // no need to convert
+    if (isHex(bytes)) return bytes
+
     const { u8aToHex } = require('@polkadot/util')
     return fallbackIfFails(u8aToHex, [bytes])
 }
@@ -77,9 +81,22 @@ export const u8aToStr = value => {
     const { u8aToString } = require('@polkadot/util')
     return u8aToString(value)
 }
+/**
+ * @name    strToU8a
+ * @summary converts any input Uint8Array
+ * 
+ * @param   {*} value any non-string value will be stringified.
+ *                    Objects and Arrays will be stringified using `JSON.stringify(value)`.
+ *                    Any Map or Set will be converted to Array first using `Array.from(value)`.
+ */
 export const strToU8a = value => {
     const { stringToU8a } = require('@polkadot/util')
-    return stringToU8a(value)
+    const str = isArrLike(value)
+        ? JSON.stringify(Array.from(value))
+        : isObj(value)
+            ? JSON.stringify(value)
+            : `${value}`
+    return stringToU8a(str)
 }
 export const decodeUTF8 = strToU8a // ToDo: deprecate
 export const encodeUTF8 = u8aToStr // ToDo: deprecate
