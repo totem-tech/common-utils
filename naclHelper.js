@@ -131,7 +131,12 @@ export const encrypt = (message, senderSecretKey, recipientPublicKey, nonce, asH
  * const keyPairRecipient = encryptionKeypair(randomBytes(117))
  * 
  * // encrypt
- * const { sealed, nonce, isBox } = encryptObj(ojb, keys, keyPair.secretkey)
+ * const { sealed, nonce, isBox } = encryptObj(
+ *     obj,
+ *     keys,
+ *     keyPair.secretkey,
+ *     keyPairRecipient.publicKey,
+ * )
  * 
  * // if sealed is nul encryption has failed
  * console.log({ sealed, nonce, isBox })
@@ -146,7 +151,7 @@ export const encryptObj = (obj, keys, secretKey, recipientPublicKey, nonce) => {
     // generate nonce if not supplied
     nonce = bytesToHex(nonce) || newNonce(true) 
     Object.keys(sealed)
-        .filter(x => key !== 'nonce' && (!isArr(keys) || keys.includes(x)))
+        .filter(key => key !== 'nonce' && (!isArr(keys) || keys.includes(key)))
         .forEach(key => {
             const value = sealed[key]
             let result
