@@ -25,7 +25,7 @@ export const format = (date, seconds = false, ms = false) => {
     const xDate = new Date(date)
     let formatted = [
         xDate.getFullYear(),
-        xDate.getMonth(),
+        xDate.getMonth() + 1,
         xDate.getDate(),
     ]
         .map(fill)
