@@ -174,7 +174,7 @@ export const encryptObj = (obj, keys, secretKey, recipientPublicKey, nonce) => {
                     value,
                     secretKey,
                     // only include recipient public key if not secretBox encrption
-                    ...[!isBox && recipientPublicKey].filter(Boolean),
+                    ...[isBox && recipientPublicKey].filter(Boolean),
                     nonce,
                     true,
                 )
