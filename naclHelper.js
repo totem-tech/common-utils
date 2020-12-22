@@ -79,12 +79,14 @@ export const encrypt = (message, senderSecretKey, recipientPublicKey, nonce, asH
  * @name    encryptObj
  * @summary recursively encrypt specified or all properties of an object.
  * 
- * @param   {Object}            obj 
- * @param   {Array}             keys (optional) if valid array, only specified object properties will be encrypted.
+ * @param   {Object}            obj     object to encrypt
+ * @param   {Array}             keys    (optional) if valid array, only specified object properties will be encrypted.
  * @param   {String|Uint8Array} secretKey 
- * @param   {String|Uint8Array} recipientPublicKey 
- * @param   {String|Uint8Array} nonce (optional) a single nonce to encrypt the entire object.
- *                                    If not 
+ * @param   {String|Uint8Array} recipientPublicKey (optional) if not supplied, will encrypt using SecretBox. 
+ *                                      Otherwise, will use Box encryption.
+ * @param   {String|Uint8Array} nonce   (optional) a single nonce to encrypt the entire object.
+ *                                      If falsy, will generate new random nonce.
+ * @param   {Boolean}           asHex   (optional)
  * 
  * 
  * @returns {Object} ```json
@@ -132,23 +134,24 @@ export const encrypt = (message, senderSecretKey, recipientPublicKey, nonce, asH
  * // encrypt using Box encryption
  * const boxResult = encryptObj(
  *     obj,
- *     keys,
  *     keyPair.secretKey,
  *     keyPairRecipient.publicKey,
+ *     keys,
  * )
  * 
  * // encrypt using SecretBox/Secretkey encryption
  * const secretBoxResult = encryptObj(
  *     obj,
- *     keys,
  *     keyPair.secretKey,
+ *     null,
+ *     keys,
  * )
  * 
  * // if sealed is nul encryption has failed
  * console.log({ boxResult, secretBoxResult })
  * ```
  */
-export const encryptObj = (obj, keys, secretKey, recipientPublicKey, nonce) => {
+export const encryptObj = (obj, secretKey, recipientPublicKey, keys, nonce, asHex = true) => {
     obj = objCopy(obj, {})
     const isBox = isHex(recipientPublicKey) || isUint8Arr(recipientPublicKey)
     const encryptFn = isBox
@@ -171,11 +174,11 @@ export const encryptObj = (obj, keys, secretKey, recipientPublicKey, nonce) => {
                 .map(k => k.split(childKeyPrefix).join(''))
             keyResult = encryptObj(
                 value,
+                secretKey,
+                recipientPublicKey,
                 childKeys.length > 0
                     ? childKeys // encrypt only specified child keys
                     : null,     // encrypt all child keys
-                secretKey,
-                recipientPublicKey,
                 nonce,
             )
         } else {
@@ -185,7 +188,7 @@ export const encryptObj = (obj, keys, secretKey, recipientPublicKey, nonce) => {
                 // only include recipient public key if not secretBox encrption
                 ...[isBox && recipientPublicKey].filter(Boolean),
                 nonce,
-                true,
+                asHex,
             )
         }
         obj[key] = isBox
