@@ -417,6 +417,7 @@ export const verifySignature = naclVerify
 export default {
     decrypt,
     encrypt,
+    encryptObj,
     encryptionKeypair,
     keyDataFromEncoded,
     keyInfoFromKeyData,
