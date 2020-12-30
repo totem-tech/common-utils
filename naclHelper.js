@@ -15,7 +15,7 @@ import {
     naclVerify,
     randomAsU8a,
 } from '@polkadot/util-crypto'
-import { isArr, isHex, isObj, isStr, isUint8Arr, objCopy } from "./utils"
+import { isArr, isHex, isObj, isUint8Arr } from "./utils"
 import {
     bytesToHex,
     hexToBytes,
@@ -25,17 +25,18 @@ import {
 } from "./convert"
 
 /**
- * @name decrypt
- * @description decrypted a message encrypted using TweetNacl Box depryption (open) mechanism
+ * @name    decrypt
+ * @summary decrypted a message encrypted using TweetNacl Box depryption (open) mechanism
  *
- * @param {String} sealed String|Uint8Array. data to encrypt
- * @param {String} nonce String|Uint8Array
- * @param {String} senderPublicKey String|Uint8Array
- * @param {String} recipientSecretKey String|Uint8Array
+ * @param   {String|Uint8Array} sealed  data to encrypt
+ * @param   {String|Uint8Array} nonce
+ * @param   {String|Uint8Array} senderPublicKey
+ * @param   {String|Uint8Array} recipientSecretKey
+ * @param   {Boolean}
  *
- * @returns String decrypted message
+ * @returns {String|Uint8Array} decrypted message
  */
-export const decrypt = (sealed = '', nonce = '', senderPublicKey = '', recipientSecretKey = '', asString = true) => {
+export const decrypt = (sealed, nonce, senderPublicKey, recipientSecretKey, asString = true) => {
     const decrypted = naclOpen(
         hexToBytes(sealed),
         hexToBytes(nonce),
@@ -46,6 +47,72 @@ export const decrypt = (sealed = '', nonce = '', senderPublicKey = '', recipient
     return !asString
         ? decrypted
         : u8aToStr(decrypted)
+}
+
+/**
+ * @name    decryptObj
+ * @summary recursively decrypt objects encrypted using `encryptObj()` function. 
+ * @description see see `encryptObj()` function documentation for examples
+ * 
+ * @param   {Object}            obj         data object to decrypt
+ * @param   {String|Uint8Array} senderPublicKey 
+ * @param   {String|Uint8Array} recipientSecretKey 
+ * @param   {Array}             keys        (optional) to decrypt only specified object properties. 
+ *                                          If valid array, unlisted properties will not be decrypted.
+ *                                          If not a valid array, will attempt to decrypt all properties.
+ *                                          See examples for different usage cases.
+ * @param   {Boolean}           asString    (optional) whether to convert result bytes to string.
+ *                                          Default: true
+ * 
+ * @returns {Object} decrypted object
+ */
+export const decryptObj = (obj, senderPublicKey, recipientSecretKey, keys, asString = true) => {
+    if (!isObj(obj)) return
+
+    const result = {...obj}
+    const isBox = !!senderPublicKey
+    const open = isBox
+        ? decrypt
+        : secretBoxDecrypt
+    const validKeys = !isArr(keys)
+        ? Object.keys(result)
+        : keys.filter(k => result.hasOwnProperty(k))
+    
+    for (let i = 0; i < validKeys.length; i++) {
+        const key = validKeys[i]
+        const value = result[key]
+
+        // value is an object => recursively decrypt
+        if (isObj(value)) {
+            const childKeyPrefix = `${key}.`
+            const childKeys = keys
+                .filter(k => k.startsWith(childKeyPrefix))
+                // get rid of prefix
+                .map(k => k.replace(new RegExp(childKeyPrefix), ''))
+            
+            result[key] = decryptObj(
+                value,
+                senderPublicKey,
+                recipientSecretKey,
+                childKeys,
+                asString,
+            )
+            continue
+        }
+
+        const bytes = hexToBytes(value)
+        if (!bytes || bytes.length <= 24) throw new Error('Decryption failed')
+        const args = [
+            new Uint8Array(bytes.slice(24)),
+            new Uint8Array(bytes.slice(0, 24)),
+            ...[isBox && senderPublicKey].filter(Boolean),
+            recipientSecretKey,
+            asString,
+        ]
+        result[key] = open(...args)
+    }
+
+    return result
 }
 
 /**
@@ -79,50 +146,48 @@ export const encrypt = (message, senderSecretKey, recipientPublicKey, nonce, asH
  * @name    encryptObj
  * @summary recursively encrypt specified or all properties of an object.
  * 
- * @param   {Object}            obj     object to encrypt
- * @param   {Array}             keys    (optional) if valid array, only specified object properties will be encrypted.
+ * @param   {Object}            result  object to encrypt
  * @param   {String|Uint8Array} secretKey 
  * @param   {String|Uint8Array} recipientPublicKey (optional) if not supplied, will encrypt using SecretBox. 
  *                                      Otherwise, will use Box encryption.
- * @param   {String|Uint8Array} nonce   (optional) a single nonce to encrypt the entire object.
- *                                      If falsy, will generate new random nonce.
- * @param   {Boolean}           asHex   (optional)
+ * @param   {Array}             keys    (optional) to encrypt only specified object properties. 
+ *                                      If valid array, unlisted properties will not be encrypted.
+ *                                      If not a valid array, will attempt to encrypt all properties.
+ *                                      See examples for different usage cases.
+ * @param   {Boolean}           asHex   (optional) Default: true
  * 
- * 
- * @returns {Object} ```json
- *     {
- *         sealed: String, // if isBox === true
- *         encrypted: string, // if isBox === false
- *         nonce: String,  
- *         isBox: Boolean, // indicates whether encrypted using SecretBox or Box
- *     }
+ * @returns {Object} ```javascript
+ *     [
+ *         result, // encrypted object. 
+ *         isBox,  // indicates whether encrypted using SecretBox or Box
+ *     ]
  * ```
- * 
  * 
  * @example ```javascript
  * // object to encrypt
  * const obj = {
  *     first: 'some text',
- *     second: 1,
+ *     second: 1, // will be converted to string: "1"
  *     third: 'ignored property',
- *     nonce: 'special property will not be encrypted unless specifically included in `keys` array',
+ *     fifth: null, // will be converted to string: "null"
  * }
  * 
  * // secondary object for recursive encryption
  * obj.fourth = {
- *      a: [1, 2, 3],
- *      b: new Map([[1,1], [2,3]]),
- *      c: 'not to be encrypted',
+ *     a: [1, 2, 3], // will be converted to string
+ *     b: new Map([[1,1], [2,3]]), // will be converted to 2D Array and then to string
+ *     c: 'not to be encrypted', // will not be touched
  *  }
  * 
  * // specify which properties to encrypt. If `keys` is falsy, will encrypt everything.
  * const keys = [
- *  'first',
- *  'second',
- *  'fourth',
- *  // removing the below two items will encrypt the entire `fourth` object
- *  'fourth.a',
- *  'fourth.b',
+ *     'first',
+ *     'second',
+ *     'fifth',
+ *     'fourth',
+ *     // removing the below two items will encrypt the entire `fourth` object
+ *     'fourth.a',
+ *     'fourth.b',
  * ]
  * 
  * // generate random sender's encryption keypair
@@ -132,72 +197,104 @@ export const encrypt = (message, senderSecretKey, recipientPublicKey, nonce, asH
  * const keyPairRecipient = encryptionKeypair(randomBytes(117))
  * 
  * // encrypt using Box encryption
- * const boxResult = encryptObj(
+ * const [ box ] = encryptObj(
  *     obj,
  *     keyPair.secretKey,
  *     keyPairRecipient.publicKey,
  *     keys,
  * )
  * 
+ * // now attempt to decrypt the encrypted `box` object
+ * const boxDecrypted = decryptObj(
+ *     box,
+ *     keyPairRecipient.publicKey,
+ *     keyPair.secretKey,
+ *     keys,
+ * )
+ * 
+ * 
  * // encrypt using SecretBox/Secretkey encryption
- * const secretBoxResult = encryptObj(
+ * const [ secretBox ] = encryptObj(
  *     obj,
  *     keyPair.secretKey,
  *     null,
  *     keys,
  * )
  * 
- * // if sealed is nul encryption has failed
- * console.log({ boxResult, secretBoxResult })
+ * // now attempt to decrypt the encrypted `box` object
+ * const secretBoxDecrypted = decryptObj(
+ *     secretBox,
+ *     null,
+ *     keyPair.secretKey,
+ *     keys,
+ * )
+ * 
+ * // if sealed is null encryption has failed
+ * console.log({ 
+ *     box,
+ *     boxDecrypted,
+ *     secretBox,
+ *     secretBoxDecrypted,
+ * })
  * ```
  */
-export const encryptObj = (obj, secretKey, recipientPublicKey, keys, nonce, asHex = true) => {
-    obj = objCopy(obj, {})
+export const encryptObj = (obj, secretKey, recipientPublicKey, keys, asHex = true) => {
+    if (!isObj(obj)) return
+
+    const result = {...obj}
     const isBox = isHex(recipientPublicKey) || isUint8Arr(recipientPublicKey)
     const encryptFn = isBox
         ? encrypt
         : secretBoxEncrypt
-    // generate nonce if not supplied
-    nonce = nonce && bytesToHex(nonce) || newNonce(true) 
-    const filteredKeys = Object.keys(obj)
-        .filter(key => !isArr(keys)
-            ? key !== 'nonce'
-            : keys.includes(key)
-        )
-    filteredKeys.forEach(key => {
-        const value = obj[key]
-        let keyResult
+    const validKeys = !isArr(keys)
+        ? Object.keys(result)
+        : keys.filter(k => result.hasOwnProperty(k))
+    
+    for (let i = 0; i < validKeys.length; i++) {
+        const key = validKeys[i]
+        const value = result[key]
+
+        // value is an object => recursively encrypt
         if (isObj(value)) {
             const childKeyPrefix = `${key}.`
             const childKeys = keys
                 .filter(k => k.startsWith(childKeyPrefix))
-                .map(k => k.split(childKeyPrefix).join(''))
-            keyResult = encryptObj(
+                // get rid of prefix
+                .map(k => k.replace(new RegExp(childKeyPrefix), ''))
+            
+            result[key] = encryptObj(
                 value,
                 secretKey,
                 recipientPublicKey,
                 childKeys.length > 0
                     ? childKeys // encrypt only specified child keys
                     : null,     // encrypt all child keys
-                nonce,
-            )
-        } else {
-            keyResult = encryptFn(
-                value,
-                secretKey,
-                // only include recipient public key if not secretBox encrption
-                ...[isBox && recipientPublicKey].filter(Boolean),
-                nonce,
-                asHex,
-            )
+            )[0]
+            continue
         }
-        obj[key] = isBox
-            ? keyResult.sealed
-            : keyResult.encrypted
-    })
-    const result = { nonce, isBox }
-    result[isBox ? 'sealed' : 'encrypted'] = obj
-    return result
+
+        const { encrypted, nonce, sealed } = encryptFn(
+            value,
+            secretKey,
+            // only include recipient public key if not secretBox encrption
+            ...[isBox && recipientPublicKey].filter(Boolean),
+            newNonce(false), // generate new nonce
+            false,
+        )
+        if (!encrypted && !sealed) {
+            console.log('Encryption failed!',{value})
+            throw new Error('Encryption failed!')
+        }
+
+        const bytes = new Uint8Array([ ...nonce, ...(encrypted || sealed) ])
+        result[key] = !asHex
+            ? bytes
+            : bytesToHex(bytes)
+    }
+    return [
+        result,
+        isBox,
+    ]
 }
 
 /**
