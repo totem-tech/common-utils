@@ -22,11 +22,24 @@ export const icons = {
 	warning: 'lightning'
 }
 
-// trim texts
-export const clearClutter = x => x.split('\n').map(y => y.trim()).filter(Boolean).join(' ')
+/**
+ * @name	clearClutter
+ * @summary clears clutter from strings
+ * 
+ * @param	{String} x 
+ * 
+ * @returns {String}
+ */
+export const clearClutter = x => x.split('\n')
+	.map(y => y.trim())
+	.filter(Boolean)
+	.join(' ')
 
-/*
- * Copies supplied string to system clipboard
+/**
+ * @name	copyToClipboard
+ * @summary copies text to clipboard. No compatible with NodeJS.
+ * 
+ * @param	{String} str 
  */
 export const copyToClipboard = str => {
 	const el = document.createElement('textarea')
@@ -76,9 +89,6 @@ export const generateHash = (seed, algo, bitLength = 256) => {
 	return // unsuporrted
 }
 
-/*
- * Data validation
- */
 /**
  * @name    isAddress
  * @summary validates if supplied is a valid address
@@ -168,16 +178,14 @@ export const hasValue = x => {
 	}
 }
 
-// randomInt generates random number within a range
-//
-// Params:
-// @min		number
-// @max		number
-// 
-// returns number
-export const randomInt = (min, max) => parseInt(Math.random() * (max - min) + min)
-
-// getKeys returns an array of keys or indexes depending on object type
+/**
+ * @name	getKeys
+ * @summary returns an Array of keys or indexes depending on input type
+ * 
+ * @param	{Array|Map|Object} source 
+ * 
+ * @returns {Array}
+ */
 export const getKeys = source => {
 	if (isArr(source)) return source.map((_, i) => i)
 	if (isMap(source)) return Array.from(source).map(x => x[0])
@@ -185,20 +193,21 @@ export const getKeys = source => {
 	return []
 }
 
-// arrMapSlice mimics the behaviour of Array.prototype.map() with the
-// convenience of only executing callback on range of indexes
-//
-// Params:
-// @arr         array
-// @startIndex  number
-// @endIndex    number    : inclusive
-// @callback    function  : callback to be executed on each item within the set range
-//              Params:
-//              @currentValue
-//              @currentIndex
-//              @array
-//
-// Returns array of items all returned by @callback
+/**
+ * @name	arrMapSlice
+ * @summary mimics the behaviour of Array.map() with the convenience of only executing callback on range of indexes
+ * 
+ * @param {Array} 	 data 
+ * @param {Number}   startIndex 
+ * @param {Number}   endIndex 
+ * @param {Function} callback   to be executed on each item within the set range
+ *              				Params:
+ *              				@currentValue
+ *              				@currentIndex
+ *              				@array
+ * 
+ * @returns {Array} list of all items returned by @callback
+ */
 export const arrMapSlice = (data, startIndex, endIndex, callback) => {
 	const isAMap = isMap(data)
 	if (!isArr(data) && !isAMap) return []
@@ -218,32 +227,61 @@ export const arrMapSlice = (data, startIndex, endIndex, callback) => {
 	return result
 }
 
-// Read-only array
-export const arrReadOnly = (arr = [], strict = false) => objReadOnly(arr, strict)
+/**
+ * @name	arrReadOnly
+ * @summary sugar for `objReadOnly()` for an Array
+ * 
+ * @param	{Array}	input 
+ * @param	{Boolean} strict
+ * 
+ * @returns {Array}
+ */
+export const arrReadOnly = (input, strict, silent) => objReadOnly(input, strict, silent)
 
-// Reverse array items
+/**
+ * @name	arrReverse
+ * @summary Reverse an array conditionally
+ * 
+ * @param	{Array}		arr
+ * @param	{Boolean}	reverse	 (optional) condition to reverse the array.
+ * 								 Default: true
+ * @param	{Boolean}	newArray (optional) whether to cnstruct new array or use input.
+ * 								 Default: true
+ * 
+ * @returns {Array}
+ */ 
 export const arrReverse = (arr, reverse = true, newArray = true) => {
 	if (!isArr(arr)) return []
-	arr = !newArray ? arr : [...arr]
-	return reverse ? arr.reverse() : arr
+	if (newArray) arr = [...arr]
+	return reverse
+		? arr.reverse()
+		: arr
 }
 
-// arrSearch search for objects by key-value pairs
-//
-// Params:
-// @map			Map
-// @keyValues	Object	: key-value pairs
-// @matchAll	boolean 	: match all supplied key-value pairs
-// @ignoreCase	boolean	: case-insensitive search for strings
-//
-// Returns Map (key = original index) or Array (index not preserved) if @returnArr == true
-export const arrSearch = (arr, keyValues, matchExact, matchAll, ignoreCase, returnArr) => {
-	const result = returnArr ? new Array() : new Map()
+/**
+ * @name	arrSearch
+ * @summary search array of objects
+ * 
+ * @param	{Array}	  arr 
+ * @param	{Object}  keyValues  specific keys and respective values to search for
+ * @param	{Boolean} matchExact (optional) whether to match the value exactly as specified in @keyValues
+ * @param	{Boolean} matchAll   (optional) whether all or any supplied keys should match
+ * @param	{Boolean} ignoreCase (optional)
+ * @param	{Boolean} asArray    (optional) wheter to return result as Array or Map
+ * 
+ * @returns {Array|Map} Map (key = original index) or Array (index not preserved) if @returnArr == true
+ */
+export const arrSearch = (arr, keyValues, matchExact, matchAll, ignoreCase, asArray) => {
+	const result = asArray
+		? new Array()
+		: new Map()
 	if (!isObj(keyValues) || !isObjArr(arr)) return result
+
 	const keys = Object.keys(keyValues)
 	for (var index = 0; index < arr.length; index++) {
 		let matched = false
 		const item = arr[index]
+
 		for (const i in keys) {
 			const key = keys[i]
 			let keyword = keyValues[key]
@@ -251,13 +289,20 @@ export const arrSearch = (arr, keyValues, matchExact, matchAll, ignoreCase, retu
 
 			if (ignoreCase && isStr(value)) {
 				value = value.toLowerCase()
-				keyword = isStr(keyword) ? keyword.toLowerCase() : keyword
+				keyword = isStr(keyword)
+					? keyword.toLowerCase()
+					: keyword
 			}
 
-			matched = !matchExact && (isStr(value) || isArr(value)) ? value.indexOf(keyword) >= 0 : value === keyword
+			matched = !matchExact && (isStr(value) || isArr(value))
+				? value.indexOf(keyword) >= 0
+				: value === keyword
 			if ((matchAll && !matched) || (!matchAll && matched)) break
 		}
-		matched && (returnArr ? result.push(item) : result.set(index, item))
+		matched && (asArray
+			? result.push(item)
+			: result.set(index, item)
+		)
 	}
 	return result
 }
@@ -416,20 +461,22 @@ export const objClean = (obj, keys, recursive = false) => {
  * @name	objCreate
  * @summary constructs a new object with supplied key(s) and value(s)
  * 
- * @param	{String|Array}	key 
- * @param	{*|Array}		value 
+ * @param	{String|Array}	keys 
+ * @param	{*|Array}		values 
  * 
  * @returns	{Object}
  */
-export const objCreate = (key, value) => {
+export const objCreate = (keys, values) => {
 	const obj = {}
-	if (!isArr(key)) {
-		obj[key] = value
-		return obj
-	}
+	if (!isArr(keys)) keys = [keys]
 	// arrays of keys and values supplied
-	value = !isArr(value) ? [value] : value
-	key.forEach(k => obj[k] = value[key])
+	if (!isArr(values)) values = [values]
+
+	for (let i = 0; i < keys.length; i++) {
+		const key = keys[i]
+		const value = values[i]
+		obj[key] = value
+	}
 	return obj
 }
 
@@ -542,8 +589,8 @@ export const objToFormData = (obj = {}, excludeUndefined = true) => {
 export const objWithoutKeys = (obj, keys) => {
 	if (!isObj(obj) || !isArr(keys)) return {}
 
-	const result = objCopy(obj, {})
-	const allKeys = Object.keys(keys)
+	const result = {...obj}
+	const allKeys = Object.keys(result)
 	for (let i = 0; i < allKeys.length; i++) {
 		const key = allKeys[i]
 		// ignore property
@@ -566,36 +613,54 @@ export const mapFilter = (map, callback) => {
 	})
 	return result
 }
-// mapFindByKey finds a specific object by supplied object property/key and value within
-//
-// Params:
-// @map		Map: Map of objects
-// @key		any: object key to match or null if value is not an object
-// @value	any
-//
-// Returns Object: first item partial/fully matching @value with supplied @key
+
+/**
+ * @name	mapFindByKey
+ * @summary finds a specific object by supplied object property/key and value within.
+ * 
+ * Unused??
+ * 
+ * @param	{Map}	  map 		 Map of objects
+ * @param	{*}		  key 		 object key to match or null if value is not an object
+ * @param	{*}		  value 
+ * @param	{Boolean} matchExact 
+ * 
+ * @returns {*} first item partial/fully matching @value with supplied @key
+ */
 export const mapFindByKey = (map, key, value, matchExact) => {
 	for (let [_, item] of map.entries()) {
-		const val = key === null ? item : item[key]
+		const val = key === null
+			? item
+			: item[key]
 		if (!matchExact && (isStr(val) || isArr(val)) ? val.indexOf(value) >= 0 : val === value) return item
 	}
 }
 
-// mapJoin joins (and overrides) key-value pairs from @source to @dest
-export const mapJoin = (source = new Map(), dest = new Map()) => {
-	Array.from(source).forEach(([key, value]) => dest.set(key, value))
-	return dest
-}
+/**
+ * @name	mapJoin
+ * @summary joins two maps
+ * 
+ * @param	{Map} source 
+ * @param	{Map} dest   any existing values will be overriden
+ * 
+ * @returns {Map}
+ */
+export const mapJoin = (source, dest = new Map()) => new Map([
+	...Array.from(dest),
+	...Array.from(source),
+])
 
-// mapSearch search for objects by key-value pairs
-//
-// Params:
-// @map			Map
-// @keyValues	Object	: key-value pairs
-// @matchAll	boolean 	: match all supplied key-value pairs
-// @ignoreCase	boolean	: case-insensitive search for strings
-//
-// Returns Map
+/**
+ * @name	mapSearch
+ * @summary search for objects by key-value pairs
+ * 
+ * @param 	{Map}		map
+ * @param 	{Object}	keyValues  key-value pairs
+ * @param 	{Boolean}	matchAll   (optional) match all supplied key-value pairs
+ * @param 	{Boolean}	ignoreCase (optional) case-insensitive search for strings
+ *
+ * @returns {Map}
+ */
 export const mapSearch = (map, keyValues, matchExact, matchAll, ignoreCase) => {
 	const result = new Map()
 	if (!isObj(keyValues) || !isMap(map)) return result
@@ -634,6 +699,17 @@ export const mapSort = (map, key, reverse) => {
 		reverse
 	))
 }
+
+/**
+ * @name	randomInt
+ * @summary generates random number within a range
+ * 
+ * @param	{Number} min lowest number
+ * @param	{Number} max highest number
+ * 
+ * @returns {Number}
+ */
+export const randomInt = (min, max) => parseInt(Math.random() * (max - min) + min)
 
 /**
  * @name	search
