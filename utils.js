@@ -396,7 +396,7 @@ export const objClean = (obj, keys, recursive = false) => {
 		if (!recursive || !isObj(value)) continue
 
 		const childPrefix = `${key}.`
-		const childKeys = keys.filter(k => k.startsWith(childPrefix))
+		let childKeys = keys.filter(k => k.startsWith(childPrefix))
 		if (childKeys.length === 0) continue
 		
 		// get rid of child key prefix 
@@ -547,9 +547,8 @@ export const objWithoutKeys = (obj, keys) => {
 	for (let i = 0; i < allKeys.length; i++) {
 		const key = allKeys[i]
 		// ignore property
-		if (keys.includes(key)) continue
-		const value 
-		result[key] = obj[key]
+		if (!keys.includes(key)) continue
+		delete result[key]
 	}
 	return result
 }
