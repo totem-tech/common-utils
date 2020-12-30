@@ -271,20 +271,43 @@ export const arrSort = (arr, key, reverse = false, sortOriginal = false) => {
 	return reverse ? arrReverse(sortedArr, true) : sortedArr
 }
 
-// arrUnique returns unique values in an array
-export const arrUnique = (arr = []) => [...new Set(arr)]
+/**
+ * @name	arrUnique
+ * @summary constructs a new array of unique values
+ * 
+ * @param	{Array} source
+ * 
+ * @returns {Array}
+ */
+export const arrUnique = (source = []) => [...new Set(source)]
 
-// className formats supplied value into CSS class name compatible string for React
-//
-// Params:
-// @value	string/object/array: if object supplied, 
-//							key		string: CSS class
-//							value	boolean: whether to include the key to the final output
+/**
+ * @name	className
+ * @summary formats supplied value into CSS class name compatible string for React
+ * 
+ * @param	{Object|Array} value 
+ * 
+ * @returns	{String}
+ * 
+ * @example ```JavaScript
+ * const isSection = false
+ * const isIcon = true
+ * const withBorder = false
+ * const str = className([
+ *     'ui',
+ *     { section: isSection, icon: isIcon },
+ *     withBorder && 'bordered',
+ * ])
+ * 
+ * // expected result: 'ui icon'
+ * ```
+ */
 export const className = value => {
 	if (isStr(value)) return value
 	if (isObj(value)) {
 		// convert into an array
-		value = Object.keys(value).map(key => !!value[key] && key)
+		value = Object.keys(value)
+			.map(key => !!value[key] && key)
 	}
 	if (!isArr(value)) return ''
 	return value
@@ -293,15 +316,17 @@ export const className = value => {
 		.join(' ')
 }
 
-// deferred returns a function that invokes the callback function after certain delay/timeout
-// If the returned function is invoked again before timeout,
-// the invokation will be deferred further with the duration supplied in @delay
-//
-// Params:
-// @callback  function  : function to be invoked after deferred delay
-// @delay     number    : number of milliseconds to be delayed.
-//                        Default value: 50
-// @thisArg    object   : optional, makes sure callback is bounded to supplied object 
+/**
+ * @name	deferred
+ * @summary returns a function that invokes the callback function after certain delay/timeout
+ * 
+ * @param	{Function}	callback 	function to be invoked after timeout
+ * @param	{Number}	delay		(optional) timeout duration in milliseconds.
+ * 									Default: 50
+ * @param	{*}			thisArg		(optional) the special `thisArgs` to be used when invoking the callback.
+ * 
+ * @returns {Function}
+ */
 export const deferred = (callback, delay, thisArg) => {
 	if (!isFn(callback)) return // nothing to do!!
 	let timeoutId
@@ -311,63 +336,91 @@ export const deferred = (callback, delay, thisArg) => {
 	}
 }
 
-// objContains tests if an object contains all the supplied keys/properties
-//
-// Params:
-// @obj		object
-// @keys	array: list of required properties in the object
-//
-// Returns	boolean
-export const objContains = (obj = {}, keys = []) => {
-	if (!isObj(obj) || !isArr(keys)) return false
-	for (let i = 0; i < keys.length; i++) {
-		if (!obj.hasOwnProperty(keys[i])) return false
-	}
-	return true
-}
-
 /**
  * @name	objCopy
- * @summary recursively copies properties of an object to another object
+ * @summary deep-copy an object to another object
  * 
- * @param	{Object}	source				source object
- * @param	{Object}	dest				destination object
- * @param	{Array}		preventOverride		(optional) prevent overriding `@source` property values in this list.
- * 											Default: [undefined]
+ * @param	{Object}	source	source object
+ * @param	{Object}	dest	destination object
+ * @param	{Array}		ignore	(optional) prevents @dest's property to be overriden 
+ * 						    	if @source's property value is in the list
+ *						    	Default: [undefined]
+ * @returns {Object}
  */
-export const objCopy = (source = {}, dest = {}, preventOverride = [undefined]) => {
-	Object.keys(source).forEach(key => {
-		if (preventOverride.includes(source[key])) return
-		dest[key] = isArr(source[key])
-			? JSON.parse(JSON.stringify(source[key]))
-			: isObj(source[key])
-				? objCopy(source[key], dest[key], preventOverride)
-				: source[key]
-	})
+export const objCopy = (source = {}, dest = {}, ignore = [undefined]) => {
+	const sKeys = Object.keys(source)
+	for (let i = 0; i < sKeys.length; i++) {
+		const key = sKeys[i]
+		if (dest.hasOwnProperty(key) && ignore.includes(source[key])) continue
+
+		const value = source[key]
+		if (isArrLike(value)) {
+			let newValue = JSON.parse(JSON.stringify(Array.from(value)))
+			if (isMap(value)) {
+				newValue = new Map(newValue)
+			} else if (isSet(value)) {
+				newValue = new Set([...newValue])
+			}
+			dest[key] = newValue
+		} else if (isObj(value)) {
+			dest[key] = objCopy(source[key], dest[key], ignore)
+		} else {
+			dest[key] = value
+		}
+	}
+
 	return dest
 }
 
-// objClean produces a clean object with only the supplied keys and their respective values
-//
-// Params:
-// @obj		object/array
-// @keys	array : if empty/not array, an empty object will be returned
-//
-// Returns object
-export const objClean = (obj, keys) => !isObj(obj) || !isArr(keys) ? {} : keys.reduce((cleanObj, key) => {
-	if (obj.hasOwnProperty(key)) {
-		cleanObj[key] = obj[key]
-	}
-	return cleanObj
-}, {})
+/** 
+ * @name	objClean
+ * @summary	constructs a new object with only the supplied property names (keys) and their respective values
+ * 
+ * @param	{Object}	obj
+ * @param	{Array}		keys		property names
+ * @param	{Boolean}	recursive	(optional) Default: false
+ * 
+ * @returns	{Object}
+ */
+export const objClean = (obj, keys, recursive = false) => {
+	if (!isObj(obj) || !isArr(keys)) return {}
 
-// objCreate constructs a new object with supplied key(s) and value(s)
-//
-// Params:
-// @key		string/array
-// @value	any/array
-//
-// Returns	object
+	const result = {}
+	for (let i = 0; i < keys.length; i++) {
+		const key = keys[i]
+		if (!obj.hasOwnProperty(key)) continue
+
+		let value = obj[key]
+		result[key] = value
+		// recursively clean up child property with object value
+		if (!recursive || !isObj(value)) continue
+
+		const childPrefix = `${key}.`
+		const childKeys = keys.filter(k => k.startsWith(childPrefix))
+		if (childKeys.length === 0) continue
+		
+		// get rid of child key prefix 
+		childKeys = childKeys.map(k =>
+			k.replace(new RegExp(childPrefix), '')
+		)
+		result[key] = objClean(
+			value,
+			childKeys,
+			recursive,
+		)
+	}
+	return result
+}
+
+/**
+ * @name	objCreate
+ * @summary constructs a new object with supplied key(s) and value(s)
+ * 
+ * @param	{String|Array}	key 
+ * @param	{*|Array}		value 
+ * 
+ * @returns	{Object}
+ */
 export const objCreate = (key, value) => {
 	const obj = {}
 	if (!isArr(key)) {
@@ -379,30 +432,44 @@ export const objCreate = (key, value) => {
 	key.forEach(k => obj[k] = value[key])
 	return obj
 }
-// objHasKeys checks if all the supplied keys exists in a object
-//
-// Params:
-// @obj				object
-// @keys			array
-// @requireValue	book	: (optional) if true, will check if all keys has valid value
-//
-// returns boolean
-export const objHasKeys = (obj = {}, keys = [], requireValue = false) => {
-	return !keys.reduce((no, key) => no || (requireValue ? !hasValue(obj[key]) : !obj.hasOwnProperty(key)), false)
+
+/**
+ * @name	objHasKeys
+ * @summary checks if all the supplied keys exists in a object
+ * 
+ * @param	{Object} 	obj 
+ * @param	{Array} 	keys 
+ * @param	{Boolean}	requireValue (optional) whether each property should have some value.
+ * 
+ * @returns {Boolean}
+ */
+export function objHasKeys(obj = {}, keys = [], requireValue = false){
+	if (!isObj(obj) || !isArr(keys)) return false
+
+	for (let i = 0; i < keys.length; i++) {
+		const key = keys[i]
+		if (!obj.hasOwnProperty(key)) return false
+		if (!requireValue) continue
+
+		if (!hasValue(obj[key])) return false
+	}
+	return true
 }
 
-// objReadOnly returns a new read-only object where only new properties can be added.
-//
-// Params:
-// @obj	   object/array : (optional) if valid object supplied, new object will be created based on @obj.
-//					 Otherwise, new empty object will be used.
-//					 PS: original supplied object's properties will remain writable, unless re-assigned to the returned object.
-// @strict boolean: (optional) if true, any attempt to add or update property to returned object will throw a TypeError.
-//					 Otherwise, only new properties can be added. Attempts to update properties will be silently ignored.
-// @silent boolean: (optional) whether to throw error when in strict mode
-//
-// Returns  object
-export const objReadOnly = (obj = {}, strict = false, silent = false) => new Proxy(obj, {
+/**
+ * @name	objReadOnly
+ * @summary constructs a new read-only object where only new properties can be added.
+ * 
+ * @param	{Object}	obj 
+ * @param	{Boolean}	strict	(optional) If true, any attempt to add or update property will fail.
+ *					 			Otherwise, only new properties can be added but updates will fail.
+ *								Default: false
+ * @param	{Boolean}	silent	(optional) whether to throw error when property add/update fails.
+ * 								Default: false
+ * 
+ * @returns	{Object}
+ */
+export const objReadOnly = (obj, strict = false, silent = false) => new Proxy(obj || {}, {
 	setProperty: (self, key, value) => {
 		// prevents adding new or updating existing property
 		const isStrict = !isFn(strict)
@@ -463,21 +530,29 @@ export const objToFormData = (obj = {}, excludeUndefined = true) => {
 	return formData
 }
 
-// objWithoutKeys creates a new object excluding specified keys
-// 
-// Params:
-// @obj		object
-// @keys	array
-//
-// Returns object
-export const objWithoutKeys = (obj, keys) => !isObj(obj) || !isArr(keys) ? {} : (
-	Object.keys(obj).reduce((result, key) => {
-		if (keys.indexOf(key) === -1) {
-			result[key] = obj[key]
-		}
-		return result
-	}, {})
-)
+/**
+ * @name	objWithoutKeys
+ * @summary constructs a new object excluding specific properties
+ * 
+ * @param	{Object} obj 
+ * @param	{Array}  keys property names to exclude
+ * 
+ * @returns {Object}
+ */
+export const objWithoutKeys = (obj, keys) => {
+	if (!isObj(obj) || !isArr(keys)) return {}
+
+	const result = objCopy(obj, {})
+	const allKeys = Object.keys(keys)
+	for (let i = 0; i < allKeys.length; i++) {
+		const key = allKeys[i]
+		// ignore property
+		if (keys.includes(key)) continue
+		const value 
+		result[key] = obj[key]
+	}
+	return result
+}
 
 export const mapFilter = (map, callback) => {
 	const result = new Map()
@@ -561,15 +636,27 @@ export const mapSort = (map, key, reverse) => {
 	))
 }
 
-// Search Array or Map
-export const search = (data, keywords, keys) => {
-	if (!keywords || keywords.length === 0 || !(isArr(data) || isMap(data))) return data
-	const fn = isMap(data) ? mapSearch : arrSearch
-	const keyValues = keys.reduce((obj, key) => {
-		obj[key] = keywords
-		return obj
-	}, {})
-	return fn(data, keyValues, false, false, true, false)
+/**
+ * @name	search
+ * @summary Search Array or Map
+ * 
+ * @param	{Array|Map} data 
+ * @param	{String}	query search query
+ * @param	{Array}		keys  property names to search for
+ * 
+ * @returns {Array|Map}
+ */
+export const search = (data, query, keys = []) => {
+	if (!query || query.length === 0 || !(isArr(data) || isMap(data))) return data
+	const searchFunc = isMap(data)
+		? mapSearch
+		: arrSearch
+	const keyValues = objCreate(
+		keys,
+		new Array(keys.length)
+			.fill(query)
+	)
+	return searchFunc(data, keyValues, false, false, true, false)
 }
 
 /**
@@ -615,11 +702,28 @@ export const searchRanked = (searchKeys = ['text']) => (options, searchQuery) =>
 	return searchKeys.reduce((result, key) => result.concat(search(key)), [])
 }
 
-// Sort Array or Map
+/**
+ * @name	sort
+ * @summary Sort Array or Map
+ * 
+ * @param {Array|Map} data 
+ * @param {String}	  key		   (optional) property to sort by
+ * @param {Boolean}   reverse	   (optional)
+ * @param {Boolean}	  sortOriginal (optional)
+ * 
+ * @returns {Array|Map}
+ */
 export const sort = (data, key, reverse, sortOriginal) => {
-	const sortFunc = isArr(data) ? arrSort : (isMap(data) ? mapSort : null)
+	const sortFunc = isArr(data)
+		? arrSort
+		: isMap(data) && mapSort
 	if (!sortFunc) return []
-	return sortFunc(data, key, reverse, sortOriginal)
+	return sortFunc(
+		data,
+		key,
+		reverse,
+		sortOriginal,
+	)
 }
 
 /**
@@ -643,40 +747,54 @@ export const strFill = (str, maxLen = 2, filler = ' ', after = false) => {
 	return arrReverse([filler.repeat(count), str], after).join('')
 }
 
-// textCapitalize capitalizes the first letter of the given string(s)
-//
-// Params:
-// @text			string/array/object
-// @fullSentence	bool: whether to capitalize every single word or just the first word
-// @forceLowercase	bool: convert string to lower case before capitalizing
-//
-// Returns string/array/object (same as input if supported otherwise undefined)
+/**
+ * @name	textCapitalize
+ * @summary capitalizes the first letter of input
+ * 
+ * @param	{String|Object} input 
+ * @param	{Boolean} 		fullSentence   (optional) whether to capitalize every single word or just the first word
+ * @param	{Boolean}		forceLowercase (optional) convert string to lower case before capitalizing
+ * 
+ * @returns {*}
+ */
 export const textCapitalize = (input, fullSentence = false, forceLowercase = false) => {
 	if (!input) return input
 	if (isStr(input)) {
 		if (forceLowercase) input = input.toLowerCase()
 		if (!fullSentence) return input[0].toUpperCase() + input.slice(1)
-		return input.split(' ').map(word => textCapitalize(word, false)).join(' ')
+		return input.split(' ')
+			.map(word => textCapitalize(word, false))
+			.join(' ')
 	}
-	if (isObj(input)) return Object.keys(input).reduce((obj, key) => {
-		obj[key] = textCapitalize(input[key], fullSentence, forceLowercase)
-		return obj
-	}, isArr(input) ? [] : {})
+	return !isObj(input)
+		? ''
+		: Object.keys(input)
+			.reduce((obj, key) => {
+				obj[key] = textCapitalize(
+					input[key],
+					fullSentence,
+					forceLowercase,
+				)
+				return obj
+			}, isArr(input) ? [] : {})
 }
 
-// textEllipsis shortens string into 'abc...xyz' or 'abcedf... form
-//
-// Params: 
-// @text    string
-// @maxLen  number: maximum length of the shortened text including dots
-// @numDots number: number of dots to be inserted in the middle. Default: 3
-// @split   boolean: if false, will add dots at the end
-//
-// Returns string
+/**
+ * @name	textEllipsis
+ * @summary shortens string into 'abc...xyz' or 'abcedf...' form
+ * 
+ * @param	{string} text 
+ * @param	{Number} maxLen	 maximum length of the shortened text including dots
+ * @param	{Number} numDots (optional) number of dots to be inserted in the middle.
+ * 							 Default: 3
+ * @param	{Boolean} split  (optional) If false, will add dots at the end, otherwise, in the middle.
+ * 							 Default: true
+ * 
+ * @returns {String}
+ */
 export const textEllipsis = (text, maxLen, numDots, split = true) => {
-	text = !isStr(text) ? '' : text
-	maxLen = maxLen || text.length
-	if (text.length <= maxLen || !maxLen) return text
+	if (!isStr(text)) return ''
+	if (!maxLen || text.length <= maxLen) return text
 	numDots = numDots || 3
 	const textLen = maxLen - numDots
 	const partLen = Math.floor(textLen / 2)
@@ -684,6 +802,10 @@ export const textEllipsis = (text, maxLen, numDots, split = true) => {
 	const arr = text.split('')
 	const dots = new Array(numDots).fill('.').join('')
 	const left = arr.slice(0, split ? partLen : maxLen - numDots).join('')
-	const right = !split ? '' : arr.slice(text.length - (isEven ? partLen : partLen + 1)).join('')
+	const right = !split
+		? ''
+		: arr.slice(
+			text.length - (isEven ? partLen : partLen + 1)
+		).join('')
 	return left + dots + right
 }
