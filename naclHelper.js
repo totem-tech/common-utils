@@ -57,9 +57,9 @@ export const decrypt = (sealed, nonce, senderPublicKey, recipientSecretKey, asSt
  * @param   {Object}            obj         data object to decrypt
  * @param   {String|Uint8Array} senderPublicKey 
  * @param   {String|Uint8Array} recipientSecretKey 
- * @param   {Array}             keys        (optional) to decrypt only specified object properties. 
+ * @param   {Array}             keys        (optional) `obj` property names, to be decrypted. 
  *                                          If valid array, unlisted properties will not be decrypted.
- *                                          If not a valid array, will attempt to decrypt all properties.
+ *                                          Otherwise, will attempt to decrypt all properties.
  *                                          See examples for different usage cases.
  * @param   {Boolean}           asString    (optional) whether to convert result bytes to string.
  *                                          Default: true
@@ -75,7 +75,9 @@ export const decryptObj = (obj, senderPublicKey, recipientSecretKey, keys, asStr
         ? decrypt
         : secretBoxDecrypt
     const validKeys = !isArr(keys)
+        // decrypt all properties
         ? Object.keys(result)
+        // decrypt only specified properties
         : keys.filter(k => result.hasOwnProperty(k))
     
     for (let i = 0; i < validKeys.length; i++) {
@@ -85,7 +87,7 @@ export const decryptObj = (obj, senderPublicKey, recipientSecretKey, keys, asStr
         // value is an object => recursively decrypt
         if (isObj(value)) {
             const childKeyPrefix = `${key}.`
-            const childKeys = keys
+            const childKeys = validKeys
                 .filter(k => k.startsWith(childKeyPrefix))
                 // get rid of prefix
                 .map(k => k.replace(new RegExp(childKeyPrefix), ''))
