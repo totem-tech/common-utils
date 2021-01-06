@@ -15,7 +15,7 @@ import {
     naclVerify,
     randomAsU8a,
 } from '@polkadot/util-crypto'
-import { isArr, isHex, isObj, isUint8Arr } from "./utils"
+import { isArr, isHex, isObj, isUint8Arr, objCopy } from "./utils"
 import {
     bytesToHex,
     hexToBytes,
@@ -241,13 +241,15 @@ export const encrypt = (message, senderSecretKey, recipientPublicKey, nonce, asH
 export const encryptObj = (obj, secretKey, recipientPublicKey, keys, asHex = true) => {
     if (!isObj(obj)) return
 
-    const result = {...obj}
+    const result = objCopy(obj, {}, [])
     const isBox = isHex(recipientPublicKey) || isUint8Arr(recipientPublicKey)
     const encryptFn = isBox
         ? encrypt
         : secretBoxEncrypt
     const validKeys = !isArr(keys)
-        ? Object.keys(result)
+        // encrypt all properties
+        ? Object.keys(result) 
+        //  encrypt only specified properties
         : keys.filter(k => result.hasOwnProperty(k))
     
     for (let i = 0; i < validKeys.length; i++) {
@@ -257,7 +259,7 @@ export const encryptObj = (obj, secretKey, recipientPublicKey, keys, asHex = tru
         // value is an object => recursively encrypt
         if (isObj(value)) {
             const childKeyPrefix = `${key}.`
-            const childKeys = keys
+            const childKeys = validKeys
                 .filter(k => k.startsWith(childKeyPrefix))
                 // get rid of prefix
                 .map(k => k.replace(new RegExp(childKeyPrefix), ''))
