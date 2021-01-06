@@ -59,7 +59,7 @@ export const decrypt = (sealed, nonce, senderPublicKey, recipientSecretKey, asSt
  * @param   {String|Uint8Array} recipientSecretKey 
  * @param   {Array}             keys        (optional) `obj` property names, to be decrypted. 
  *                                          If valid array, unlisted properties will not be decrypted.
- *                                          Otherwise, will attempt to decrypt all properties.
+ *                                          g9i, will attempt to decrypt all properties.
  *                                          See examples for different usage cases.
  * @param   {Boolean}           asString    (optional) whether to convert result bytes to string.
  *                                          Default: true
@@ -83,6 +83,7 @@ export const decryptObj = (obj, senderPublicKey, recipientSecretKey, keys, asStr
     for (let i = 0; i < validKeys.length; i++) {
         const key = validKeys[i]
         const value = result[key]
+        if (!obj.hasOwnProperty(key)) continue
 
         // value is an object => recursively decrypt
         if (isObj(value)) {
@@ -96,7 +97,9 @@ export const decryptObj = (obj, senderPublicKey, recipientSecretKey, keys, asStr
                 value,
                 senderPublicKey,
                 recipientSecretKey,
-                childKeys,
+                childKeys.length > 0
+                    ? childKeys // decrypt only specified child keys
+                    : null,     // decrypt all child keys
                 asString,
             )
             continue
@@ -257,6 +260,7 @@ export const encryptObj = (obj, secretKey, recipientPublicKey, keys, asHex = tru
     for (let i = 0; i < validKeys.length; i++) {
         const key = validKeys[i]
         const value = result[key]
+        if (!obj.hasOwnProperty(key)) continue
 
         // value is an object => recursively encrypt
         if (isObj(value)) {
