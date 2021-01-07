@@ -40,7 +40,7 @@ export let messages = {
     reject: 'value not acceptable',
     required: 'required field',
     string: 'valid string required',
-    type: 'invalid type',
+    type: 'invalid data type',
     unique: 'array must not contain duplicate values',
     url: 'invalid URL',
 
@@ -99,6 +99,7 @@ export const validate = (value, config, customMessages = {}) => {
         const {
             accept,
             decimals,
+            instanceOf,
             keys,
             requiredKeys, 
             max,
@@ -194,33 +195,39 @@ export const validate = (value, config, customMessages = {}) => {
                     return errorMsgs.url
                 }
                 break
-            default:
-                // unsupported type
-                if (isStr(type)) return errorMsgs.type
-                // validation for unlisted types by checking if the value is an instance of `type`
-                // (eg: ApiPromise, BN)
-                if (!(value instanceof type)) return errorMsgs.type
+                default:
+                    // validation for unlisted types by checking if the value is an instance of `type`
+                    // (eg: ApiPromise, BN)
+                    try {
+                        if (!(value instanceof instanceOf)) return errorMsgs.instanceof || errorMsgs.type
+                    } catch (_) { } 
+                    // unsupported type
+                    return errorMsgs.type
         }
-
-        // validate array/integer/number/string length
-        if (isValidNumber(maxLength) && (valueIsArr ? value : `${value}`).length > maxLength)
-            return `${errorMsgs.lengthMax}: ${maxLength}`
-        if (isValidNumber(minLength) && (valueIsArr ? value : `${value}`).length < minLength)
-            return `${errorMsgs.lengthMin}: ${minLength}`
 
         // valid only if value `accept` array includes `value` or items in `value` array
         if (isArr(accept) && accept.length) {
             // if `value` is array all items in it must be in the `accept` array
-            const valid = !valueIsArr ? accept.includes(value) : value.every(v => accept.includes(v))
+            const valid = !valueIsArr
+                ? accept.includes(value)
+                : value.every(v => accept.includes(v))
             if (!valid) return errorMsgs.accept
         }
         // valid only if value `reject` array does not include the `value` or items in `value` array
-        if (isArr(reject) && reject.length && reject.includes(value)) {
-            const valid = !valueIsArr ? !reject.includes(value) : value.every(v => !reject.includes(v))
+        if (isArr(reject) && reject.length) {
+            const valid = !valueIsArr
+                ? !reject.includes(value)
+                : value.every(v => !reject.includes(v))
             if (!valid) return errorMsgs.reject
         }
 
-        if (regex && isFn(regex.test) && !regex.test(value)) return errorMsgs.regex
+        // validate regex expression
+        if (regex instanceof RegExp && !regex.test(value)) return errorMsgs.regex
+
+        // validate array/integer/number/string length
+        const len = (valueIsArr ? value : `${value}`).length
+        if (isValidNumber(maxLength) && len > maxLength) return `${errorMsgs.lengthMax}: ${maxLength}`
+        if (isValidNumber(minLength) && len < minLength) return `${errorMsgs.lengthMin}: ${minLength}`
 
         // valid according to the config
         return null

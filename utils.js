@@ -146,7 +146,7 @@ export const isETHAddress = (address, chainId) => {
 export const isFn = x => typeof x === 'function'
 export const isHash = x => HASH_REGEX.test(`${x}`)
 export const isHex = x => HEX_REGEX.test(`${x}`)
-export const isInteger = x => isValidNumber(x) && `${x}`.split('.').length === 1
+export const isInteger = x => Number.isInteger(x)
 export const isMap = x => x instanceof Map
 export const isObj = x => !!x && typeof x === 'object' && !isArr(x) && !isMap(x) && !isSet(x)
 // Checks if argument is an Array of Objects. Each element type must be object, otherwise will return false.
