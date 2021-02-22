@@ -1,10 +1,10 @@
-import { blake2AsHex, keccakAsHex } from '@polkadot/util-crypto'
+// import { blake2AsHex, keccakAsHex } from '@polkadot/util-crypto'
 import { ss58Decode } from './convert'
 /*
  * List of optional node-modules and the functions used by them:
  * Module Name          : Function Name
  * ---------------------------
- * @polkadot/util-crypto: isAddress
+ * @polkadot/util-crypto: isAddress, generateHash
  * escapeStringRegexp   : escapeStringRegexp, searchRanked
  * form-data   			: objToFormData
  * web3-utils  			: isAddress, isETHAddress
@@ -75,6 +75,7 @@ export const escapeStringRegexp = (str) => {
  * @param	{Number}	bitLength 
  */
 export const generateHash = (seed, algo, bitLength = 256) => {
+	const { blake2AsHex, keccakAsHex } = require('@polkadot/util-crypto')
 	seed = isUint8Arr(seed) ? seed : (
 		isStr(seed) ? seed : JSON.stringify(seed)
 	)
