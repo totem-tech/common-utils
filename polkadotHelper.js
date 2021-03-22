@@ -1,4 +1,4 @@
-import { ApiPromise, WsProvider } from '@polkadot/api'
+import { ApiPromise, ApiRx, WsProvider } from '@polkadot/api'
 import Keyring from '@polkadot/keyring/'
 import createPair from '@polkadot/keyring/pair'
 import { isFn, isArr, isDefined, isObj, isStr, isValidNumber, isArr2D } from './utils'
@@ -24,25 +24,28 @@ const config = {
 }
 const nonces = {}
 
-// connect initiates a connection to the blockchain using PolkadotJS
-//
-// Params:
-// @nodeUrl     string
-// @types       object: custom type definitions
-// @autoConnect boolean: whether to auto reconnect or create an once-off connection
-//
-// returns promise: 
-//                  - will resolve to an object: { api, provider}
-//                  - will reject to either a @err: string or object (if object use @message property for error message)
-//                  - will reject if connection fails as well as times out
+/**
+ * @name    connect
+ * @summary initiates a connection to the blockchain using PolkadotJS 
+ * 
+ * @param   {String}    nodeUrl 
+ * @param   {Object}    types       custom type definitions
+ * @param   {Boolean}   autoConnect whether to auto reconnect or create an once-off connection
+ * @param   {Number}    timeout     connection timeout duration in milliseconds
+ * 
+ * @returns {Object}    { api, keyring, provider }
+ *                  - will resolve to an object: { api, provider}
+ *                  - will reject to either a @err: string or object (if object use @message property for error message)
+ *                  - will reject if connection fails as well as times out
+ */
 export const connect = (
     nodeUrl = config.nodes[0],
     types = config.types,
     autoConnect = true,
     timeout = config.timeout,
-    timeoutMsg = config.errorMsgs.connectionTimeout,
-    failedMsg = config.errorMsgs.connectionFailed,
 ) => new Promise((resolve, reject) => {
+    const timeoutMsg = config.errorMsgs.connectionTimeout
+    const failedMsg = config.errorMsgs.connectionFailed
     const provider = new WsProvider(nodeUrl, autoConnect)
     if (!autoConnect) provider.connect()
     // auto reject if doesn't connect within specified duration
@@ -56,14 +59,18 @@ export const connect = (
     )
 })
 
-// setDefaultConfig sets default config (node URL, type definitions etc) for use connections, 
-// unless explicitly provided in the @connect function.
-//
-// Params:
-// @nodes   array: array of node URLs
-// @types   object
-//
-// Returns object: @config
+/**
+ * @name    setDefaultConfig
+ * @summary sets default config (node URL, type definitions etc) for use connections, 
+ *          unless explicitly provided in the `connect` function.
+ * 
+ * @param   {Array}     nodes 
+ * @param   {Object}    types 
+ * @param   {Number}    timeout 
+ * @param   {Object}    errorMsgs 
+ * 
+ * @returns {Object}
+ */
 export const setDefaultConfig = (nodes, types, timeout, errorMsgs = {}) => {
     config.nodes = isArr(nodes) ? nodes : config.nodes
     config.types = isObj(types) ? types : config.types
@@ -144,17 +151,20 @@ export const keyring = {
     remove: address => keyring.contains(address) && !_keyring.removePair(address),
 }
 
-// query makes storage API calls using PolkadotJS. All values returned will be sanitised.
-//
-// Params:
-// @api     ApiRx: API instance created using PolkadotJS or @connect()
-// @func    string: path to the PolkadotJS API function as a string. Eg: 'api.rpc.system.health'
-// @args    array: arguments to be supplied when invoking the API function.
-//              To subscribe to the API supply a callback function as the last item in the array.
-// @print   boolean: if true, will print the result of the query
-//
-// Returns  function/any: If callback is supplied in @args, will return the unsubscribe function.
-//              Otherwise, value of the query will be returned
+/**
+ * @name    query
+ * @summary Make storage API calls using PolkadotJS. All values returned will be sanitised.
+ * 
+ * @param   {ApiRx}           api   API instance created using PolkadotJS or `connect` function
+ * @param   {String|Function} func  path to the PolkadotJS API function as a string. Eg: 'api.rpc.system.health'
+ * @param   {Array}           args  (optional) arguments to be supplied when invoking the API function.
+ *                                  To subscribe to the API supply a callback function as the last item in the array.
+ * @param   {Boolean}         multi (optional) indicates `funcs` is a multi-query (and `func` !== 'api.query.multi')
+ * @param   {Boolean}         print (optional) whether to print output to console
+ * 
+ * @returns {Function|*}      If callback is supplied in `args`, will return the function to unsubscribe.
+ *                            Otherwise, result of the query will be returned
+ */
 export const query = async (
     api,
     func,
@@ -217,15 +227,18 @@ export const query = async (
 
 export const sanitise = x => JSON.parse(JSON.stringify(x)) // get rid of jargon
 
-// sign and send an already instantiated transaction
-//
-// Params:
-// @api         ApiRx: API instance created using PolkadotJS or @connect()
-// @address     string: account holder identity
-// @tx          TxRx: an already instantiated transaction created using the @api
-// @rxStatus    Subject: RxJS Subject to update the UI on status changes, if required
-//
-// Returns      promise 
+/**
+ * @name    signAndSend
+ * @summary sign and send an already instantiated transaction
+ * 
+ * @param   {ApiRx}   api       API instance created using PolkadotJS or @connect()
+ * @param   {String}  address   Account holder identity
+ * @param   {TxRx}    tx        An already instantiated transaction created using the @api
+ * @param   {Number}  nonce     Next unused nonce to be used for the transaction
+ * @param   {Subject} rxStatus  RxJS Subject to update the UI on status changes, if required
+ * 
+ * @returns {Array}   [blockHash, eventsArr]
+ */
 export const signAndSend = async (api, address, tx, nonce, rxStatus) => {
     const account = _keyring.getPair(address)
     nonce = nonce || await query(api, api.query.system.accountNonce, address)
@@ -283,15 +296,19 @@ export const signAndSend = async (api, address, tx, nonce, rxStatus) => {
     })
 }
 
-// transfer funds between accounts
-//
-// Params:
-// @toAddress       string: destination identity/address
-// @secretKey       string: address (must have already been added to keyring) or secretKey or seed (type: 'sr25519')
-// @publicKey       string: if falsy, @secretkey will be assumed to be a seed or an address 
-// @api             object: PolkadkRingot API from `ApiPromise`
-//
-// Returns promise: will resolve to transaction hash
+/**
+ * @name    transfer
+ * @summary transfer funds between accounts
+ * 
+ * @param   {string} toAddress 
+ * @param   {Number} amount 
+ * @param   {string} secretKey    One of the three: address or secretKey or seed (type: 'sr25519').
+ *                                If address, must have already been added to keyring.
+ * @param   {object} publicKey    If falsy, `secretkey` will be assumed to be a seed or an address  
+ * @param   {ApiRx} api           PolkadkRingot API from `ApiPromise`
+ * 
+ * @returns {Array}   [blockHash, eventsArr]
+ */
 export const transfer = async (toAddress, amount, secretKey, publicKey, api) => {
     if (!api) {
         // config.nodes wasn't set => return empty promise that rejects immediately

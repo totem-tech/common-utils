@@ -1,8 +1,14 @@
-import { blake2AsHex, keccakAsHex } from '@polkadot/util-crypto'
-// import { ss58Decode } from './convert'
-import { decodeAddress, encodeAddress, setSS58Format } from '@polkadot/util-crypto'
-import { isAddress as isETHAddress2 } from 'web3-utils'
-import escapeStringRegexp from 'escape-string-regexp'
+// import { blake2AsHex, keccakAsHex } from '@polkadot/util-crypto'
+import { ss58Decode } from './convert'
+/*
+ * List of optional node-modules and the functions used by them:
+ * Module Name          : Function Name
+ * ---------------------------
+ * @polkadot/util-crypto: isAddress, generateHash
+ * escapeStringRegexp   : escapeStringRegexp, searchRanked
+ * form-data   			: objToFormData
+ * web3-utils  			: isAddress, isETHAddress
+*/
 
 export const HEX_REGEX = /^0x[0-9a-f]+$/i
 export const HASH_REGEX = /^0x[0-9a-f]{64}$/i
@@ -16,11 +22,24 @@ export const icons = {
 	warning: 'lightning'
 }
 
-// trim texts
-export const clearClutter = x => x.split('\n').map(y => y.trim()).filter(Boolean).join(' ')
+/**
+ * @name	clearClutter
+ * @summary clears clutter from strings
+ * 
+ * @param	{String} x 
+ * 
+ * @returns {String}
+ */
+export const clearClutter = x => x.split('\n')
+	.map(y => y.trim())
+	.filter(Boolean)
+	.join(' ')
 
-/*
- * Copies supplied string to system clipboard
+/**
+ * @name	copyToClipboard
+ * @summary copies text to clipboard. No compatible with NodeJS.
+ * 
+ * @param	{String} str 
  */
 export const copyToClipboard = str => {
 	const el = document.createElement('textarea')
@@ -42,6 +61,11 @@ export const downloadFile = (content, fileName, contentType) => {
 	a.click()
 }
 
+export const escapeStringRegexp = (str) => {
+	const fn = require('escape-string-regexp')
+	return fn(str)
+}
+
 /**
  * @name	generateHash
  * @summary generate hash using supplied data
@@ -51,6 +75,7 @@ export const downloadFile = (content, fileName, contentType) => {
  * @param	{Number}	bitLength 
  */
 export const generateHash = (seed, algo, bitLength = 256) => {
+	const { blake2AsHex, keccakAsHex } = require('@polkadot/util-crypto')
 	seed = isUint8Arr(seed) ? seed : (
 		isStr(seed) ? seed : JSON.stringify(seed)
 	)
@@ -65,36 +90,43 @@ export const generateHash = (seed, algo, bitLength = 256) => {
 	return // unsuporrted
 }
 
-/*
- * Data validation
- */
 /**
  * @name    isAddress
  * @summary validates if supplied is a valid address
  * 
  * @param    {String}	address 
- * @param    {String}	type            (optional) Supported: Polkadot (default), ETH
- * @param    {Number}	chainId			(optional) chainId for ETH address, ss58Format for Polkadot. Default: 0
- * @param    {Boolean}	ignoreChecksum	(optional) for Polkadot only. Default: false
+ * @param    {String}	type            (optional) valid types: polkadot (default), ethereum
+ * @param    {Number}	chainId			(optional) chainId for Ethereum address, ss58Format for Polkadot.
+ * 											Default: 0
+ * @param    {Boolean}	ignoreChecksum	(optional) for Polkadot only.
+ * 											Default: false
  */
 export const isAddress = (address, type, chainId = 0, ignoreChecksum = false) => {
     try {
         switch (`${type}`.toLowerCase()) {
-            case 'ethereum':
-				return isETHAddress2(address, chainId || 0)
+			case 'ethereum':
+				return isETHAddress(address, chainId || 0)
 			case 'polkadot':
-            default:
-                // assume Polkadot/totem address
-                return !!decodeAddress(address, ignoreChecksum, chainId)
+			default:
+				// assume Polkadot/Totem address
+				const account = ss58Decode(address, ignoreChecksum, chainId)
+				// must be 32 bytes length
+                return !!account && account.length === 32
         }
     } catch (e) {
         return false
     }
 }
+isAddress.validTypes = {
+	ethereum: 'ethereum',
+	polkadot: 'polkadot',
+}
 export const isArr = x => Array.isArray(x)
 // isArr2D checks if argument is a 2-dimentional array
 export const isArr2D = x => isArr(x) && x.every(isArr)
-export const isAsyncFn = x => x instanceof (async () => { }).constructor
+// checks if convertible to an array by using `Array.from(x)`
+export const isArrLike = x => isSet(x) || isMap(x) || isArr(x)
+export const isAsyncFn = x => x instanceof (async () => { }).constructor && x[Symbol.toStringTag] === "AsyncFunction"
 export const isBool = x => typeof x === 'boolean'
 export const isBond = x => {
 	try {
@@ -108,11 +140,14 @@ export const isBond = x => {
 export const isDate = x => x instanceof Date && isValidNumber(x.getUTCMilliseconds())
 export const isDefined = x => x !== undefined && x !== null
 export const isError = x => x instanceof Error
-export const isETHAddress = isETHAddress2
+export const isETHAddress = (address, chainId) => {
+	const { isAddress } = require('web3-utils')
+	return isAddress(address, chainId)
+}
 export const isFn = x => typeof x === 'function'
 export const isHash = x => HASH_REGEX.test(`${x}`)
 export const isHex = x => HEX_REGEX.test(`${x}`)
-export const isInteger = x => isValidNumber(x) && `${x}`.split('.').length === 1
+export const isInteger = x => Number.isInteger(x)
 export const isMap = x => x instanceof Map
 export const isObj = x => !!x && typeof x === 'object' && !isArr(x) && !isMap(x) && !isSet(x)
 // Checks if argument is an Array of Objects. Each element type must be object, otherwise will return false.
@@ -144,16 +179,14 @@ export const hasValue = x => {
 	}
 }
 
-// randomInt generates random number within a range
-//
-// Params:
-// @min		number
-// @max		number
-// 
-// returns number
-export const randomInt = (min, max) => parseInt(Math.random() * (max - min) + min)
-
-// getKeys returns an array of keys or indexes depending on object type
+/**
+ * @name	getKeys
+ * @summary returns an Array of keys or indexes depending on input type
+ * 
+ * @param	{Array|Map|Object} source 
+ * 
+ * @returns {Array}
+ */
 export const getKeys = source => {
 	if (isArr(source)) return source.map((_, i) => i)
 	if (isMap(source)) return Array.from(source).map(x => x[0])
@@ -161,20 +194,21 @@ export const getKeys = source => {
 	return []
 }
 
-// arrMapSlice mimics the behaviour of Array.prototype.map() with the
-// convenience of only executing callback on range of indexes
-//
-// Params:
-// @arr         array
-// @startIndex  number
-// @endIndex    number    : inclusive
-// @callback    function  : callback to be executed on each item within the set range
-//              Params:
-//              @currentValue
-//              @currentIndex
-//              @array
-//
-// Returns array of items all returned by @callback
+/**
+ * @name	arrMapSlice
+ * @summary mimics the behaviour of Array.map() with the convenience of only executing callback on range of indexes
+ * 
+ * @param {Array} 	 data 
+ * @param {Number}   startIndex 
+ * @param {Number}   endIndex 
+ * @param {Function} callback   to be executed on each item within the set range
+ *              				Params:
+ *              				@currentValue
+ *              				@currentIndex
+ *              				@array
+ * 
+ * @returns {Array} list of all items returned by @callback
+ */
 export const arrMapSlice = (data, startIndex, endIndex, callback) => {
 	const isAMap = isMap(data)
 	if (!isArr(data) && !isAMap) return []
@@ -194,32 +228,61 @@ export const arrMapSlice = (data, startIndex, endIndex, callback) => {
 	return result
 }
 
-// Read-only array
-export const arrReadOnly = (arr = [], strict = false) => objReadOnly(arr, strict)
+/**
+ * @name	arrReadOnly
+ * @summary sugar for `objReadOnly()` for an Array
+ * 
+ * @param	{Array}	input 
+ * @param	{Boolean} strict
+ * 
+ * @returns {Array}
+ */
+export const arrReadOnly = (input, strict, silent) => objReadOnly(input, strict, silent)
 
-// Reverse array items
+/**
+ * @name	arrReverse
+ * @summary Reverse an array conditionally
+ * 
+ * @param	{Array}		arr
+ * @param	{Boolean}	reverse	 (optional) condition to reverse the array.
+ * 								 Default: true
+ * @param	{Boolean}	newArray (optional) whether to cnstruct new array or use input.
+ * 								 Default: true
+ * 
+ * @returns {Array}
+ */ 
 export const arrReverse = (arr, reverse = true, newArray = true) => {
 	if (!isArr(arr)) return []
-	arr = !newArray ? arr : [...arr]
-	return reverse ? arr.reverse() : arr
+	if (newArray) arr = [...arr]
+	return reverse
+		? arr.reverse()
+		: arr
 }
 
-// arrSearch search for objects by key-value pairs
-//
-// Params:
-// @map			Map
-// @keyValues	Object	: key-value pairs
-// @matchAll	boolean 	: match all supplied key-value pairs
-// @ignoreCase	boolean	: case-insensitive search for strings
-//
-// Returns Map (key = original index) or Array (index not preserved) if @returnArr == true
-export const arrSearch = (arr, keyValues, matchExact, matchAll, ignoreCase, returnArr) => {
-	const result = returnArr ? new Array() : new Map()
+/**
+ * @name	arrSearch
+ * @summary search array of objects
+ * 
+ * @param	{Array}	  arr 
+ * @param	{Object}  keyValues  specific keys and respective values to search for
+ * @param	{Boolean} matchExact (optional) whether to match the value exactly as specified in @keyValues
+ * @param	{Boolean} matchAll   (optional) whether all or any supplied keys should match
+ * @param	{Boolean} ignoreCase (optional)
+ * @param	{Boolean} asArray    (optional) wheter to return result as Array or Map
+ * 
+ * @returns {Array|Map} Map (key = original index) or Array (index not preserved) if @returnArr == true
+ */
+export const arrSearch = (arr, keyValues, matchExact, matchAll, ignoreCase, asArray) => {
+	const result = asArray
+		? new Array()
+		: new Map()
 	if (!isObj(keyValues) || !isObjArr(arr)) return result
+
 	const keys = Object.keys(keyValues)
 	for (var index = 0; index < arr.length; index++) {
 		let matched = false
 		const item = arr[index]
+
 		for (const i in keys) {
 			const key = keys[i]
 			let keyword = keyValues[key]
@@ -227,13 +290,20 @@ export const arrSearch = (arr, keyValues, matchExact, matchAll, ignoreCase, retu
 
 			if (ignoreCase && isStr(value)) {
 				value = value.toLowerCase()
-				keyword = isStr(keyword) ? keyword.toLowerCase() : keyword
+				keyword = isStr(keyword)
+					? keyword.toLowerCase()
+					: keyword
 			}
 
-			matched = !matchExact && (isStr(value) || isArr(value)) ? value.indexOf(keyword) >= 0 : value === keyword
+			matched = !matchExact && (isStr(value) || isArr(value))
+				? value.indexOf(keyword) >= 0
+				: value === keyword
 			if ((matchAll && !matched) || (!matchAll && matched)) break
 		}
-		matched && (returnArr ? result.push(item) : result.set(index, item))
+		matched && (asArray
+			? result.push(item)
+			: result.set(index, item)
+		)
 	}
 	return result
 }
@@ -247,20 +317,43 @@ export const arrSort = (arr, key, reverse = false, sortOriginal = false) => {
 	return reverse ? arrReverse(sortedArr, true) : sortedArr
 }
 
-// arrUnique returns unique values in an array
-export const arrUnique = (arr = []) => [...new Set(arr)]
+/**
+ * @name	arrUnique
+ * @summary constructs a new array of unique values
+ * 
+ * @param	{Array} source
+ * 
+ * @returns {Array}
+ */
+export const arrUnique = (source = []) => [...new Set(source)]
 
-// className formats supplied value into CSS class name compatible string for React
-//
-// Params:
-// @value	string/object/array: if object supplied, 
-//							key		string: CSS class
-//							value	boolean: whether to include the key to the final output
+/**
+ * @name	className
+ * @summary formats supplied value into CSS class name compatible string for React
+ * 
+ * @param	{Object|Array} value 
+ * 
+ * @returns	{String}
+ * 
+ * @example ```JavaScript
+ * const isSection = false
+ * const isIcon = true
+ * const withBorder = false
+ * const str = className([
+ *     'ui',
+ *     { section: isSection, icon: isIcon },
+ *     withBorder && 'bordered',
+ * ])
+ * 
+ * // expected result: 'ui icon'
+ * ```
+ */
 export const className = value => {
 	if (isStr(value)) return value
 	if (isObj(value)) {
 		// convert into an array
-		value = Object.keys(value).map(key => !!value[key] && key)
+		value = Object.keys(value)
+			.map(key => !!value[key] && key)
 	}
 	if (!isArr(value)) return ''
 	return value
@@ -269,15 +362,17 @@ export const className = value => {
 		.join(' ')
 }
 
-// deferred returns a function that invokes the callback function after certain delay/timeout
-// If the returned function is invoked again before timeout,
-// the invokation will be deferred further with the duration supplied in @delay
-//
-// Params:
-// @callback  function  : function to be invoked after deferred delay
-// @delay     number    : number of milliseconds to be delayed.
-//                        Default value: 50
-// @thisArg    object   : optional, makes sure callback is bounded to supplied object 
+/**
+ * @name	deferred
+ * @summary returns a function that invokes the callback function after certain delay/timeout
+ * 
+ * @param	{Function}	callback 	function to be invoked after timeout
+ * @param	{Number}	delay		(optional) timeout duration in milliseconds.
+ * 									Default: 50
+ * @param	{*}			thisArg		(optional) the special `thisArgs` to be used when invoking the callback.
+ * 
+ * @returns {Function}
+ */
 export const deferred = (callback, delay, thisArg) => {
 	if (!isFn(callback)) return // nothing to do!!
 	let timeoutId
@@ -287,97 +382,142 @@ export const deferred = (callback, delay, thisArg) => {
 	}
 }
 
-// objContains tests if an object contains all the supplied keys/properties
-//
-// Params:
-// @obj		object
-// @keys	array: list of required properties in the object
-//
-// Returns	boolean
-export const objContains = (obj = {}, keys = []) => {
-	if (!isObj(obj) || !isArr(keys)) return false
+/**
+ * @name	objCopy
+ * @summary deep-copy an object to another object
+ * 
+ * @param	{Object}	source	source object
+ * @param	{Object}	dest	destination object
+ * @param	{Array}		ignore	(optional) prevents @dest's property to be overriden 
+ * 						    	if @source's property value is in the list
+ *						    	Default: [undefined]
+ * @returns {Object}
+ */
+export const objCopy = (source = {}, dest = {}, ignore = [undefined]) => {
+	const sKeys = Object.keys(source)
+	for (let i = 0; i < sKeys.length; i++) {
+		const key = sKeys[i]
+		if (dest.hasOwnProperty(key) && ignore.includes(source[key])) continue
+
+		const value = source[key]
+		if (isArrLike(value)) {
+			let newValue = JSON.parse(JSON.stringify(Array.from(value)))
+			if (isMap(value)) {
+				newValue = new Map(newValue)
+			} else if (isSet(value)) {
+				newValue = new Set([...newValue])
+			}
+			dest[key] = newValue
+		} else if (isObj(value)) {
+			dest[key] = objCopy(source[key], dest[key], ignore)
+		} else {
+			dest[key] = value
+		}
+	}
+
+	return dest
+}
+
+/** 
+ * @name	objClean
+ * @summary	constructs a new object with only the supplied property names (keys) and their respective values
+ * 
+ * @param	{Object}	obj
+ * @param	{Array}		keys		property names
+ * @param	{Boolean}	recursive	(optional) Default: false
+ * 
+ * @returns	{Object}
+ */
+export const objClean = (obj, keys, recursive = false) => {
+	if (!isObj(obj) || !isArr(keys)) return {}
+
+	const result = {}
 	for (let i = 0; i < keys.length; i++) {
-		if (!obj.hasOwnProperty(keys[i])) return false
+		const key = keys[i]
+		if (!obj.hasOwnProperty(key)) continue
+
+		let value = obj[key]
+		result[key] = value
+		// recursively clean up child property with object value
+		if (!recursive || !isObj(value)) continue
+
+		const childPrefix = `${key}.`
+		let childKeys = keys.filter(k => k.startsWith(childPrefix))
+		if (childKeys.length === 0) continue
+		
+		// get rid of child key prefix 
+		childKeys = childKeys.map(k =>
+			k.replace(new RegExp(childPrefix), '')
+		)
+		result[key] = objClean(
+			value,
+			childKeys,
+			recursive,
+		)
+	}
+	return result
+}
+
+/**
+ * @name	objCreate
+ * @summary constructs a new object with supplied key(s) and value(s)
+ * 
+ * @param	{String|Array}	keys 
+ * @param	{*|Array}		values 
+ * 
+ * @returns	{Object}
+ */
+export const objCreate = (keys, values) => {
+	const obj = {}
+	if (!isArr(keys)) keys = [keys]
+	// arrays of keys and values supplied
+	if (!isArr(values)) values = [values]
+
+	for (let i = 0; i < keys.length; i++) {
+		const key = keys[i]
+		const value = values[i]
+		obj[key] = value
+	}
+	return obj
+}
+
+/**
+ * @name	objHasKeys
+ * @summary checks if all the supplied keys exists in a object
+ * 
+ * @param	{Object} 	obj 
+ * @param	{Array} 	keys 
+ * @param	{Boolean}	requireValue (optional) whether each property should have some value.
+ * 
+ * @returns {Boolean}
+ */
+export function objHasKeys(obj = {}, keys = [], requireValue = false){
+	if (!isObj(obj) || !isArr(keys)) return false
+
+	for (let i = 0; i < keys.length; i++) {
+		const key = keys[i]
+		if (!obj.hasOwnProperty(key)) return false
+		if (!requireValue) continue
+
+		if (!hasValue(obj[key])) return false
 	}
 	return true
 }
 
 /**
- * @name	objCopy
- * @summary recursively copies properties of an object to another object
+ * @name	objReadOnly
+ * @summary constructs a new read-only object where only new properties can be added.
  * 
- * @param	{Object}	source				source object
- * @param	{Object}	dest				destination object
- * @param	{Array}		preventOverride		prevent overriding @source property value is in this list
+ * @param	{Object}	obj 
+ * @param	{Boolean}	strict	(optional) If true, any attempt to add or update property will fail.
+ *					 			Otherwise, only new properties can be added but updates will fail.
+ *								Default: false
+ * @param	{Boolean}	silent	(optional) whether to throw error when property add/update fails.
+ * 								Default: false
+ * 
+ * @returns	{Object}
  */
-export const objCopy = (source = {}, dest = {}, preventOverride = [undefined]) => {
-	Object.keys(source).forEach(key => {
-		if (preventOverride.includes(source[key])) return
-		dest[key] = isArr(source[key])
-			? JSON.parse(JSON.stringify(source[key]))
-			: isObj(source[key])
-				? objCopy(source[key], dest[key], preventOverride)
-				: source[key]
-	})
-	return dest
-}
-
-// objClean produces a clean object with only the supplied keys and their respective values
-//
-// Params:
-// @obj		object/array
-// @keys	array : if empty/not array, an empty object will be returned
-//
-// Returns object
-export const objClean = (obj, keys) => !isObj(obj) || !isArr(keys) ? {} : keys.reduce((cleanObj, key) => {
-	if (obj.hasOwnProperty(key)) {
-		cleanObj[key] = obj[key]
-	}
-	return cleanObj
-}, {})
-
-// objCreate constructs a new object with supplied key(s) and value(s)
-//
-// Params:
-// @key		string/array
-// @value	any/array
-//
-// Returns	object
-export const objCreate = (key, value) => {
-	const obj = {}
-	if (!isArr(key)) {
-		obj[key] = value
-		return obj
-	}
-	// arrays of keys and values supplied
-	value = !isArr(value) ? [value] : value
-	key.forEach(k => obj[k] = value[key])
-	return obj
-}
-// objHasKeys checks if all the supplied keys exists in a object
-//
-// Params:
-// @obj				object
-// @keys			array
-// @requireValue	book	: (optional) if true, will check if all keys has valid value
-//
-// returns boolean
-export const objHasKeys = (obj = {}, keys = [], requireValue = false) => {
-	return !keys.reduce((no, key) => no || (requireValue ? !hasValue(obj[key]) : !obj.hasOwnProperty(key)), false)
-}
-
-// objReadOnly returns a new read-only object where only new properties can be added.
-//
-// Params:
-// @obj	   object/array : (optional) if valid object supplied, new object will be created based on @obj.
-//					 Otherwise, new empty object will be used.
-//					 PS: original supplied object's properties will remain writable, unless re-assigned to the returned object.
-// @strict boolean: (optional) if true, any attempt to add or update property to returned object will throw a TypeError.
-//					 Otherwise, only new properties can be added. Attempts to update properties will be silently ignored.
-// @silent boolean: (optional) whether to throw error when in strict mode
-//
-// Returns  object
-export const objReadOnly = (obj = {}, strict = false, silent = false) => new Proxy(obj, {
+export const objReadOnly = (obj, strict = false, silent = false) => new Proxy(obj || {}, {
 	setProperty: (self, key, value) => {
 		// prevents adding new or updating existing property
 		const isStrict = !isFn(strict)
@@ -398,21 +538,68 @@ export const objReadOnly = (obj = {}, strict = false, silent = false) => new Pro
 	deleteProperty: () => false
 })
 
-// objWithoutKeys creates a new object excluding specified keys
-// 
-// Params:
-// @obj		object
-// @keys	array
-//
-// Returns object
-export const objWithoutKeys = (obj, keys) => !isObj(obj) || !isArr(keys) ? {} : (
-	Object.keys(obj).reduce((result, key) => {
-		if (keys.indexOf(key) === -1) {
-			result[key] = obj[key]
-		}
-		return result
-	}, {})
-)
+/**
+ * @name	objToUrlParams
+ * @summary	constructs URL param string from an object, excluding any `undefined` values
+ * 
+ * @param	{Object} obj
+ * 
+ * @returns	{String}
+ */
+export const objToUrlParams = (obj = {}, excludeUndefined = true) => Object.keys(obj)
+    .map(key => {
+		const value = obj[key]
+		if (excludeUndefined && value === undefined) return
+		const valueEscaped = !isArr(value)
+			? escape(value)
+			// prevents escaping comma when joining array
+			: value.map(escape).join()
+		return `${key}=${valueEscaped}`
+
+	})
+	.filter(Boolean)
+	.join('&')
+	
+export const objToFormData = (obj = {}, excludeUndefined = true) => {
+	let formData
+	try {
+		formData = new FormData()
+	} catch (_) {
+		// for nodejs only
+		const FormData = require('form-data')
+		formData = new FormData()
+	}
+	Object.keys(obj).forEach(key => { 
+		let value = obj[key]
+		if (excludeUndefined && value === undefined) return
+		if (isArr(value)) value = value.join()
+		formData.append(key, value)
+	})
+	return formData
+}
+
+/**
+ * @name	objWithoutKeys
+ * @summary constructs a new object excluding specific properties
+ * 
+ * @param	{Object} obj 
+ * @param	{Array}  keys property names to exclude
+ * 
+ * @returns {Object}
+ */
+export const objWithoutKeys = (obj, keys) => {
+	if (!isObj(obj) || !isArr(keys)) return {}
+
+	const result = {...obj}
+	const allKeys = Object.keys(result)
+	for (let i = 0; i < allKeys.length; i++) {
+		const key = allKeys[i]
+		// ignore property
+		if (!keys.includes(key)) continue
+		delete result[key]
+	}
+	return result
+}
 
 export const mapFilter = (map, callback) => {
 	const result = new Map()
@@ -427,36 +614,54 @@ export const mapFilter = (map, callback) => {
 	})
 	return result
 }
-// mapFindByKey finds a specific object by supplied object property/key and value within
-//
-// Params:
-// @map		Map: Map of objects
-// @key		any: object key to match or null if value is not an object
-// @value	any
-//
-// Returns Object: first item partial/fully matching @value with supplied @key
+
+/**
+ * @name	mapFindByKey
+ * @summary finds a specific object by supplied object property/key and value within.
+ * 
+ * Unused??
+ * 
+ * @param	{Map}	  map 		 Map of objects
+ * @param	{*}		  key 		 object key to match or null if value is not an object
+ * @param	{*}		  value 
+ * @param	{Boolean} matchExact 
+ * 
+ * @returns {*} first item partial/fully matching @value with supplied @key
+ */
 export const mapFindByKey = (map, key, value, matchExact) => {
 	for (let [_, item] of map.entries()) {
-		const val = key === null ? item : item[key]
+		const val = key === null
+			? item
+			: item[key]
 		if (!matchExact && (isStr(val) || isArr(val)) ? val.indexOf(value) >= 0 : val === value) return item
 	}
 }
 
-// mapJoin joins (and overrides) key-value pairs from @source to @dest
-export const mapJoin = (source = new Map(), dest = new Map()) => {
-	Array.from(source).forEach(([key, value]) => dest.set(key, value))
-	return dest
-}
+/**
+ * @name	mapJoin
+ * @summary joins two maps
+ * 
+ * @param	{Map} source 
+ * @param	{Map} dest   any existing values will be overriden
+ * 
+ * @returns {Map}
+ */
+export const mapJoin = (source, dest = new Map()) => new Map([
+	...Array.from(dest),
+	...Array.from(source),
+])
 
-// mapSearch search for objects by key-value pairs
-//
-// Params:
-// @map			Map
-// @keyValues	Object	: key-value pairs
-// @matchAll	boolean 	: match all supplied key-value pairs
-// @ignoreCase	boolean	: case-insensitive search for strings
-//
-// Returns Map
+/**
+ * @name	mapSearch
+ * @summary search for objects by key-value pairs
+ * 
+ * @param 	{Map}		map
+ * @param 	{Object}	keyValues  key-value pairs
+ * @param 	{Boolean}	matchAll   (optional) match all supplied key-value pairs
+ * @param 	{Boolean}	ignoreCase (optional) case-insensitive search for strings
+ *
+ * @returns {Map}
+ */
 export const mapSearch = (map, keyValues, matchExact, matchAll, ignoreCase) => {
 	const result = new Map()
 	if (!isObj(keyValues) || !isMap(map)) return result
@@ -496,15 +701,38 @@ export const mapSort = (map, key, reverse) => {
 	))
 }
 
-// Search Array or Map
-export const search = (data, keywords, keys) => {
-	if (!keywords || keywords.length === 0 || !(isArr(data) || isMap(data))) return data
-	const fn = isMap(data) ? mapSearch : arrSearch
-	const keyValues = keys.reduce((obj, key) => {
-		obj[key] = keywords
-		return obj
-	}, {})
-	return fn(data, keyValues, false, false, true, false)
+/**
+ * @name	randomInt
+ * @summary generates random number within a range
+ * 
+ * @param	{Number} min lowest number
+ * @param	{Number} max highest number
+ * 
+ * @returns {Number}
+ */
+export const randomInt = (min, max) => parseInt(Math.random() * (max - min) + min)
+
+/**
+ * @name	search
+ * @summary Search Array or Map
+ * 
+ * @param	{Array|Map} data 
+ * @param	{String}	query search query
+ * @param	{Array}		keys  property names to search for
+ * 
+ * @returns {Array|Map}
+ */
+export const search = (data, query, keys = []) => {
+	if (!query || query.length === 0 || !(isArr(data) || isMap(data))) return data
+	const searchFunc = isMap(data)
+		? mapSearch
+		: arrSearch
+	const keyValues = objCreate(
+		keys,
+		new Array(keys.length)
+			.fill(query)
+	)
+	return searchFunc(data, keyValues, false, false, true, false)
 }
 
 /**
@@ -522,16 +750,20 @@ export const search = (data, keywords, keys) => {
 export const searchRanked = (searchKeys = ['text']) => (options, searchQuery) => {
 	if (!searchQuery) return options
 	if (!options || options.length === 0) return []
+	
 	const uniqueValues = {}
 	const regex = new RegExp(escapeStringRegexp(searchQuery), 'i')
 	if (!searchQuery) return options
+
 	const search = key => {
 		const matches = options.map((option, i) => {
 			try {
 				if (!option || !hasValue(option[key])) return
+				
 				// catches errors caused by the use of some special characters with .match() below
 				let x = JSON.stringify(option[key]).match(regex)
 				if (!x || uniqueValues[options[i].value]) return
+
 				const matchIndex = x.index
 				uniqueValues[options[i].value] = 1
 				return { index: i, matchIndex }
@@ -539,26 +771,47 @@ export const searchRanked = (searchKeys = ['text']) => (options, searchQuery) =>
 				console.log(e)
 			}
 		}).filter(r => !!r)
+
 		return arrSort(matches, 'matchIndex').map(x => options[x.index])
 	}
 
 	return searchKeys.reduce((result, key) => result.concat(search(key)), [])
 }
 
-// Sort Array or Map
+/**
+ * @name	sort
+ * @summary Sort Array or Map
+ * 
+ * @param {Array|Map} data 
+ * @param {String}	  key		   (optional) property to sort by
+ * @param {Boolean}   reverse	   (optional)
+ * @param {Boolean}	  sortOriginal (optional)
+ * 
+ * @returns {Array|Map}
+ */
 export const sort = (data, key, reverse, sortOriginal) => {
-	const sortFunc = isArr(data) ? arrSort : (isMap(data) ? mapSort : null)
+	const sortFunc = isArr(data)
+		? arrSort
+		: isMap(data) && mapSort
 	if (!sortFunc) return []
-	return sortFunc(data, key, reverse, sortOriginal)
+	return sortFunc(
+		data,
+		key,
+		reverse,
+		sortOriginal,
+	)
 }
 
 /**
  * @name 	strFill
  * @summary pre/post-fill a string
- * @param {String}	str text to pre/post-fill 
- * @param {Number}	maxLen maximum total length of result string. Default: 2
- * @param {String}	filler string to fill
- * @param {Boolean}	after whether to add filler after or before @str.
+ * 
+ * @param	{String}	str		text to pre/post-fill 
+ * @param	{Number}	maxLen	maximum total length string to fill.
+ * 								If string length is higher than `maxLen`, will leave as is.
+ * 								Default: 2
+ * @param	{String}	filler	string to fill
+ * @param	{Boolean}	after	whether to add filler after or before @str.
  * 
  * @returns {String}
  */
@@ -570,47 +823,65 @@ export const strFill = (str, maxLen = 2, filler = ' ', after = false) => {
 	return arrReverse([filler.repeat(count), str], after).join('')
 }
 
-// textCapitalize capitalizes the first letter of the given string(s)
-//
-// Params:
-// @text			string/array/object
-// @fullSentence	bool: whether to capitalize every single word or just the first word
-// @forceLowercase	bool: convert string to lower case before capitalizing
-//
-// Returns string/array/object (same as input if supported otherwise undefined)
+/**
+ * @name	textCapitalize
+ * @summary capitalizes the first letter of input
+ * 
+ * @param	{String|Object} input 
+ * @param	{Boolean} 		fullSentence   (optional) whether to capitalize every single word or just the first word
+ * @param	{Boolean}		forceLowercase (optional) convert string to lower case before capitalizing
+ * 
+ * @returns {*}
+ */
 export const textCapitalize = (input, fullSentence = false, forceLowercase = false) => {
 	if (!input) return input
 	if (isStr(input)) {
 		if (forceLowercase) input = input.toLowerCase()
 		if (!fullSentence) return input[0].toUpperCase() + input.slice(1)
-		return input.split(' ').map(word => textCapitalize(word, false)).join(' ')
+		return input.split(' ')
+			.map(word => textCapitalize(word, false))
+			.join(' ')
 	}
-	if (isObj(input)) return Object.keys(input).reduce((obj, key) => {
-		obj[key] = textCapitalize(input[key], fullSentence, forceLowercase)
-		return obj
-	}, isArr(input) ? [] : {})
+	return !isObj(input)
+		? ''
+		: Object.keys(input)
+			.reduce((obj, key) => {
+				obj[key] = textCapitalize(
+					input[key],
+					fullSentence,
+					forceLowercase,
+				)
+				return obj
+			}, isArr(input) ? [] : {})
 }
 
-// textEllipsis shortens string into 'abc...xyz' or 'abcedf... form
-//
-// Params: 
-// @text    string
-// @maxLen  number: maximum length of the shortened text including dots
-// @numDots number: number of dots to be inserted in the middle. Default: 3
-// @split   boolean: if false, will add dots at the end
-//
-// Returns string
+/**
+ * @name	textEllipsis
+ * @summary shortens string into 'abc...xyz' or 'abcedf...' form
+ * 
+ * @param	{string} text 
+ * @param	{Number} maxLen	 maximum length of the shortened text including dots
+ * @param	{Number} numDots (optional) number of dots to be inserted in the middle.
+ * 							 Default: 3
+ * @param	{Boolean} split  (optional) If false, will add dots at the end, otherwise, in the middle.
+ * 							 Default: true
+ * 
+ * @returns {String}
+ */
 export const textEllipsis = (text, maxLen, numDots, split = true) => {
-	text = !isStr(text) ? '' : text
-	maxLen = maxLen || text.length
-	if (text.length <= maxLen || !maxLen) return text
+	if (!isStr(text)) return ''
+	if (!maxLen || text.length <= maxLen) return text
 	numDots = numDots || 3
 	const textLen = maxLen - numDots
 	const partLen = Math.floor(textLen / 2)
 	const isEven = textLen % 2 === 0
 	const arr = text.split('')
 	const dots = new Array(numDots).fill('.').join('')
-	const left = arr.slice(0, split ? partLen : maxLen).join('')
-	const right = !split ? '' : arr.slice(text.length - (isEven ? partLen : partLen + 1)).join('')
+	const left = arr.slice(0, split ? partLen : maxLen - numDots).join('')
+	const right = !split
+		? ''
+		: arr.slice(
+			text.length - (isEven ? partLen : partLen + 1)
+		).join('')
 	return left + dots + right
 }
