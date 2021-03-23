@@ -1,5 +1,6 @@
 import { BehaviorSubject, Subject } from 'rxjs'
 import { isDefined, isStr, mapSearch, isMap, isValidNumber, mapSort, isArr, isFn } from './utils'
+/* For NodeJS (non-browser applications) the following node module is required: node-localstorage */
 
 let storage, isNode
 // use this to force all instances of DataStorage where caching is enabled to update data from LocalStorage
@@ -22,7 +23,10 @@ try {
         const STORAGE_PATH = process.env.STORAGE_PATH || './server/data'
         isNode = true
         storage = new nls.LocalStorage(STORAGE_PATH, 500 * 1024 * 1024)
-        storage && console.log({ STORAGE_PATH })
+        if (storage) {
+            const absolutePath = require('path').resolve(STORAGE_PATH)
+            console.log({ STORAGE_PATH, absolutePath })
+        }
     } catch (e) { }
 }
 
@@ -82,7 +86,13 @@ export default class DataStorage {
         this.disableCache = name && disableCache
         this.rxData = this.disableCache ? new Subject() : new BehaviorSubject(data)
         this.size = data.size
-        isFn(onChange) && this.rxData.subscribe(onChange)
+        this.save = true
+        this.rxData.subscribe(data => {
+            this.name && this.save && write(this.name, data)
+            this.save = true
+            this.size = data.size
+            isFn(onChange) && onChange(data)
+        })
         if (this.disableCache) return
 
         // update cached data from localStorage throughout the application only when triggered
@@ -107,10 +117,8 @@ export default class DataStorage {
         keys = isArr(keys) ? keys : [keys]
         // nothing to do
         if (!keys.length) return this
-        keys.forEach(key => data.delete(key))
 
-        this.name && write(this.name, data)
-        this.size = data.size
+        keys.forEach(key => data.delete(key))
         this.rxData.next(data)
         return this
     }
@@ -125,8 +133,16 @@ export default class DataStorage {
      * @param   {Boolean} ignoreCase (optional) case-sensitivity of the search. Default: false
      */
     find(keyValues, matchExact, matchAll, ignoreCase) {
-        const result = this.search(keyValues, matchExact, matchAll, ignoreCase, 1)
-        return result.size === 0 ? null : Array.from(result)[0][1]
+        const result = this.search(
+            keyValues,
+            matchExact,
+            matchAll,
+            ignoreCase,
+            1,
+        )
+        return result.size === 0
+            ? null
+            : Array.from(result)[0][1]
     }
 
     /**
@@ -182,9 +198,20 @@ export default class DataStorage {
      * @returns {Map}     result
      */
     search(keyValues, matchExact = false, matchAll = false, ignoreCase = false, limit = 0) {
-        const result = mapSearch(this.getAll(), keyValues, matchExact, matchAll, ignoreCase)
+        const result = mapSearch(
+            this.getAll(),
+            keyValues,
+            matchExact,
+            matchAll,
+            ignoreCase,
+        )
         const doLimit = isValidNumber(limit) && limit > 0 && result.size > limit
-        return !doLimit ? result : new Map(Array.from(result).slice(0, limit))
+        return !doLimit
+            ? result
+            : new Map(
+                Array.from(result)
+                    .slice(0, limit)
+            )
     }
 
     /**
@@ -200,8 +227,6 @@ export default class DataStorage {
         if (!isDefined(key)) return this
         const data = this.getAll()
         data.set(key, value)
-        this.name && write(this.name, data)
-        this.size = data.size
         this.rxData.next(data)
         return this
     }
@@ -221,11 +246,12 @@ export default class DataStorage {
             // merge data
             const existing = this.getAll()
             Array.from(data)
-                .forEach(([key, value]) => existing.set(key, value))
+                .forEach(([key, value]) =>
+                    existing.set(key, value)
+                )
             data = existing // merged value
         }
 
-        this.name && write(this.name, data)
         this.rxData.next(data)
         return this
     }
@@ -244,7 +270,9 @@ export default class DataStorage {
         let data = this.getAll()
         if (!key && !reverse) return data // nothing to do
 
-        data = !key ? new Map(Array.from(data).reverse()) : mapSort(data, key, reverse)
+        data = !key
+            ? new Map(Array.from(data).reverse())
+            : mapSort(data, key, reverse)
         if (save) this.setAll(data)
 
         return data
@@ -270,6 +298,10 @@ export default class DataStorage {
      * @returns {String}    JSON string
      */
     toString(replacer = null, spacing = 0) {
-        return JSON.stringify(this.toArray(), replacer, spacing)
+        return JSON.stringify(
+            this.toArray(),
+            replacer,
+            spacing,
+        )
     }
 }

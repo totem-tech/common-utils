@@ -1,11 +1,18 @@
-import { isAsyncFn, isPromise, isFn } from "./utils"
+import { isAsyncFn, isPromise, isFn, isObj } from "./utils"
+/*
+ * List of optional node-modules and the functions used by them:
+ * Module Name          : Function Name
+ * ------------------------------------
+ * abort-controller: PromisE.fetch
+ * node-fetch      : PromisE.fetch
+*/
 
 /** 
  * @name PromisE
  * @summary attempts to solve a simple problem of Promise status (resolved/rejected) not being accessible externally.
  * Also compatible with async functions
  *
- * @param {Promise|Function|*}  promise
+ * @param {Promise|Function|*}  promise AsyncFunction is not supported in NodeJS with Webpack!
  *
  * @example Examples:
  * <BR>
@@ -59,16 +66,6 @@ export default function PromisE(promise) {
  */
 PromisE.all = (...promises) => PromisE(Promise.all(promises.flat()))
 
-/**
- * @name    PromisE.delay
- * @summary simply a setTimeout as a promise
- * 
- * @param   {Number} delay
- * 
- * @returns {PromisE}
- */
-PromisE.delay = delay => PromisE(resolve => setTimeout(resolve, delay))
-
 /** 
  * @name PromisE.deferred
  * @summary the adaptation of the `deferred()` function tailored for Promises.
@@ -115,6 +112,32 @@ PromisE.deferred = () => {
     })
 }
 
+/**
+ * @name    PromisE.delay
+ * @summary simply a setTimeout as a promise
+ * 
+ * @param   {Number} delay
+ * 
+ * @returns {PromisE}
+ */
+PromisE.delay = delay => PromisE(resolve => setTimeout(resolve, delay))
+
+// if timed out err.name will be 'AbortError''
+PromisE.fetch = async (url, options, timeout, asJson = true) => {
+    try {
+        options = isObj(options) ? options : {}
+        options.method = options.method || 'get'
+        if (timeout) options.signal = aborter(timeout)
+
+        const result = await fetcher(url, options)
+        return asJson
+            ? await result.json()
+            : result
+    } catch (err) {
+        if (err.name === 'AbortError') throw 'Request timed out'
+        throw err
+    }
+}
 
 /** 
  * @name    PromisE.race
@@ -167,4 +190,23 @@ PromisE.timeout = (...args) => {
     resultPromise.timeout = timeoutPromise
     resultPromise.promise = promise
     return resultPromise
+}
+
+const aborter = timeout => {
+    const AbortController = require('abort-controller')
+    const abortCtrl = new AbortController()
+    setTimeout(() => abortCtrl.abort(), timeout)
+    return abortCtrl
+}
+const fetcher = async (url, options) => {
+    let fetch2
+    try {
+        fetch2 = fetch
+    } catch (_) {
+        // required if nodejs
+        fetch2 = require('node-fetch')
+    }
+    fetch2.Promise = PromisE
+
+    return fetch2(url, options)
 }
