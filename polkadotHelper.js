@@ -265,7 +265,7 @@ export const signAndSend = async (api, address, tx, nonce, rxStatus) => {
                 try {
                     // if status is "Future" block hash is not assigned yet!
                     hash = status.asFinalized.toHex()
-                } catch (e) { }// ignore error
+                } catch (e) { } // ignore error
 
                 // Extract custom errors from events
                 const eventErrors = events.map(({ event }) => {
