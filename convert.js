@@ -22,11 +22,11 @@ const fallbackIfFails = (func, args = [], fallbackValue = null) => {
  * 
  * @param   {Uint8Array} address 
  * @param   {Number}     ss58Format (optional) use to generate address for any supported parachain identity.
- *                                  Default: 0 (Polkadot)
+ *                                  Default: undefined
  * 
  * @returns {String}     null if invalid address supplied
  */
-export const ss58Encode = (address, ss58Format = 0) => {
+export const ss58Encode = (address, ss58Format) => {
     const { encodeAddress } = require('@polkadot/util-crypto')
     return fallbackIfFails(encodeAddress, [address, ss58Format])
 }

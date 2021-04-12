@@ -1,4 +1,4 @@
-{
+export default {
     "LockIdentifier": "[u8; 8]",
     "BalanceLockV1": {
         "id": "LockIdentifier",
@@ -137,5 +137,5 @@
         "txID": "Hash"
     },
     "TXKeysS<Hash,Hash>": "TXKeysS",
-    "ProjectHashRef": "H256"
+    "ProjectHashRef": "H256",
 }
