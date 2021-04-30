@@ -137,5 +137,9 @@ export default {
         "txID": "Hash"
     },
     "TXKeysS<Hash,Hash>": "TXKeysS",
+    "TXKeysT": {
+        "txID": 'Hash',
+    },
+    'TXKeysT<Hash>': 'TXKeysT',
     "ProjectHashRef": "H256",
 }
