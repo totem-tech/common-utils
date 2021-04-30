@@ -15,9 +15,10 @@ let connection
  * 
  * @returns {Objecct}   CouchDB connection
  */
-export const getConnection = (url, global = true) => {
+export const getConnection = async (url, global = true) => {
     if (global && connection) return connection
-    const con = nano(url)
+    
+    const con = await nano(url)
     if (global) connection = con
     return con
 }
@@ -31,15 +32,27 @@ export const getConnection = (url, global = true) => {
  *                                      1. string: CouchDB connection URL including username and password
  *                                      2. object: existing connection
  *                                      3. null:   will use global `connection` if available.
+ *                                  Alternatively, use a specific environment variable for individual database.
+ *                                  The name of the environement variable must be in the following format:
+ *                                      `CouchDB_URL_$DBNAME` 
+ *                                  Replace `$DBNAME` with database name. The same to be provide in the `dbName` param.
  * @param   {String}                dbName          database name
  * 
  * @returns {CouchDBStorage}
  */
 export default class CouchDBStorage {
     constructor(connectionOrUrl, dbName) {
-        this.connectionOrUrl = connectionOrUrl
+        this.connectionOrUrl = connectionOrUrl || process.env[`CouchDB_URL_${dbName}`]
+        // whethe to use the global connection or database specific
+        this.useGlobalCon = !this.connectionOrUrl
         this.db = null
         this.dbName = dbName
+
+        // Forces the application to immediately attempt to connect.
+        // This is required because "nano" (CouchDB's official NPM module) does not handle connection error properly 
+        // and the entire application crashes. Neither try-catch nor async - await can catch this freakish error!
+        // Doing this will make sure database connection error is thrown on application startup and not later.
+        if (!this.useGlobalCon) this.getDB()
     }
 
     /**
@@ -51,16 +64,18 @@ export default class CouchDBStorage {
         if (this.db) return this.db
         // if initialization is already in progress wait for it
         if (this.dbPromise) return await this.dbPromise
-        const cou = this.connectionOrUrl
+
         const dbName = this.dbName
-        const con = cou && isStr(cou)
-            ? getConnection(cou)
-            : cou || connection
-        // database already initialized
-        if (!isObj(con)) throw new Error('CouchDB: invalid connection')
         if (!dbName) throw new Error('CouchDB: missing database name')
 
-        this.dbPromise = new PromisE((resolve, reject) => (async ()=> {
+        const con = isObj(this.connectionOrUrl)
+            ? this.connectionOrUrl
+            : await getConnection(this.connectionOrUrl, this.useGlobalCon)
+            // database already initialized
+        if (!isObj(con)) throw new Error('CouchDB: invalid connection')
+
+        this.dbPromise = new PromisE((resolve, reject) => (async () => {
+            
             try {
                 // retrieve a list of all database names
                 const dbNames = await con.db.list()
