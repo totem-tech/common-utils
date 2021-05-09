@@ -17,11 +17,21 @@ let connection
  */
 export const getConnection = async (url, global = true) => {
     if (global && connection) return connection
-    
+
     const con = await nano(url)
     if (global) connection = con
     return con
 }
+
+/**
+ * @name    isCouchDBStorage
+ * @summary checks if all arguments are instance of CouchDBStorage class
+ * 
+ * @param   {...} args  values to check
+ * 
+ * @returns {Boolean} 
+ */
+export const isCouchDBStorage = (...args) => args.every(instance => instance instanceof CouchDBStorage)
 
 /**
  * @name        CouchDBStorage
@@ -69,13 +79,13 @@ export default class CouchDBStorage {
         if (!dbName) throw new Error('CouchDB: missing database name')
 
         const con = isObj(this.connectionOrUrl)
-            ? this.connectionOrUrl
+            ? await this.connectionOrUrl
             : await getConnection(this.connectionOrUrl, this.useGlobalCon)
-            // database already initialized
+        // database already initialized
         if (!isObj(con)) throw new Error('CouchDB: invalid connection')
 
         this.dbPromise = new PromisE((resolve, reject) => (async () => {
-            
+
             try {
                 // retrieve a list of all database names
                 const dbNames = await con.db.list()
@@ -91,7 +101,7 @@ export default class CouchDBStorage {
                 reject(err)
             }
         })())
-        
+
         return await this.dbPromise
     }
 
@@ -158,7 +168,7 @@ export default class CouchDBStorage {
     async get(id) {
         this.name === 'users' && console.log('getDB')
         const db = await this.getDB()
-        this.name === 'users' && console.log({db})
+        this.name === 'users' && console.log({ db })
         // prevents throwing an error when document not found.
         // instead returns undefined.
         try {
@@ -266,7 +276,7 @@ export default class CouchDBStorage {
         if (existingDoc) {
             // attach `_rev` to execute an update operation
             value._rev = existingDoc._rev
-            value = !merge ? value : {...existingDoc, ...value }
+            value = !merge ? value : { ...existingDoc, ...value }
         }
         return await db.insert(value, id)
     }
