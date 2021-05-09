@@ -1,4 +1,4 @@
-import { isAsyncFn, isPromise, isFn, isObj } from "./utils"
+import { isAsyncFn, isPromise, isFn, isObj, isInteger } from "./utils"
 /*
  * List of optional node-modules and the functions used by them:
  * Module Name          : Function Name
@@ -127,7 +127,7 @@ PromisE.fetch = async (url, options, timeout, asJson = true) => {
     try {
         options = isObj(options) ? options : {}
         options.method = options.method || 'get'
-        if (timeout) options.signal = aborter(timeout)
+        if (isInteger(timeout)) options.signal = getAbortSignal(timeout)
 
         const result = await fetcher(url, options)
         return asJson
@@ -192,11 +192,11 @@ PromisE.timeout = (...args) => {
     return resultPromise
 }
 
-const aborter = timeout => {
+const getAbortSignal = timeout => {
     const AbortController = require('abort-controller')
     const abortCtrl = new AbortController()
     setTimeout(() => abortCtrl.abort(), timeout)
-    return abortCtrl
+    return abortCtrl.signal
 }
 const fetcher = async (url, options) => {
     let fetch2
