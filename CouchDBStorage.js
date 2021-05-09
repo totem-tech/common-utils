@@ -166,9 +166,7 @@ export default class CouchDBStorage {
      * @returns {Object} document if available otherwise, undefined
      */
     async get(id) {
-        this.name === 'users' && console.log('getDB')
         const db = await this.getDB()
-        this.name === 'users' && console.log({ db })
         // prevents throwing an error when document not found.
         // instead returns undefined.
         try {
