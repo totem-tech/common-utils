@@ -94,14 +94,14 @@ export const setMessages = msgObj => {
  * @returns {String|Null} null if no errors. Otherwise, error message.
  */
 export const validate = (value, config, customMessages = {}) => {
-    const errorMsgs = { ...messages, ...customMessages,  }
+    const errorMsgs = { ...messages, ...customMessages, }
     try {
         const {
             accept,
             decimals,
             instanceOf,
             keys,
-            requiredKeys, 
+            requiredKeys,
             max,
             maxLength,
             min,
@@ -115,7 +115,7 @@ export const validate = (value, config, customMessages = {}) => {
 
         // if doesn't have any value (undefined/null) and not `required`, assume valid
         if (!hasValue(value)) return required ? errorMsgs.required : null
-        
+
         let valueIsArr = false
         // validate value type
         switch (type) {
@@ -128,7 +128,7 @@ export const validate = (value, config, customMessages = {}) => {
                 if (!isBool(value)) return errorMsgs.boolean
                 break
             case 'date':
-                // validates both ISO string and Date object
+                // validates both  string and Date object
                 const date = new Date(value)
                 const isValidDate = isDate(date)
                 if (!isValidDate) return errorMsgs.date
@@ -142,7 +142,7 @@ export const validate = (value, config, customMessages = {}) => {
             case 'email':
                 if (!isStr(value) || !emailPattern.test(value)) return errorMsgs.email
                 break
-            case 'hash': 
+            case 'hash':
                 if (!isHash(value)) return errorMsgs.hash
                 break
             case 'hex':
@@ -185,7 +185,7 @@ export const validate = (value, config, customMessages = {}) => {
             case 'string':
                 if (!isStr(value)) return errorMsgs.string
                 break
-            case 'url': 
+            case 'url':
                 try {
                     const url = new URL(value)
                     // catch any auto-correction by `new URL()`. 
@@ -195,14 +195,14 @@ export const validate = (value, config, customMessages = {}) => {
                     return errorMsgs.url
                 }
                 break
-                default:
-                    // validation for unlisted types by checking if the value is an instance of `type`
-                    // (eg: ApiPromise, BN)
-                    try {
-                        if (!(value instanceof instanceOf)) return errorMsgs.instanceof || errorMsgs.type
-                    } catch (_) { } 
-                    // unsupported type
-                    return errorMsgs.type
+            default:
+                // validation for unlisted types by checking if the value is an instance of `type`
+                // (eg: ApiPromise, BN)
+                try {
+                    if (!(value instanceof instanceOf)) return errorMsgs.instanceof || errorMsgs.type
+                } catch (_) { }
+                // unsupported type
+                return errorMsgs.type
         }
 
         // valid only if value `accept` array includes `value` or items in `value` array
@@ -313,7 +313,7 @@ export const validateObj = (obj = {}, config = {}, failFast = true, includeLabel
                 )
                 // error is an object. 
                 error && !failFast && Object.keys(error)
-                    .forEach(propKey => 
+                    .forEach(propKey =>
                         errors[`${key}.${propKey}`] = error[propKey]
                     )
             }
