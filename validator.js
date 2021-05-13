@@ -13,6 +13,7 @@ import {
     hasValue,
     objHasKeys,
     isFn,
+    isValidDate,
 } from './utils'
 
 export let messages = {
@@ -130,8 +131,8 @@ export const validate = (value, config, customMessages = {}) => {
             case 'date':
                 // validates both  string and Date object
                 const date = new Date(value)
-                const isValidDate = isDate(date)
-                if (!isValidDate) return errorMsgs.date
+                // const isValidDate = isDate(date)
+                if (!isValidDate(value)) return errorMsgs.date
                 // makes sure auto correction didnt occur when using `new Date()`. 
                 // Eg: 2020-02-30 is auto corrected to 2021-03-02)
                 if (isStr(value) && date.toISOString().split('T')[0] !== value.replace(' ', 'T').split('T')[0])
