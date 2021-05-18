@@ -707,8 +707,18 @@ export const mapSearch = (map, keyValues, matchExact, matchAll, ignoreCase) => {
 	return result
 }
 
-// Returns a new map sorted by key. Must be a map of objects
-export const mapSort = (map, key, reverse) => {
+/**
+ * @name	mapSort
+ * @summary	create a new map sorted by key. Values must be objects
+ * 
+ * @param	{Map}	 	map 
+ * @param	{String}	key 
+ * @param	{Boolen}	reverse True: accending sort. False: descending sort. Default: `false`
+ * 
+ * @returns {Map}
+ */
+// 
+export const mapSort = (map, key, reverse = false) => {
 	if (!isMap(map)) return map
 	const arr2d = Array.from(map)
 	if (!arr2d[0] || !isObj(arr2d[0][1])) return map

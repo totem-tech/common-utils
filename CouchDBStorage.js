@@ -188,16 +188,19 @@ export default class CouchDBStorage {
      * @param   {Number}     skip   (optional) for pagination, number of items to skip.
      *                              Ignored if `ids` supplied.
      *                              Default: 0
+     * @param   {Object}     extraProps extra properties to be supplied to `searchRaw()`.
+     *                              Can be used for sorting, limiting which fields to retrieve etc.
+     *                              Only used when no IDs supplied.
      * @returns {Map|Array}
      */
-    async getAll(ids = [], asMap = true, limit = 25, skip = 0) {
+    async getAll(ids = [], asMap = true, limit = 25, skip = 0, extraProps = {}) {
         const db = await this.getDB()
         // if ids supplied only retrieve only those otherwise, retrieve all (paginated)
         const paginate = !ids || ids.length === 0
         const rows = paginate
-            ? (await this.searchRaw({}, limit, skip)).docs
-            : (await db.fetch({ keys: ids }))
-                .rows.map(x => x.doc)
+            ? (await this.searchRaw({}, limit, skip, extraProps)).docs
+            : (await db.fetch({ keys: ids })).rows
+                .map(x => x.doc)
                 // ignore not found documents
                 .filter(Boolean)
         return asMap
