@@ -15,12 +15,23 @@ let connection
  * 
  * @returns {Objecct}   CouchDB connection
  */
-export const getConnection = (url, global = true) => {
+export const getConnection = async (url, global = true) => {
     if (global && connection) return connection
-    const con = nano(url)
+
+    const con = await nano(url)
     if (global) connection = con
     return con
 }
+
+/**
+ * @name    isCouchDBStorage
+ * @summary checks if all arguments are instance of CouchDBStorage class
+ * 
+ * @param   {...} args  values to check
+ * 
+ * @returns {Boolean} 
+ */
+export const isCouchDBStorage = (...args) => args.every(instance => instance instanceof CouchDBStorage)
 
 /**
  * @name        CouchDBStorage
@@ -31,15 +42,27 @@ export const getConnection = (url, global = true) => {
  *                                      1. string: CouchDB connection URL including username and password
  *                                      2. object: existing connection
  *                                      3. null:   will use global `connection` if available.
+ *                                  Alternatively, use a specific environment variable for individual database.
+ *                                  The name of the environement variable must be in the following format:
+ *                                      `CouchDB_URL_$DBNAME` 
+ *                                  Replace `$DBNAME` with database name. The same to be provide in the `dbName` param.
  * @param   {String}                dbName          database name
  * 
  * @returns {CouchDBStorage}
  */
 export default class CouchDBStorage {
     constructor(connectionOrUrl, dbName) {
-        this.connectionOrUrl = connectionOrUrl
+        this.connectionOrUrl = connectionOrUrl || process.env[`CouchDB_URL_${dbName}`]
+        // whethe to use the global connection or database specific
+        this.useGlobalCon = !this.connectionOrUrl
         this.db = null
         this.dbName = dbName
+
+        // Forces the application to immediately attempt to connect.
+        // This is required because "nano" (CouchDB's official NPM module) does not handle connection error properly 
+        // and the entire application crashes. Neither try-catch nor async - await can catch this freakish error!
+        // Doing this will make sure database connection error is thrown on application startup and not later.
+        if (!this.useGlobalCon) this.getDB()
     }
 
     /**
@@ -51,16 +74,18 @@ export default class CouchDBStorage {
         if (this.db) return this.db
         // if initialization is already in progress wait for it
         if (this.dbPromise) return await this.dbPromise
-        const cou = this.connectionOrUrl
+
         const dbName = this.dbName
-        const con = cou && isStr(cou)
-            ? getConnection(cou)
-            : cou || connection
-        // database already initialized
-        if (!isObj(con)) throw new Error('CouchDB: invalid connection')
         if (!dbName) throw new Error('CouchDB: missing database name')
 
-        this.dbPromise = new PromisE((resolve, reject) => (async ()=> {
+        const con = isObj(this.connectionOrUrl)
+            ? await this.connectionOrUrl
+            : await getConnection(this.connectionOrUrl, this.useGlobalCon)
+        // database already initialized
+        if (!isObj(con)) throw new Error('CouchDB: invalid connection')
+
+        this.dbPromise = new PromisE((resolve, reject) => (async () => {
+
             try {
                 // retrieve a list of all database names
                 const dbNames = await con.db.list()
@@ -76,7 +101,7 @@ export default class CouchDBStorage {
                 reject(err)
             }
         })())
-        
+
         return await this.dbPromise
     }
 
@@ -141,9 +166,7 @@ export default class CouchDBStorage {
      * @returns {Object} document if available otherwise, undefined
      */
     async get(id) {
-        this.name === 'users' && console.log('getDB')
         const db = await this.getDB()
-        this.name === 'users' && console.log({db})
         // prevents throwing an error when document not found.
         // instead returns undefined.
         try {
@@ -165,16 +188,19 @@ export default class CouchDBStorage {
      * @param   {Number}     skip   (optional) for pagination, number of items to skip.
      *                              Ignored if `ids` supplied.
      *                              Default: 0
+     * @param   {Object}     extraProps extra properties to be supplied to `searchRaw()`.
+     *                              Can be used for sorting, limiting which fields to retrieve etc.
+     *                              Only used when no IDs supplied.
      * @returns {Map|Array}
      */
-    async getAll(ids = [], asMap = true, limit = 25, skip = 0) {
+    async getAll(ids = [], asMap = true, limit = 25, skip = 0, extraProps = {}) {
         const db = await this.getDB()
         // if ids supplied only retrieve only those otherwise, retrieve all (paginated)
         const paginate = !ids || ids.length === 0
         const rows = paginate
-            ? (await this.searchRaw({}, limit, skip)).docs
-            : (await db.fetch({ keys: ids }))
-                .rows.map(x => x.doc)
+            ? (await this.searchRaw({}, limit, skip, extraProps)).docs
+            : (await db.fetch({ keys: ids })).rows
+                .map(x => x.doc)
                 // ignore not found documents
                 .filter(Boolean)
         return asMap
@@ -251,7 +277,7 @@ export default class CouchDBStorage {
         if (existingDoc) {
             // attach `_rev` to execute an update operation
             value._rev = existingDoc._rev
-            value = !merge ? value : {...existingDoc, ...value }
+            value = !merge ? value : { ...existingDoc, ...value }
         }
         return await db.insert(value, id)
     }

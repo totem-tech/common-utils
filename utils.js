@@ -102,8 +102,8 @@ export const generateHash = (seed, algo, bitLength = 256) => {
  * 											Default: false
  */
 export const isAddress = (address, type, chainId = 0, ignoreChecksum = false) => {
-    try {
-        switch (`${type}`.toLowerCase()) {
+	try {
+		switch (`${type}`.toLowerCase()) {
 			case 'ethereum':
 				return isETHAddress(address, chainId || 0)
 			case 'polkadot':
@@ -111,11 +111,11 @@ export const isAddress = (address, type, chainId = 0, ignoreChecksum = false) =>
 				// assume Polkadot/Totem address
 				const account = ss58Decode(address, ignoreChecksum, chainId)
 				// must be 32 bytes length
-                return !!account && account.length === 32
-        }
-    } catch (e) {
-        return false
-    }
+				return !!account && account.length === 32
+		}
+	} catch (e) {
+		return false
+	}
 }
 isAddress.validTypes = {
 	ethereum: 'ethereum',
@@ -135,9 +135,24 @@ export const isBond = x => {
 		return false
 	}
 }
+// Check if x is a valid Date instance
 // Date object can sometimes be "Invalid Date" without any timestamp.
-// Date.getUTCMilliseconds() is used to make sure it's a valid Date
-export const isDate = x => x instanceof Date && isValidNumber(x.getUTCMilliseconds())
+// Date.getTime() is used to make sure it's a valid Date
+export const isDate = x => x instanceof Date && isValidNumber(x.getTime())
+// checks if dateOrStr is a valid date
+export const isValidDate = dateOrStr => {
+	const date = new Date(dateOrStr)
+	if (!isStr(dateOrStr)) return isDate(date)
+
+	// hack to detect & prevent `new Date(dateOrStr)` converting '2021-02-31' to '2021-03-03'
+	const [original, converted] = [`${dateOrStr}`, date.toISOString()]
+		.map(y => y
+			.replace('T', '')
+			.replace('Z', '')
+			.substr(0, 10)
+		)
+	return original === converted
+}
 export const isDefined = x => x !== undefined && x !== null
 export const isError = x => x instanceof Error
 export const isETHAddress = (address, chainId) => {
@@ -151,9 +166,9 @@ export const isInteger = x => Number.isInteger(x)
 export const isMap = x => x instanceof Map
 export const isObj = x => !!x && typeof x === 'object' && !isArr(x) && !isMap(x) && !isSet(x)
 // Checks if argument is an Array of Objects. Each element type must be object, otherwise will return false.
-export const isObjArr = x => !isArr(x) ? false : !x.reduce((no, item) => no || !isObj(item), false)
+export const isObjArr = x => isArr(x) && x.every(isObj)
 // Checks if argument is a Map of Objects. Each element type must be object, otherwise will return false.
-export const isObjMap = x => !isMap(x) ? false : !Array.from(x).reduce((no, item) => no || !isObj(item[1]), false)
+export const isObjMap = x => isMap(x) && Array.from(x).every(([_, v]) => isObj(v))
 export const isPromise = x => x instanceof Promise
 export const isSet = x => x instanceof Set
 export const isStr = x => typeof x === 'string'
@@ -250,7 +265,7 @@ export const arrReadOnly = (input, strict, silent) => objReadOnly(input, strict,
  * 								 Default: true
  * 
  * @returns {Array}
- */ 
+ */
 export const arrReverse = (arr, reverse = true, newArray = true) => {
 	if (!isArr(arr)) return []
 	if (newArray) arr = [...arr]
@@ -444,7 +459,7 @@ export const objClean = (obj, keys, recursive = false) => {
 		const childPrefix = `${key}.`
 		let childKeys = keys.filter(k => k.startsWith(childPrefix))
 		if (childKeys.length === 0) continue
-		
+
 		// get rid of child key prefix 
 		childKeys = childKeys.map(k =>
 			k.replace(new RegExp(childPrefix), '')
@@ -491,7 +506,7 @@ export const objCreate = (keys, values) => {
  * 
  * @returns {Boolean}
  */
-export function objHasKeys(obj = {}, keys = [], requireValue = false){
+export function objHasKeys(obj = {}, keys = [], requireValue = false) {
 	if (!isObj(obj) || !isArr(keys)) return false
 
 	for (let i = 0; i < keys.length; i++) {
@@ -547,7 +562,7 @@ export const objReadOnly = (obj, strict = false, silent = false) => new Proxy(ob
  * @returns	{String}
  */
 export const objToUrlParams = (obj = {}, excludeUndefined = true) => Object.keys(obj)
-    .map(key => {
+	.map(key => {
 		const value = obj[key]
 		if (excludeUndefined && value === undefined) return
 		const valueEscaped = !isArr(value)
@@ -559,7 +574,7 @@ export const objToUrlParams = (obj = {}, excludeUndefined = true) => Object.keys
 	})
 	.filter(Boolean)
 	.join('&')
-	
+
 export const objToFormData = (obj = {}, excludeUndefined = true) => {
 	let formData
 	try {
@@ -569,7 +584,7 @@ export const objToFormData = (obj = {}, excludeUndefined = true) => {
 		const FormData = require('form-data')
 		formData = new FormData()
 	}
-	Object.keys(obj).forEach(key => { 
+	Object.keys(obj).forEach(key => {
 		let value = obj[key]
 		if (excludeUndefined && value === undefined) return
 		if (isArr(value)) value = value.join()
@@ -590,7 +605,7 @@ export const objToFormData = (obj = {}, excludeUndefined = true) => {
 export const objWithoutKeys = (obj, keys) => {
 	if (!isObj(obj) || !isArr(keys)) return {}
 
-	const result = {...obj}
+	const result = { ...obj }
 	const allKeys = Object.keys(result)
 	for (let i = 0; i < allKeys.length; i++) {
 		const key = allKeys[i]
@@ -690,8 +705,18 @@ export const mapSearch = (map, keyValues, matchExact, matchAll, ignoreCase) => {
 	return result
 }
 
-// Returns a new map sorted by key. Must be a map of objects
-export const mapSort = (map, key, reverse) => {
+/**
+ * @name	mapSort
+ * @summary	create a new map sorted by key. Values must be objects
+ * 
+ * @param	{Map}	 	map 
+ * @param	{String}	key 
+ * @param	{Boolen}	reverse True: accending sort. False: descending sort. Default: `false`
+ * 
+ * @returns {Map}
+ */
+// 
+export const mapSort = (map, key, reverse = false) => {
 	if (!isMap(map)) return map
 	const arr2d = Array.from(map)
 	if (!arr2d[0] || !isObj(arr2d[0][1])) return map
@@ -750,7 +775,7 @@ export const search = (data, query, keys = []) => {
 export const searchRanked = (searchKeys = ['text']) => (options, searchQuery) => {
 	if (!searchQuery) return options
 	if (!options || options.length === 0) return []
-	
+
 	const uniqueValues = {}
 	const regex = new RegExp(escapeStringRegexp(searchQuery), 'i')
 	if (!searchQuery) return options
@@ -759,7 +784,7 @@ export const searchRanked = (searchKeys = ['text']) => (options, searchQuery) =>
 		const matches = options.map((option, i) => {
 			try {
 				if (!option || !hasValue(option[key])) return
-				
+
 				// catches errors caused by the use of some special characters with .match() below
 				let x = JSON.stringify(option[key]).match(regex)
 				if (!x || uniqueValues[options[i].value]) return

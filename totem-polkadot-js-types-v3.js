@@ -13,7 +13,14 @@ export default {
     "AccountBalance": "i128",
     "AccountBalanceOf": "i128",
     "AccountBalanceOf<T>": "i128",
-    "ApprovalStatus": "u16",
+    // "ApprovalStatus": "u16",
+    "ApprovalStatus": {
+        "_enum": {
+            "Submitted": "u16",
+            "Accepted": "u16",
+            "Rejected": "u16",
+        }
+    },
     "Archival": "bool",
     "Balance": "u128",
     "BanStatus": "bool",
@@ -25,7 +32,7 @@ export default {
     "Ed25519signature": "H512",
     "EncryptNonce": "u64",
     "EncryptPublicKey": "H256",
-    "_Indicator": {
+    "Indicator": {
         "_enum": {
             "Debit": "u8",
             "Credit": "u8"
