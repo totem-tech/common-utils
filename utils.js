@@ -151,7 +151,8 @@ export const isValidDate = dateOrStr => {
 	// hack to detect & prevent `new Date(dateOrStr)` converting '2021-02-31' to '2021-03-03'
 	const [original, converted] = [dateOrStr, date.toISOString()]
 		.map(y => y
-			.replaceAll(/\T|\Z/g, ' ')
+			.replace('T', '')
+			.replace('Z', '')
 			.substr(0, 10)
 		)
 	return original === converted
@@ -169,9 +170,9 @@ export const isInteger = x => Number.isInteger(x)
 export const isMap = x => x instanceof Map
 export const isObj = x => !!x && typeof x === 'object' && !isArr(x) && !isMap(x) && !isSet(x)
 // Checks if argument is an Array of Objects. Each element type must be object, otherwise will return false.
-export const isObjArr = x => !isArr(x) ? false : !x.reduce((no, item) => no || !isObj(item), false)
+export const isObjArr = x => isArr(x) && x.every(isObj)
 // Checks if argument is a Map of Objects. Each element type must be object, otherwise will return false.
-export const isObjMap = x => !isMap(x) ? false : !Array.from(x).reduce((no, item) => no || !isObj(item[1]), false)
+export const isObjMap = x => isMap(x) && Array.from(x).every(([_, v]) => isObj(v))
 export const isPromise = x => x instanceof Promise
 export const isSet = x => x instanceof Set
 export const isStr = x => typeof x === 'string'
