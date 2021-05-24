@@ -137,19 +137,15 @@ export const isBond = x => {
 }
 // Check if x is a valid Date instance
 // Date object can sometimes be "Invalid Date" without any timestamp.
-// Date.getUTCMilliseconds() is used to make sure it's a valid Date
-export const isDate = x => x instanceof Date && isValidNumber(x.getUTCMilliseconds())
+// Date.getTime() is used to make sure it's a valid Date
+export const isDate = x => x instanceof Date && isValidNumber(x.getTime())
 // checks if dateOrStr is a valid date
 export const isValidDate = dateOrStr => {
-	// Prevents null treated as a valid date.
-	// Eg: new Date(null).toISOString() => "1970-01-01T00:00:00.000Z"
-	if (!dateOrStr) return false
-
 	const date = new Date(dateOrStr)
 	if (!isStr(dateOrStr)) return isDate(date)
 
 	// hack to detect & prevent `new Date(dateOrStr)` converting '2021-02-31' to '2021-03-03'
-	const [original, converted] = [dateOrStr, date.toISOString()]
+	const [original, converted] = [`${dateOrStr}`, date.toISOString()]
 		.map(y => y
 			.replaceAll(/\T|\Z/g, ' ')
 			.substr(0, 10)
