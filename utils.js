@@ -141,19 +141,20 @@ export const isBond = x => {
 export const isDate = x => x instanceof Date && isValidNumber(x.getUTCMilliseconds())
 // checks if dateOrStr is a valid date
 export const isValidDate = dateOrStr => {
-	const xDate = new Date(dateOrStr)
+	// Prevents null treated as a valid date.
+	// Eg: new Date(null).toISOString() => "1970-01-01T00:00:00.000Z"
+	if (!dateOrStr) return false
 
-	if (isStr(dateOrStr)) {
-		// hack to detect & prevent `new Date()` converting '2021-02-31' to '2021-03-03'
-		const ar = [dateOrStr, new Date(dateOrStr).toISOString()]
-			.map(y => y
-				.replaceAll(/\T|\Z/g, ' ')
-				.substr(0, 10)
-			)
-		return ar[0] === ar[1]
-	}
+	const date = new Date(dateOrStr)
+	if (!isStr(dateOrStr)) return isDate(date)
 
-	return isDate(xDate)
+	// hack to detect & prevent `new Date(dateOrStr)` converting '2021-02-31' to '2021-03-03'
+	const [original, converted] = [dateOrStr, date.toISOString()]
+		.map(y => y
+			.replaceAll(/\T|\Z/g, ' ')
+			.substr(0, 10)
+		)
+	return original === converted
 }
 export const isDefined = x => x !== undefined && x !== null
 export const isError = x => x instanceof Error
