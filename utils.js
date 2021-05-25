@@ -142,7 +142,7 @@ export const isDate = x => x instanceof Date && isValidNumber(x.getTime())
 // checks if dateOrStr is a valid date
 export const isValidDate = dateOrStr => {
 	const date = new Date(dateOrStr)
-	if (!isStr(dateOrStr)) return isDate(date)
+	if (!isDate(date)) return false
 
 	// hack to detect & prevent `new Date(dateOrStr)` converting '2021-02-31' to '2021-03-03'
 	const [original, converted] = [`${dateOrStr}`, date.toISOString()]
