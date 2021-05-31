@@ -1,4 +1,4 @@
-import { isAsyncFn, isPromise, isFn, isObj } from "./utils"
+import { isAsyncFn, isPromise, isFn, isObj, isInteger } from "./utils"
 /*
  * List of optional node-modules and the functions used by them:
  * Module Name          : Function Name
@@ -127,7 +127,7 @@ PromisE.fetch = async (url, options, timeout, asJson = true) => {
     try {
         options = isObj(options) ? options : {}
         options.method = options.method || 'get'
-        if (timeout) options.signal = aborter(timeout)
+        if (isInteger(timeout)) options.signal = getAbortSignal(timeout)
 
         const result = await fetcher(url, options)
         return asJson
@@ -156,6 +156,7 @@ PromisE.race = (...promises) => PromisE(Promise.race(promises))
  * Params:
  * @param {...Promise}  promise  promise/function: one or more promises as individual arguments
  * @param {Number}      timeout  timeout duration in milliseconds. If not supplied will fail immediately.
+ *                               If falsy, will use `10000`   
  * 
  * @example Example 1: multiple promises
  * <BR>
@@ -179,7 +180,9 @@ PromisE.timeout = (...args) => {
     const timeout = args.slice(-1) || 10000
     // use all arguments except last one
     const promiseArgs = args.slice(0, -1)
-    const promise = promiseArgs.length === 1 ? PromisE(promiseArgs[0]) : PromisE.all(promiseArgs)
+    const promise = promiseArgs.length === 1
+        ? PromisE(promiseArgs[0]) // makes sure single promise resolves to a single result
+        : PromisE.all(promiseArgs)
     const timeoutPromise = new PromisE((_, reject) =>
         // only reject if it's still pending
         setTimeout(() => promise.pending && reject('Timed out'), timeout)
@@ -192,11 +195,11 @@ PromisE.timeout = (...args) => {
     return resultPromise
 }
 
-const aborter = timeout => {
+const getAbortSignal = timeout => {
     const AbortController = require('abort-controller')
     const abortCtrl = new AbortController()
     setTimeout(() => abortCtrl.abort(), timeout)
-    return abortCtrl
+    return abortCtrl.signal
 }
 const fetcher = async (url, options) => {
     let fetch2
