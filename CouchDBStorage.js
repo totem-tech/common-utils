@@ -35,6 +35,24 @@ export const isCouchDBStorage = (...args) => args.flat()
     .every(instance => instance instanceof CouchDBStorage)
 
 /**
+ * @name    setTs
+ * @summary set created and updated timestamps to document
+ * 
+ * @param   {Object}    doc 
+ * @param   {Object}    existingDoc (optional)
+ * 
+ * @returns {Object}    doc
+ */
+const setTs = (doc, existingDoc) => {
+    // add/update creation and update time
+    doc.tsCreated = (existingDoc || doc).tsCreated || new Date()
+    if (!!existingDoc || doc.tsUpdated) {
+        doc.tsUpdated = new Date()
+    }
+    return doc
+}
+
+/**
  * @name        CouchDBStorage
  * @summary     a wrapper for `nano` NPM module for reading from and writing to CouchDB
  * @description connection is only initialized only when first request is made or `getDB()` method is called.
@@ -300,6 +318,8 @@ export default class CouchDBStorage {
                     ...value,
                 }
         }
+
+        setTs(doc, existingDoc)
         return await PromisE.timeout(
             db.insert(value, id),
             timeout,
@@ -326,17 +346,18 @@ export default class CouchDBStorage {
 
         const db = await this.getDB()
         for (let i = 0; i < docs.length; i++) {
-            const item = docs[i]
-            if (!item._id || item._rev) continue
+            const doc = docs[i]
+            if (!doc._id || doc._rev) continue
 
-            const existing = await this.get(item._id)
-            if (!existing) continue
+            const existingDoc = await this.get(doc._id)
+            if (!existingDoc) continue
             if (ignoreIfExists) {
                 docs[i] = null
                 continue
             }
             // attach `_rev` to prevent conflicts when updating existing items
-            item._rev = existing._rev
+            doc._rev = existingDoc._rev
+            setTs(doc, existingDoc)
         }
         const promise = db.bulk({ docs: docs.filter(Boolean) })
         return await (
