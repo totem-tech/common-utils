@@ -191,6 +191,8 @@ export const validate = (value, config, customMessages = {}) => {
                     const url = new URL(value)
                     // catch any auto-correction by `new URL()`. 
                     // Eg: spaces in the domain name being replaced by`%20` or missing `/` in protocol being auto added
+                    if (!isStr(value)) return
+                    if (value.endsWith(url.hostname)) value += '/'
                     if (url.href !== value) return errorMsgs.url
                 } catch (e) {
                     return errorMsgs.url
