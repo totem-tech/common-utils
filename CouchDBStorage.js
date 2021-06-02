@@ -1,7 +1,7 @@
 import uuid from 'uuid'
 import PromisE from './PromisE'
 import nano from 'nano'
-import { isObj, isStr, isArr, arrUnique, isMap } from './utils'
+import { isObj, isStr, isArr, arrUnique, isMap, isValidNumber } from './utils'
 
 // globab connection for use with multiple databases
 let connection
@@ -31,7 +31,26 @@ export const getConnection = async (url, global = true) => {
  * 
  * @returns {Boolean} 
  */
-export const isCouchDBStorage = (...args) => args.every(instance => instance instanceof CouchDBStorage)
+export const isCouchDBStorage = (...args) => args.flat()
+    .every(instance => instance instanceof CouchDBStorage)
+
+/**
+ * @name    setTs
+ * @summary set created and updated timestamps to document
+ * 
+ * @param   {Object}    doc 
+ * @param   {Object}    existingDoc (optional)
+ * 
+ * @returns {Object}    doc
+ */
+const setTs = (doc, existingDoc) => {
+    // add/update creation and update time
+    doc.tsCreated = (existingDoc || doc).tsCreated || new Date()
+    if (!!existingDoc || doc.tsUpdated) {
+        doc.tsUpdated = new Date()
+    }
+    return doc
+}
 
 /**
  * @name        CouchDBStorage
@@ -152,8 +171,8 @@ export default class CouchDBStorage {
      * 
      * @returns {Object} document if available otherwise, undefined
      */
-    async find(selector, extraProps) {
-        const docs = await this.search(selector, 1, 0, false, extraProps)
+    async find(selector, extraProps, timeout) {
+        const docs = await this.search(selector, 1, 0, false, extraProps, timeout)
         return docs[0]
     }
 
@@ -191,9 +210,11 @@ export default class CouchDBStorage {
      * @param   {Object}     extraProps extra properties to be supplied to `searchRaw()`.
      *                              Can be used for sorting, limiting which fields to retrieve etc.
      *                              Only used when no IDs supplied.
+     * @param   {Number}    timeout timeout duration in milliseconds (only when no IDs supplied).
+     *                              Default: `15000`
      * @returns {Map|Array}
      */
-    async getAll(ids = [], asMap = true, limit = 25, skip = 0, extraProps = {}) {
+    async getAll(ids = [], asMap = true, limit = 25, skip = 0, extraProps = {}, timeout) {
         const db = await this.getDB()
         // if ids supplied only retrieve only those otherwise, retrieve all (paginated)
         const paginate = !ids || ids.length === 0
@@ -221,12 +242,14 @@ export default class CouchDBStorage {
      * @param   {Boolean} asMap      (optional) whether to return result as an `Array` or `Map`
      *                               Default: true
      * @param   {Object}  extraProps (optional) extra properties to be supplied to to the mango query
+     * @param   {Number}    timeout     query timeout duration in milliseconds.
+     *                                  Default: `15000`
      * 
      * @returns {Map|Array}
      */
-    async search(selector = {}, limit = 0, skip = 0, asMap = true, extraProps) {
+    async search(selector = {}, limit = 0, skip = 0, asMap = true, extraProps, timeout) {
         if (!isObj(selector) || Object.keys(selector).length === 0) return asMap ? new Map() : []
-        const result = await this.searchRaw(selector, limit, skip, extraProps)
+        const result = await this.searchRaw(selector, limit, skip, extraProps, timeout)
         return !asMap
             ? result.docs
             : new Map(result.docs.map(doc => [doc._id, doc]))
@@ -236,14 +259,16 @@ export default class CouchDBStorage {
      * @name    searchRaw
      * @summary sugar for `db.find()`
      * 
-     * @param   {Object} selector 
-     * @param   {Number} limit 
-     * @param   {Number} skip 
-     * @param   {Object} extraProps 
+     * @param   {Object}    selector 
+     * @param   {Number}    limit 
+     * @param   {Number}    skip 
+     * @param   {Object}    extraProps
+     * @param   {Number}    timeout     query timeout duration in milliseconds.
+     *                                  Default: `15000`
      * 
      * @returns {Array}
      */
-    async searchRaw(selector = {}, limit = 0, skip = 0, extraProps = {}) {
+    async searchRaw(selector = {}, limit = 0, skip = 0, extraProps = {}, timeout = 15000) {
         const db = await this.getDB()
         const query = {
             ...extraProps,
@@ -251,7 +276,10 @@ export default class CouchDBStorage {
             limit: limit === 0 ? undefined : limit,
             skip,
         }
-        return await db.find(query)
+        return await PromisE.timeout(
+            db.find(query),
+            timeout,
+        )
     }
 
     /**
@@ -262,38 +290,54 @@ export default class CouchDBStorage {
      * @param   {Object}    value      
      * @param   {Boolean}   override   (optional) whether to allow override of existing document.
      *                                 If truthy, will automatically check if `@id` already exists.
-     *                   If false and `@id` exists and correct `@value._rev` not supplied, CouchDB will throw error.
-     *                                 Default: true
+     *                                 If false and `@id` exists and correct `@value._rev` not supplied,
+     *                                 CouchDB will throw error.
+     *                                 Default: `true`
      * @param   {Boolean}   merge      (optional) whether to merge `@value` with exiting entry.
      *                                 Only applicable if `@override` is truthy.
-     *                                 Default: false 
+     *                                 Default: `false`
+     * @param   {Number}    timeout    timeout duration in milliseconds for save operation.
+     *                                 Default: `3000`
+     * 
      *
      * @returns {Object}
      */
-    async set(id, value, override = true, merge = false) {
-        id = isStr(id) ? id : uuid.v1()
+    async set(id, value, override = true, merge = false, timeout = 3000) {
+        id = isStr(id)
+            ? id
+            : uuid.v1()
         const db = await this.getDB()
         const existingDoc = override && await this.get(id)
         if (existingDoc) {
             // attach `_rev` to execute an update operation
             value._rev = existingDoc._rev
-            value = !merge ? value : { ...existingDoc, ...value }
+            value = !merge
+                ? value
+                : {
+                    ...existingDoc,
+                    ...value,
+                }
         }
-        return await db.insert(value, id)
+
+        setTs(doc, existingDoc)
+        return await PromisE.timeout(
+            db.insert(value, id),
+            timeout,
+        )
     }
 
     /**
      * @name    setAll 
      * @summary bulk add or update documents in single request
      *
-     * Params:
      * @param   {Array|Map} docs            documents to add or update
-     * @param   {Boolean}   ignoreIfExists  (optional) if true, will prevent overriding existing documents.
-     *                                      Default: false
+     * @param   {Boolean}   ignoreIfExists  (optional) if `true`, will prevent overriding existing documents.
+     *                                      Default: `false`
+     * @param   {Number}    timeout         bulk save operation timeout duration in milliseconds
      *
      * @returns {*}
      */
-    async setAll(docs, ignoreIfExists = false) {
+    async setAll(docs, ignoreIfExists = false, timeout) {
         if (isMap(docs)) {
             // convert Map to Array
             docs = Array.from(docs).map(([_id, item]) => ({ ...item, _id }))
@@ -302,18 +346,24 @@ export default class CouchDBStorage {
 
         const db = await this.getDB()
         for (let i = 0; i < docs.length; i++) {
-            const item = docs[i]
-            if (!item._id || item._rev) continue
+            const doc = docs[i]
+            if (!doc._id || doc._rev) continue
 
-            const existing = await this.get(item._id)
-            if (!existing) continue
+            const existingDoc = await this.get(doc._id)
+            if (!existingDoc) continue
             if (ignoreIfExists) {
                 docs[i] = null
                 continue
             }
             // attach `_rev` to prevent conflicts when updating existing items
-            item._rev = existing._rev
+            doc._rev = existingDoc._rev
+            setTs(doc, existingDoc)
         }
-        return await db.bulk({ docs: docs.filter(Boolean) })
+        const promise = db.bulk({ docs: docs.filter(Boolean) })
+        return await (
+            isValidNumber(timeout)
+                ? PromisE.timeout(promise, timeout)
+                : promise
+        )
     }
 }
