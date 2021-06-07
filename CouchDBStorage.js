@@ -319,7 +319,7 @@ export default class CouchDBStorage {
                 }
         }
 
-        setTs(doc, existingDoc)
+        setTs(existingDoc, existingDoc)
         return await PromisE.timeout(
             db.insert(value, id),
             timeout,
