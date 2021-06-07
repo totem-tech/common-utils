@@ -298,7 +298,7 @@ export const signAndSend = async (api, address, tx, nonce, rxStatus) => {
                 }))
                     // exclude empty event data
                     .filter(event => event.data && event.data.length) || {}
-                console.log(`Polkadot: Completed at block hash: ${hash}`, !isNode && { eventsArr })
+                console.log(`Polkadot: Completed at block hash: ${hash}`, isNode ? '' : { eventsArr })
                 rxStatus && rxStatus.complete()
                 resolve([hash, eventsArr])
             })
