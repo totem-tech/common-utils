@@ -166,7 +166,7 @@ export const isInteger = x => Number.isInteger(x)
 export const isMap = x => x instanceof Map
 export const isNodeJS = () => {
 	try {
-		return !!window && !!localStorage
+		eval(window) && eval(localStorage)
 	} catch (_) {
 		return true
 	}
