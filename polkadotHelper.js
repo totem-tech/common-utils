@@ -2,10 +2,14 @@ import { ApiPromise, ApiRx, WsProvider } from '@polkadot/api'
 import Keyring from '@polkadot/keyring/'
 import createPair from '@polkadot/keyring/pair'
 import { bytesToHex } from './convert'
-import { isFn, isArr, isDefined, isObj, isStr, isValidNumber, isArr2D, isUint8Arr, objHasKeys } from './utils'
+import {
+    isFn, isArr, isDefined, isObj, isStr, isValidNumber,
+    isArr2D, isUint8Arr, objHasKeys, isNodeJS
+} from './utils'
 
 const TYPE = 'sr25519'
 const _keyring = new Keyring({ type: TYPE })
+const isNode = isNodeJS()
 const config = {
     nodes: [],
     timeout: 30000,
@@ -294,7 +298,7 @@ export const signAndSend = async (api, address, tx, nonce, rxStatus) => {
                 }))
                     // exclude empty event data
                     .filter(event => event.data && event.data.length) || {}
-                console.log(`Polkadot: Completed at block hash: ${hash}`, { eventsArr })
+                console.log(`Polkadot: Completed at block hash: ${hash}`, !isNode && { eventsArr })
                 rxStatus && rxStatus.complete()
                 resolve([hash, eventsArr])
             })

@@ -1,34 +1,50 @@
 import { BehaviorSubject, Subject } from 'rxjs'
-import { isDefined, isStr, mapSearch, isMap, isValidNumber, mapSort, isArr, isFn } from './utils'
+import { isDefined, isStr, mapSearch, isMap, isValidNumber, mapSort, isArr, isFn, isNodeJS } from './utils'
 /* For NodeJS (non-browser applications) the following node module is required: node-localstorage */
 
-let storage, isNode
+let storage
 // use this to force all instances of DataStorage where caching is enabled to update data from LocalStorage
 // ONLY USE IN EXTREME CASES such as restoring a backup.
 // Usage: rxForeUpdateCache.next(true)
-export const rxForeUpdateCache = new Subject()
+// export const rxForeUpdateCache = new Subject()
+// try {
+//     // Use browser localStorage if available
+//     storage = localStorage
+//     if (storage === null) {
+//         // hack for iframe
+//         // localStorage will not work!! (expected)
+//         storage = { getItem: () => '', setItem: () => { } }
+//     }
+// } catch (e) {
+//     try {
+//         // for NodeJS server
+//         const nls = require('node-localstorage')
+//         const STORAGE_PATH = process.env.STORAGE_PATH || './server/data'
+//         storage = new nls.LocalStorage(STORAGE_PATH, 500 * 1024 * 1024)
+//         if (storage) {
+//             const absolutePath = require('path').resolve(STORAGE_PATH)
+//             console.log({ STORAGE_PATH, absolutePath })
+//         }
+//     } catch (e) { }
+// }
 try {
-    // Use browser localStorage if available
-    storage = localStorage
-    isNode = false
-    if (storage === null) {
-        // hack for iframe
-        // localStorage will not work!! (expected)
-        storage = { getItem: () => '', setItem: () => { } }
-    }
-} catch (e) {
-    try {
+    if (isNodeJS()) {
         // for NodeJS server
-        const nls = require('node-localstorage')
         const STORAGE_PATH = process.env.STORAGE_PATH || './server/data'
-        isNode = true
-        storage = new nls.LocalStorage(STORAGE_PATH, 500 * 1024 * 1024)
-        if (storage) {
-            const absolutePath = require('path').resolve(STORAGE_PATH)
-            console.log({ STORAGE_PATH, absolutePath })
+        storage = new require('node-localstorage')
+            .LocalStorage(STORAGE_PATH, 500 * 1024 * 1024)
+        const absolutePath = require('path')
+            .resolve(STORAGE_PATH)
+        console.log({ STORAGE_PATH, absolutePath })
+    } else {
+        // for web browser
+        storage = localStorage || {
+            // hack for iframe
+            getItem: () => '',
+            setItem: () => { },
         }
-    } catch (e) { }
-}
+    }
+} catch (_) { /* ignore error */ }
 
 /**
  * @name    read
