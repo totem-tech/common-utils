@@ -85,46 +85,6 @@ export default class CouchDBStorage {
     }
 
     /**
-     * @name        getDB
-     * @summary     Connect to CouchDB and then create new or re-use existing `db` instance
-     * @description Will create new database, if does not exist.
-     */
-    async getDB() {
-        if (this.db) return this.db
-        // if initialization is already in progress wait for it
-        if (this.dbPromise) return await this.dbPromise
-
-        const dbName = this.dbName
-        if (!dbName) throw new Error('CouchDB: missing database name')
-
-        const con = isObj(this.connectionOrUrl)
-            ? await this.connectionOrUrl
-            : await getConnection(this.connectionOrUrl, this.useGlobalCon)
-        // database already initialized
-        if (!isObj(con)) throw new Error('CouchDB: invalid connection')
-
-        this.dbPromise = new PromisE((resolve, reject) => (async () => {
-
-            try {
-                // retrieve a list of all database names
-                const dbNames = await con.db.list()
-                // database already exists, use it
-                if (!dbNames.includes(dbName)) {
-                    // database doesn't exist, create it
-                    console.log('CouchDB: new database created. Name:', dbName)
-                    await con.db.create(dbName)
-                }
-                this.dbPromise = null
-                resolve(con.use(dbName))
-            } catch (err) {
-                reject(err)
-            }
-        })())
-
-        return await this.dbPromise
-    }
-
-    /**
      * @name    delete
      * @summary delete documents
      * 
@@ -227,6 +187,46 @@ export default class CouchDBStorage {
         return asMap
             ? new Map(rows.map(x => [x._id, x]))
             : rows
+    }
+
+    /**
+     * @name        getDB
+     * @summary     Connect to CouchDB and then create new or re-use existing `db` instance
+     * @description Will create new database, if does not exist.
+     */
+    async getDB() {
+        if (this.db) return this.db
+        // if initialization is already in progress wait for it
+        if (this.dbPromise) return await this.dbPromise
+
+        const dbName = this.dbName
+        if (!dbName) throw new Error('CouchDB: missing database name')
+
+        const con = isObj(this.connectionOrUrl)
+            ? await this.connectionOrUrl
+            : await getConnection(this.connectionOrUrl, this.useGlobalCon)
+        // database already initialized
+        if (!isObj(con)) throw new Error('CouchDB: invalid connection')
+
+        this.dbPromise = new PromisE((resolve, reject) => (async () => {
+
+            try {
+                // retrieve a list of all database names
+                const dbNames = await con.db.list()
+                // database already exists, use it
+                if (!dbNames.includes(dbName)) {
+                    // database doesn't exist, create it
+                    console.log('CouchDB: new database created. Name:', dbName)
+                    await con.db.create(dbName)
+                }
+                this.dbPromise = null
+                resolve(con.use(dbName))
+            } catch (err) {
+                reject(err)
+            }
+        })())
+
+        return await this.dbPromise
     }
 
     /**
@@ -365,5 +365,30 @@ export default class CouchDBStorage {
                 ? PromisE.timeout(promise, timeout)
                 : promise
         )
+    }
+
+    /**
+     * @name    view
+     * @summary query a specific CouchDB "view"
+     * 
+     * @param   {String} designName 
+     * @param   {String} viewName 
+     * @param   {Object} params     (optional)
+     * 
+     * @returns {Array}
+     */
+    async view(designName, viewName, params) {
+        const db = await this.getDB()
+        const { rows = [] } = await db.view(
+            designName,
+            viewName,
+            {
+                include_docs: true,
+                ...params,
+
+            },
+        )
+
+        return rows.map(x => x.doc)
     }
 }
