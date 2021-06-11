@@ -1,10 +1,15 @@
 import { ApiPromise, ApiRx, WsProvider } from '@polkadot/api'
 import Keyring from '@polkadot/keyring/'
 import createPair from '@polkadot/keyring/pair'
-import { isFn, isArr, isDefined, isObj, isStr, isValidNumber, isArr2D } from './utils'
+import { bytesToHex } from './convert'
+import {
+    isFn, isArr, isDefined, isObj, isStr, isValidNumber,
+    isArr2D, isUint8Arr, objHasKeys, isNodeJS
+} from './utils'
 
 const TYPE = 'sr25519'
 const _keyring = new Keyring({ type: TYPE })
+const isNode = isNodeJS()
 const config = {
     nodes: [],
     timeout: 30000,
@@ -118,9 +123,16 @@ export const keyring = {
     //
     // Params:
     // @seeds   array: uri/seed
-    add: (seeds = []) => seeds.forEach(s => {
+    add: (seeds = []) => seeds.forEach(seed => {
         try {
-            _keyring.addFromUri(s)
+            if (isUint8Arr(seed)) {
+                seed = bytesToHex(seed)
+            } else if (isObj(seed) && objHasKeys(seed, ['secretKey', 'publicKey'])) {
+                const { secretKey, publicKey } = seed
+                const pair = createPair(TYPE, { secretKey, publicKey })
+                return _keyring.addPair(pair)
+            }
+            return _keyring.addFromUri(seed)
         } catch (error) { console.log('Failed to add seed to keyring', error) }
     }),
 
@@ -286,7 +298,7 @@ export const signAndSend = async (api, address, tx, nonce, rxStatus) => {
                 }))
                     // exclude empty event data
                     .filter(event => event.data && event.data.length) || {}
-                console.log(`Polkadot: Completed at block hash: ${hash}`, { eventsArr })
+                console.log(`Polkadot: Completed at block hash: ${hash}`, isNode ? '' : { eventsArr })
                 rxStatus && rxStatus.complete()
                 resolve([hash, eventsArr])
             })
