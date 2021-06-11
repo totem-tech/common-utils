@@ -287,7 +287,7 @@ export default class CouchDBStorage {
      * @summary create or update document
      * 
      * @param   {String}    id         (optional) if exists, will update document
-     * @param   {Object}    doc      
+     * @param   {Object}    value      
      * @param   {Boolean}   override   (optional) whether to allow override of existing document.
      *                                 If truthy, will automatically check if `@id` already exists.
      *                                 If false and `@id` exists and correct `@value._rev` not supplied,
@@ -302,7 +302,7 @@ export default class CouchDBStorage {
      *
      * @returns {Object}
      */
-    async set(id, doc, override = true, merge = false, timeout = 3000) {
+    async set(id, value, override = true, merge = false, timeout = 3000) {
         id = isStr(id)
             ? id
             : uuid.v1()
@@ -310,18 +310,18 @@ export default class CouchDBStorage {
         const existingDoc = override && await this.get(id)
         if (existingDoc) {
             // attach `_rev` to execute an update operation
-            doc._rev = existingDoc._rev
-            doc = !merge
-                ? doc
+            value._rev = existingDoc._rev
+            value = !merge
+                ? value
                 : {
                     ...existingDoc,
-                    ...doc,
+                    ...value,
                 }
         }
 
         setTs(value, existingDoc)
         return await PromisE.timeout(
-            db.insert(doc, id),
+            db.insert(value, id),
             timeout,
         )
     }
