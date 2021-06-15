@@ -3,11 +3,11 @@ import { isDefined, isStr, mapSearch, isMap, isValidNumber, mapSort, isArr, isFn
 /* For NodeJS (non-browser applications) the following node module is required: node-localstorage */
 
 let storage
+// use this to force all instances of DataStorage where caching is enabled to update data from LocalStorage
+// ONLY USE IN EXTREME CASES such as restoring a backup.
 // Usage: rxForeUpdateCache.next(true)
 export const rxForeUpdateCache = new Subject()
 
-// use this to force all instances of DataStorage where caching is enabled to update data from LocalStorage
-// ONLY USE IN EXTREME CASES such as restoring a backup.
 // try {
 //     // Use browser localStorage if available
 //     storage = localStorage
