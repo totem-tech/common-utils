@@ -44,6 +44,9 @@ export const isCouchDBStorage = (...args) => args.flat()
  * @returns {Object}    doc
  */
 const setTs = (doc, existingDoc) => {
+    if (!doc) {
+        console.log({ doc, existingDoc })
+    }
     // add/update creation and update time
     doc.tsCreated = (existingDoc || doc).tsCreated || new Date()
     if (!!existingDoc || doc.tsUpdated) {
@@ -52,30 +55,34 @@ const setTs = (doc, existingDoc) => {
     return doc
 }
 
-/**
- * @name        CouchDBStorage
- * @summary     a wrapper for `nano` NPM module for reading from and writing to CouchDB
- * @description connection is only initialized only when first request is made or `getDB()` method is called.
- * 
- * @param   {String|Object|Null}    connectionOrUrl Possible values:
- *                                      1. string: CouchDB connection URL including username and password
- *                                      2. object: existing connection
- *                                      3. null:   will use global `connection` if available.
- *                                  Alternatively, use a specific environment variable for individual database.
- *                                  The name of the environement variable must be in the following format:
- *                                      `CouchDB_URL_$DBNAME` 
- *                                  Replace `$DBNAME` with database name. The same to be provide in the `dbName` param.
- * @param   {String}                dbName          database name
- * 
- * @returns {CouchDBStorage}
- */
 export default class CouchDBStorage {
-    constructor(connectionOrUrl, dbName) {
+    /**
+     * @name        CouchDBStorage
+     * @summary     a wrapper for `nano` NPM module for reading from and writing to CouchDB
+     * @description connection is only initialized only when first request is made or `getDB()` method is called.
+     *
+     * @param   {String|Object|Null}    connectionOrUrl Possible values:
+     *                                      1. string: CouchDB connection URL including username and password
+     *                                      2. object: existing connection
+     *                                      3. null:   will use global `connection` if available.
+     *                                  Alternatively, use a specific environment variable for individual database.
+     *                                  The name of the environement variable must be in the following format:
+     *                                      `CouchDB_URL_$DBNAME`
+     *                                  Replace `$DBNAME` with database name. The same to be provide in param `dbName`
+     * @param   {String}                dbName          database name
+     * @param   {Array}                 fields (optional) fields to retreive whenever retrieving documents.
+     *                                  This can be overridden in the `extraProps` argument wherever applicable.
+     *                                  Default: `[]` (all fields)
+     *
+     * @returns {CouchDBStorage}
+     */
+    constructor(connectionOrUrl, dbName, fields = []) {
         this.connectionOrUrl = connectionOrUrl || process.env[`CouchDB_URL_${dbName}`]
         // whethe to use the global connection or database specific
         this.useGlobalCon = !this.connectionOrUrl
         this.db = null
         this.dbName = dbName
+        this.fields = fields
 
         // Forces the application to immediately attempt to connect.
         // This is required because "nano" (CouchDB's official NPM module) does not handle connection error properly 
@@ -132,7 +139,14 @@ export default class CouchDBStorage {
      * @returns {Object} document if available otherwise, undefined
      */
     async find(selector, extraProps, timeout) {
-        const docs = await this.search(selector, 1, 0, false, extraProps, timeout)
+        const docs = await this.search(
+            selector,
+            1,
+            0,
+            false,
+            extraProps,
+            timeout,
+        )
         return docs[0]
     }
 
@@ -144,13 +158,14 @@ export default class CouchDBStorage {
      * 
      * @returns {Object} document if available otherwise, undefined
      */
-    async get(id) {
-        const db = await this.getDB()
-        // prevents throwing an error when document not found.
-        // instead returns undefined.
-        try {
-            return await db.get(id)
-        } catch (e) { }
+    async get(id, fields, timeout) {
+        return await this.find(
+            { _id: id },
+            isArr(fields)
+                ? { fields }
+                : undefined,
+            timeout
+        )
     }
 
     /**
@@ -271,6 +286,7 @@ export default class CouchDBStorage {
     async searchRaw(selector = {}, limit = 0, skip = 0, extraProps = {}, timeout = 15000) {
         const db = await this.getDB()
         const query = {
+            fields: this.fields,
             ...extraProps,
             selector,
             limit: limit === 0 ? undefined : limit,
@@ -286,28 +302,28 @@ export default class CouchDBStorage {
      * @name    set 
      * @summary create or update document
      * 
-     * @param   {String}    id         (optional) if exists, will update document
-     * @param   {Object}    value      
-     * @param   {Boolean}   override   (optional) whether to allow override of existing document.
-     *                                 If truthy, will automatically check if `@id` already exists.
-     *                                 If false and `@id` exists and correct `@value._rev` not supplied,
-     *                                 CouchDB will throw error.
-     *                                 Default: `true`
-     * @param   {Boolean}   merge      (optional) whether to merge `@value` with exiting entry.
-     *                                 Only applicable if `@override` is truthy.
-     *                                 Default: `false`
-     * @param   {Number}    timeout    timeout duration in milliseconds for save operation.
-     *                                 Default: `3000`
+     * @param   {String}    id      (optional) if exists, will update document
+     * @param   {Object}    value   
+     * @param   {Boolean}   update  (optional) whether to allow updating existing document.
+     *                              If truthy, will automatically check if `@id` already exists.
+     *                              If false and `@id` exists and correct `@value._rev` not already supplied, CouchDB 
+     *                              will throw an error.
+     *                              Default: `true`
+     * @param   {Boolean}   merge   (optional) whether to merge `@value` with exiting entry.
+     *                              Only applicable if `@update` is truthy.
+     *                              Default: `true`
+     * @param   {Number}    timeout timeout duration in milliseconds for save operation.
+     *                              Default: `3000`
      * 
      *
      * @returns {Object}
      */
-    async set(id, value, override = true, merge = false, timeout = 3000) {
+    async set(id, value, update = true, merge = true, timeout = 3000) {
         id = isStr(id)
             ? id
             : uuid.v1()
         const db = await this.getDB()
-        const existingDoc = override && await this.get(id)
+        const existingDoc = update && await this.get(id, [])
         if (existingDoc) {
             // attach `_rev` to execute an update operation
             value._rev = existingDoc._rev
@@ -349,7 +365,7 @@ export default class CouchDBStorage {
             const doc = docs[i]
             if (!doc._id || doc._rev) continue
 
-            const existingDoc = await this.get(doc._id)
+            const existingDoc = await this.get(doc._id, [])
             if (!existingDoc) continue
             if (ignoreIfExists) {
                 docs[i] = null
