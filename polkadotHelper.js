@@ -14,10 +14,10 @@ const config = {
     nodes: [],
     timeout: 30000,
     types: {},
-    // minimum required amount in XTX to create a transation.
+    // minimum required amount in TOTEM to create a transation.
     // This is a temporary solution until upgraded to PolkadotJS V2.
-    // 140 XTX for a simple transaction.
-    // 1 XTX for existential balance. 
+    // 140 TOTEM for a simple transaction.
+    // 1 TOTEM for existential balance.
     txFeeMin: 141, // unused/deprecated
     errorMsgs: {
         connectionFailed: 'Connection failed',
@@ -258,7 +258,7 @@ export const signAndSend = async (api, address, tx, nonce, rxStatus) => {
         nonce = nonces[address] + 1
     }
     nonces[address] = nonce
-    console.log('Polkadot: initiating transation', { nonce })
+    console.log('Totem Blockchain: initiating transation', { nonce })
     return await new Promise(async (resolve, reject) => {
         try {
             const signed = await tx.sign(account, { nonce })
@@ -266,7 +266,7 @@ export const signAndSend = async (api, address, tx, nonce, rxStatus) => {
                 const { events, status } = result
                 const isFuture = status.type !== 'Future'
                 let hash = ''
-                console.log('Polkadot: Transaction status', status.type)
+                console.log('Totem Blockchain: Transaction status', status.type)
 
                 // notify
                 rxStatus && rxStatus.next(result)
@@ -287,7 +287,7 @@ export const signAndSend = async (api, address, tx, nonce, rxStatus) => {
                 }).filter(Boolean)
 
                 if (eventErrors.length > 0) {
-                    console.log('Polkadot: Transaction failed!', { blockHash: hash, eventErrorMsg: eventErrors })
+                    console.log('Totem Blockchain: Transaction failed!', { blockHash: hash, eventErrors })
                     return reject(eventErrors.join(' | '))
                 }
 
@@ -298,7 +298,7 @@ export const signAndSend = async (api, address, tx, nonce, rxStatus) => {
                 }))
                     // exclude empty event data
                     .filter(event => event.data && event.data.length) || {}
-                console.log(`Polkadot: Completed at block hash: ${hash}`, isNode ? '' : { eventsArr })
+                console.log(`Totem Blockchain: Completed at block hash: ${hash}`, isNode ? '' : { eventsArr })
                 rxStatus && rxStatus.complete()
                 resolve([hash, eventsArr])
             })
@@ -322,6 +322,8 @@ export const signAndSend = async (api, address, tx, nonce, rxStatus) => {
  * @returns {Array}   [blockHash, eventsArr]
  */
 export const transfer = async (toAddress, amount, secretKey, publicKey, api) => {
+    throw new Error('Deprecated')
+
     if (!api) {
         // config.nodes wasn't set => return empty promise that rejects immediately
         if (config.nodes.length === 0) throw new Error('Unable to connect: node URL not set')
