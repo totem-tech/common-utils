@@ -318,7 +318,7 @@ export default class CouchDBStorage {
      *
      * @returns {Object}
      */
-    async set(id, value, update = true, merge = true, timeout = 3000) {
+    async set(id, value, update = true, merge = true, timeout = 3000, updateTS = true) {
         id = isStr(id)
             ? id
             : uuid.v1()
@@ -326,16 +326,17 @@ export default class CouchDBStorage {
         const existingDoc = update && await this.get(id, [])
         if (existingDoc) {
             // attach `_rev` to execute an update operation
-            value._rev = existingDoc._rev
             value = !merge
                 ? value
                 : {
                     ...existingDoc,
                     ...value,
                 }
+            // make sure _rev is latest
+            value._rev = existingDoc._rev
         }
 
-        setTs(value, existingDoc)
+        updateTS && setTs(value, existingDoc)
         return await PromisE.timeout(
             db.insert(value, id),
             timeout,
@@ -353,7 +354,7 @@ export default class CouchDBStorage {
      *
      * @returns {*}
      */
-    async setAll(docs, ignoreIfExists = false, timeout) {
+    async setAll(docs, ignoreIfExists = false, timeout, updateTS = true) {
         if (isMap(docs)) {
             // convert Map to Array
             docs = Array.from(docs).map(([_id, item]) => ({ ...item, _id }))
@@ -373,7 +374,7 @@ export default class CouchDBStorage {
             }
             // attach `_rev` to prevent conflicts when updating existing items
             doc._rev = existingDoc._rev
-            setTs(doc, existingDoc)
+            updateTS && setTs(doc, existingDoc)
         }
         const promise = db.bulk({ docs: docs.filter(Boolean) })
         return await (
