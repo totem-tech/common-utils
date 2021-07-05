@@ -36,10 +36,10 @@ export const format = (date, seconds = false, ms = false) => {
         xDate.getMinutes(),
         seconds && xDate.getSeconds(),
     ]
-        .filter(Boolean)
+        .filter(x => x !== false)
         .map(fill)
         .join(':')
-    
+
     return !seconds || !ms
         ? formatted
         : `${formatted}.${xDate.getMilliseconds()}`
