@@ -772,20 +772,23 @@ export const search = (data, query, keys = []) => {
  * @summary 		enhanced search for Dropdown
  * @description		Semantic UI Dropdown search defaults to only "text" option property.
  * 					See FormInput for usage.
- * @param {Array}	searchKeys default: ['text']
+ * @param {Array}	searchKeys	Object properties (keys) to search for.
+ * 								Default: ['text'] (for Dropdown and similar input fields)
+ * @param {Number}  maxResults	limits maximum number of results returned.
+ * 								Default: `100`
  * 
  * @returns	{Function}	a callback function. Params:
  *						@options 		array of objects
  *						@searchQuery	string
  *						returns array of objects
  */
-export const searchRanked = (searchKeys = ['text']) => (options, searchQuery) => {
-	if (!searchQuery) return options
+export const searchRanked = (searchKeys = ['text'], maxResults = 100) => (options, searchQuery) => {
 	if (!options || options.length === 0) return []
+	if (!searchQuery) return options.slice(0, maxResults)
 
 	const uniqueValues = {}
-	const regex = new RegExp(escapeStringRegexp(searchQuery), 'i')
-	if (!searchQuery) return options
+	const regex = new RegExp(escapeStringRegexp(searchQuery || ''), 'i')
+	if (!searchQuery) return options.slice(0, maxResults)
 
 	const search = key => {
 		const matches = options.map((option, i) => {
@@ -807,7 +810,9 @@ export const searchRanked = (searchKeys = ['text']) => (options, searchQuery) =>
 		return arrSort(matches, 'matchIndex').map(x => options[x.index])
 	}
 
-	return searchKeys.reduce((result, key) => result.concat(search(key)), [])
+	return searchKeys
+		.reduce((result, key) => result.concat(search(key)), [])
+		.slice(0, maxResults)
 }
 
 /**
