@@ -158,7 +158,7 @@ export default class CouchDBStorage {
      * 
      * @returns {Object} document if available otherwise, undefined
      */
-    async get(id, fields, timeout) {
+    async get(id, fields = this.fields, timeout) {
         return await this.find(
             { _id: id },
             isArr(fields)
