@@ -343,11 +343,11 @@ export const arrSort = (arr, key, reverse = false, sortOriginal = false) => {
  * @name	arrUnique
  * @summary constructs a new array of unique values
  * 
- * @param	{Array} source
+ * @param	{...any} args
  * 
  * @returns {Array}
  */
-export const arrUnique = (source = []) => [...new Set(source)]
+export const arrUnique = (...args) => Array.from(new Set([...args].flat()))
 
 /**
  * @name	className
