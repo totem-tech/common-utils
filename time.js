@@ -64,7 +64,9 @@ export const blockNumberToTS = (block, currentBlock, asString = true) => {
     const date = new Date()
     // add or substract duration to the @date to get to the timestamp of the @block
     date.setSeconds(date.getSeconds() + numSeconds)
-    return !asString ? date : format(date)
+    return !asString
+        ? date
+        : format(date)
 }
 
 export const secondsToDuration = numSeconds => {
