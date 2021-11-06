@@ -152,9 +152,10 @@ export default class CouchDBStorage {
 
     /**
      * @name    get
-     * @summary get document by ID without throwing error if ID doesn't exists.
+     * @summary get document with specified fields. This method cannot retrieve any design documents.
      * 
-     * @param   {String} id document ID. (the `_id` property)
+     * @param   {String} id     document ID. (the `_id` property)
+     * @param   {Array}  fields list of properties to retrieve. 
      * 
      * @returns {Object} document if available otherwise, undefined
      */
@@ -166,6 +167,21 @@ export default class CouchDBStorage {
                 : undefined,
             timeout
         )
+    }
+
+    /**
+     * @name    getDoc
+     * @summary retrieve a document with all properties. This method can retrieve design documents.
+     * 
+     * @param   {String} id document ID. (the `_id` property)
+     * 
+     * @returns {Object}
+     */
+    async getDoc(id) {
+        const db = await this.getDB()
+        try {
+            return await db.get(id)
+        } catch (_) { }
     }
 
     /**

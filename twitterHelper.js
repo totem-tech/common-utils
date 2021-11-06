@@ -33,15 +33,15 @@ class TwitterHelper {
      * @name    checkFollower
      * @summary get Twitter follower information
      * 
-     * @param   {String} sourceHanle 
+     * @param   {String} sourceHandle 
      * @param   {String} targetHandle 
      * 
      * @returns {Boolean}
      */
-    async getFollower(sourceHanle, targetHandle) {
+    async getFollower(sourceHandle, targetHandle) {
         await this.getClient()
         const params = {
-            'source_screen_name': sourceHanle,
+            'source_screen_name': sourceHandle,
             'target_screen_name': targetHandle,
         }
         try {
@@ -54,7 +54,6 @@ class TwitterHelper {
                 : this.joinTwitterErrors(err)
             )
         }
-
     }
 
     /**
@@ -80,7 +79,29 @@ class TwitterHelper {
                 : this.joinTwitterErrors(err)
             )
         }
+    }
 
+    /**
+     * @name    getUser
+     * @summary get Twitter user data
+     * 
+     * @param   {String} handleOrId
+     * 
+     * @returns {Object}
+     */
+    async getUser(handleOrId) {
+        await this.getClient()
+        const params = { 'screen_name': handleOrId }
+        try {
+            const result = await this.client
+                .get('users/show', params)
+            return result
+        } catch (err) {
+            throw new Error(!err.errors
+                ? err
+                : this.joinTwitterErrors(err)
+            )
+        }
     }
 
     joinTwitterErrors(err) {
