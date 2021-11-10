@@ -101,6 +101,11 @@ export const validate = (value, config, customMessages = {}) => {
         ...customMessages,
         ...config.customMessages,
     }
+
+    // If error message is falsy change it to `true`
+    Object
+        .keys(errorMsgs)
+        .forEach(key => errorMsgs[key] = errorMsgs[key] || true)
     try {
         let err
         const {
