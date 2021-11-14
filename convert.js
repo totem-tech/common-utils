@@ -91,7 +91,7 @@ export const u8aToStr = value => {
  */
 export const strToU8a = value => {
     if (isUint8Arr(value)) return value
-    
+
     const { stringToU8a } = require('@polkadot/util')
     const str = isArrLike(value)
         ? JSON.stringify(Array.from(value))
@@ -111,11 +111,11 @@ export const encodeUTF8 = u8aToStr // ToDo: deprecate
  * 
  * @returns {String}    If invalid address returns empty string.
  */
-export const addressToStr = address => fallbackIfFails(
+export const addressToStr = (address, ignoreChecksum, ss58Format) => fallbackIfFails(
     ss58Encode, // first attempt to convert bytes to string
-    [address],
+    [address, ss58Format],
     // if fails check if address is a valid string
-    fallbackIfFails(ss58Decode, [address]) && address || '',
+    fallbackIfFails(ss58Decode, [address, ignoreChecksum, ss58Format]) && address || '',
 )
 
 

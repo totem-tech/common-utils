@@ -405,6 +405,28 @@ export const deferred = (callback, delay, thisArg) => {
 }
 
 /**
+ * @name    getUrlParam
+ * @summary read parameters of a given URL
+ * 
+ * @param   {String} name   (optional) if supplied will return a specific paramenter as string.
+ *                          Otherwise, will return an object containing all the URL parameters with respective values.
+ * @param   {String} url    
+ * 
+ * @returns {String|Object}
+ */
+export const getUrlParam = (name, url = '') => {
+	const params = {}
+	const regex = /[?&]+([^=&]+)=([^&]*)/gi
+	url.replace(
+		regex,
+		(_, key, value) => params[key] = decodeURIComponent(value)
+	)
+	return name
+		? params[name] || ''
+		: params
+}
+
+/**
  * @name	objCopy
  * @summary deep-copy an object to another object
  * 
