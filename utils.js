@@ -76,9 +76,11 @@ export const escapeStringRegexp = (str) => {
  */
 export const generateHash = (seed, algo, bitLength = 256) => {
 	const { blake2AsHex, keccakAsHex } = require('@polkadot/util-crypto')
-	seed = isUint8Arr(seed) ? seed : (
-		isStr(seed) ? seed : JSON.stringify(seed)
-	)
+	seed = isUint8Arr(seed)
+		? seed
+		: isStr(seed)
+			? seed
+			: JSON.stringify(seed)
 	switch (`${algo}`.toLowerCase()) {
 		case 'keccak':
 			return keccakAsHex(seed)
@@ -179,7 +181,7 @@ export const isObjMap = x => isMap(x) && Array.from(x).every(([_, v]) => isObj(v
 export const isPromise = x => x instanceof Promise
 export const isSet = x => x instanceof Set
 export const isStr = x => typeof x === 'string'
-export const isSubjectLike = x => isObj(x) && isFn(x.subscribe)
+export const isSubjectLike = x => isObj(x) && isFn(x.subscribe) && isFn(x.next)
 export const isUint8Arr = arr => arr instanceof Uint8Array
 export const isValidNumber = x => typeof x == 'number' && !isNaN(x) && isFinite(x)
 export const hasValue = x => {

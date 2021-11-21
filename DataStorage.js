@@ -3,31 +3,24 @@ import { isDefined, isStr, mapSearch, isMap, isValidNumber, mapSort, isArr, isFn
 /* For NodeJS (non-browser applications) the following node module is required: node-localstorage */
 
 let storage
-// use this to force all instances of DataStorage where caching is enabled to update data from LocalStorage
-// ONLY USE IN EXTREME CASES such as restoring a backup.
-// Usage: rxForeUpdateCache.next(true)
+/**
+ * @name    rxForeUpdateCache
+ * @summary force all or certain instances of DataStorage to reload data from storage
+ * 
+ * @param   {Boolean|Array}
+ * 
+ * @example 
+ * ```javascript
+ * // Update only certain modules
+ * const moduleKey = 'totem_identities'
+ * rxForeUpdateCache.next([moduleKey])
+ * 
+ * // Update every single instance of DataStorage that uses storage (has a "name")
+ * rxForeUpdateCache.next(true)
+ * ```
+ */
 export const rxForeUpdateCache = new Subject()
 
-// try {
-//     // Use browser localStorage if available
-//     storage = localStorage
-//     if (storage === null) {
-//         // hack for iframe
-//         // localStorage will not work!! (expected)
-//         storage = { getItem: () => '', setItem: () => { } }
-//     }
-// } catch (e) {
-//     try {
-//         // for NodeJS server
-//         const nls = require('node-localstorage')
-//         const STORAGE_PATH = process.env.STORAGE_PATH || './server/data'
-//         storage = new nls.LocalStorage(STORAGE_PATH, 500 * 1024 * 1024)
-//         if (storage) {
-//             const absolutePath = require('path').resolve(STORAGE_PATH)
-//             console.log({ STORAGE_PATH, absolutePath })
-//         }
-//     } catch (e) { }
-// }
 try {
     if (isNodeJS()) {
         // for NodeJS server
@@ -101,7 +94,9 @@ export default class DataStorage {
         data = !isMap(data) ? new Map() : data
         this.name = name
         this.disableCache = name && disableCache
-        this.rxData = this.disableCache ? new Subject() : new BehaviorSubject(data)
+        this.rxData = this.disableCache
+            ? new Subject()
+            : new BehaviorSubject(data)
         this.size = data.size
         this.save = true
         this.rxData.subscribe(data => {
@@ -113,8 +108,13 @@ export default class DataStorage {
         if (this.disableCache) return
 
         // update cached data from localStorage throughout the application only when triggered
-        rxForeUpdateCache.subscribe(ok => {
-            if (this.disableCache || ok !== true) return
+        rxForeUpdateCache.subscribe(refresh => {
+            const doRefresh = !this.name
+                ? false
+                : isArr(refresh)
+                    ? refresh.includes(this.name)
+                    : refresh === true
+            if (!doRefresh) return
             const data = read(this.name)
             this.size = data.size
             this.rxData.next(data)
@@ -196,6 +196,7 @@ export default class DataStorage {
      *                              @item   Array: Each item will contain key and value in an array. Eg: [key, value]
      *                              @index  Number
      *                              @array  Array: The entire Map in a 2D Array. Eg: [[key, value], [key2, value2]]
+     * 
      * @returns {Array} array of items returned by callback
      */
     map(callback) {

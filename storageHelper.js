@@ -1,9 +1,8 @@
 /*
- * Storage Service: to handle all interactions with browser's localStorage.
- * Typically this should be used by other services
+ * Storage Helper: helper funtions to handle all interactions with browser's localStorage including backup and restore.
  */
-import { downloadFile, generateHash, hasValue, isMap, isObj, isSet, isStr, objClean } from './utils'
-import DataStorage from './DataStorage'
+import DataStorage, { rxForeUpdateCache } from './DataStorage'
+import { downloadFile, generateHash, hasValue, isMap, isObj, isSet, isStr, isValidDate, objClean } from './utils'
 
 // Local Storage item key prefix for all items
 const PREFIX = 'totem_'
@@ -25,50 +24,10 @@ export const essentialKeys = [
     'totem_settings',
 ]
 
-/**
- * @name    downloadBackup
- * @summary download backup of application data
- * 
- * @param   {String}    backup (optional) will be generated if not supplied
- * 
- * @returns {Array}     [backupContent: string, timestamp: string]
- */
-export const downloadBackup = () => {
-    const fileBackupTS = new Date().toISOString()
-    const content = JSON.stringify(generateBackupData(fileBackupTS))
-    let { hostname } = window.location
-    if (hostname === 'localhost') hostname = `totem-localhost`
-
-    const fileName = `${hostname}-backup-${fileBackupTS}.json`
-    downloadFile(
-        content,
-        fileName,
-        'application/json'
-    )
-    return [content, fileBackupTS, fileName]
-}
-
-/**
- * @name    generateBackupData
- * @summary generate a replica of the localStorage contents only includes the properties specified in `essentialKeys`
- * @param   {String}    fileBackupTS (optional) if supplied downloaded identities will be updated
- */
-// generates user data for backup, excluding non-essential items such as cache etc...
-export const generateBackupData = (fileBackupTS) => {
-    const data = objClean(localStorage, essentialKeys)
-    const keys = Object.keys(data)
-    keys.forEach(key => {
-        // parse JSON string
-        data[key] = JSON.parse(data[key])
-        if (!fileBackupTS || key !== 'totem_identities') return
-        // update backup timestamp
-        data[key]
-            .forEach(([_, identity]) =>
-                identity.fileBackupTS = fileBackupTS
-            )
-    })
-    return data
-}
+export const modulesWithTS = [
+    'totem_identities',
+    'totem_partners',
+]
 
 /**
  * @name    rw
@@ -116,6 +75,121 @@ export const rw = (storage, key, propKey, value, override = false) => {
     return data[propKey]
 }
 
+export const backup = {
+    /**
+     * @name    backup.download
+     * @summary download backup of application data
+     * 
+     * @param   {String}    filename (optional)
+     * 
+     * @returns {Array} [
+     *                      content     string: st
+     *                      timestamp   string:
+     *                      fileName    string:
+     *                  ]
+     */
+    download: (filename = backup.generateFilename()) => {
+        const timestamp = storage
+            .backup
+            .filenameToTS(filename)
+        const data = backup.generateData(timestamp)
+        data.__fileName = filename
+        const content = JSON.stringify(data)
+        downloadFile(
+            content,
+            filename,
+            'application/json'
+        )
+        return {
+            data,
+            hash: generateHash(content),
+            timestamp,
+            filename,
+        }
+    },
+
+    /**
+     * @name    backup.filenameToTS
+     * @summary extract timestamp from the backup filename
+     * 
+     * @returns {String}
+     */
+    filenameToTS: (filename) => `${filename || ''}`
+        .split('backup-')[1]
+        .split('.json')[0],
+
+    /**
+     * @name    backup.generate
+     * @summary generates an object for backup only using essential data from localStorage
+     * 
+     * @returns {Object}
+     */
+    generateData: (timestamp) => {
+        const data = objClean(localStorage, essentialKeys)
+        Object
+            .keys(data)
+            .forEach(key => {
+                data[key] = JSON.parse(data[key])
+
+                if (!timestamp || modulesWithTS.includes(key)) return
+                // update backup timestamp
+                data[key]
+                    .forEach(([_, entry]) =>
+                        entry.fileBackupTS = timestamp
+                    )
+            })
+        return data
+    },
+
+    /**
+     * @name    backup.generateFileName
+     * @summary generates a backup filename using current timestamp and URL hostname
+     * 
+     * @returns {String}
+     */
+    generateFilename: (timestamp = new Date().toISOString()) => {
+        const hostname = window.location.hostname === 'localhost'
+            ? 'totem-localhost'
+            : window.location.hostname
+
+        const fileName = `${hostname}-backup-${timestamp}.json`
+        return fileName
+    },
+
+    /**
+     * @name    backup.updateTS
+     * @summary update backup timestamps of module data (eg: identities, partners).
+     *          This should only be invoked after backup download has been confirmed.
+     */
+    updateFileBackupTS: (data, timestamp) => {
+        if (!isObj(data) || !isValidDate(timestamp)) return console.log('updateFileBackupTS invalid', data, timestamp)
+
+        Object
+            .keys(data)
+            .forEach(moduleKey => {
+                if (!modulesWithTS.includes(moduleKey)) return
+                const moduleStorage = new DataStorage(moduleKey)
+                const keysToUpdated = data[moduleKey]
+                    .map(([key]) => key)
+                const updated = moduleStorage
+                    .map(([key, value]) => [
+                        key,
+                        {
+                            ...value,
+                            fileBackupTS: keysToUpdated.includes(key)
+                                ? timestamp
+                                : value.fileBackupTS,
+                        },
+                    ])
+                moduleStorage.setAll(new Map(updated))
+            })
+
+        // update modules
+        rxForeUpdateCache.next(modulesWithTS)
+    }
+}
+
+storage.backup = backup
 storage.countries = new DataStorage(PREFIX_STATIC + 'countries', true)
 
 storage.settings = {
@@ -174,12 +248,22 @@ storage.clearNonEssentialData = () => {
         '_static_',
         '_cache_',
     ]
-    const shouldRemove = key => !essentialKeys.includes(key) && ( // makes sure essential keys are not removed
-        keys.includes(key) ||
-        partialKeys.reduce((remove, pKey) => remove || key.includes(pKey), false)
-    )
+    const shouldRemove = key => !essentialKeys.includes(key)
+        // makes sure essential keys are not removed
+        && (
+            keys.includes(key)
+            || partialKeys.reduce((remove, pKey) =>
+                remove || key.includes(pKey),
+                false,
+            )
+        )
 
-    Object.keys(localStorage).forEach(key => shouldRemove(key) && localStorage.removeItem(key))
+    Object
+        .keys(localStorage)
+        .forEach(key =>
+            shouldRemove(key)
+            && localStorage.removeItem(key)
+        )
 }
 
 export default storage

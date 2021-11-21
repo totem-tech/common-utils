@@ -21,15 +21,23 @@ const useState = (...args) => require('react').useState(...args)
  */
 export const iUseReducer = (reducerFn, initialState = {}, onUnmount) => {
     const [[rxSetState, iniState]] = useState(() => {
-        const rxSetState = isFn(initialState) && new Subject()
+        const rxSetState = isFn(initialState) && new BehaviorSubject({})
         initialState = !rxSetState
             ? initialState
             : initialState(rxSetState)
 
-        return [rxSetState, initialState]
+        return [
+            rxSetState,
+            {
+                ...initialState,
+                ...rxSetState.value,
+            }
+        ]
     })
     const [state, setStateOrg] = useReducer(
-        isFn(reducerFn) ? reducerFn : reducer,
+        isFn(reducerFn)
+            ? reducerFn
+            : reducer,
         iniState,
     )
     // ignores state update if component is unmounted
@@ -39,9 +47,7 @@ export const iUseReducer = (reducerFn, initialState = {}, onUnmount) => {
 
     useEffect(() => {
         setStateOrg.mounted = true
-        const subscription = rxSetState && rxSetState.subscribe(newState =>
-            setStateOrg.mounted && setStateOrg(newState)
-        )
+        const subscription = rxSetState && rxSetState.subscribe(setState)
 
         return () => {
             setStateOrg.mounted = false
