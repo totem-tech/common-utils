@@ -3,7 +3,7 @@ import { ss58Decode } from './convert'
 /*
  * List of optional node-modules and the functions used by them:
  * Module Name          : Function Name
- * ---------------------------
+ * ------------------------------------------------------
  * @polkadot/util-crypto: isAddress, generateHash
  * escapeStringRegexp   : escapeStringRegexp, searchRanked
  * form-data   			: objToFormData
@@ -407,6 +407,22 @@ export const deferred = (callback, delay, thisArg) => {
 }
 
 /**
+ * @name	getFuncParams
+ * @summary extracts the parameter names of a given function. 
+ * 
+ * @param	{Function} func 
+ * 
+ * @returns {Array}
+ */
+export const getFuncParams = func => func
+	.toString()
+	.replace('function', '')
+	.trim()
+	.split('(')[1]
+	.split(')')[0]
+	.split(', ')
+
+/**
  * @name    getUrlParam
  * @summary read parameters of a given URL
  * 
@@ -607,14 +623,7 @@ export const objToUrlParams = (obj = {}, excludeUndefined = true) => Object.keys
 	.join('&')
 
 export const objToFormData = (obj = {}, excludeUndefined = true) => {
-	let formData
-	try {
-		formData = new FormData()
-	} catch (_) {
-		// for nodejs only
-		const FormData = require('form-data')
-		formData = new FormData()
-	}
+	let formData = new FormData()
 	Object.keys(obj).forEach(key => {
 		let value = obj[key]
 		if (excludeUndefined && value === undefined) return

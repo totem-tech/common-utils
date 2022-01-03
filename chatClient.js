@@ -3,16 +3,28 @@ import ioClient from 'socket.io-client'
 import { translated } from './languageHelper'
 import storage from './storageHelper'
 import { subjectAsPromise } from './reactHelper'
-import { isFn, isObj, isStr, objWithoutKeys } from './utils'
+import { getFuncParams, isFn, isObj, isStr, objWithoutKeys } from './utils'
 
 const textsCap = translated({
     invalidRequest: 'invalid request',
 }, true)[1]
 
+let instance, socket, hostname;
+const TOTEM_LIVE = 'totem.live'
+try {
+    hostname = window.location.hostname
+    if (hostname !== 'localhost' && !hostname.endsWith(TOTEM_LIVE)) throw 'use prod'
+} catch (err) {
+    // use production URL as default where `window` is not available
+    // or if not accessed from totem.live
+    hostname = TOTEM_LIVE
+}
 // chat server port
-// use 3003 for dev.totem.live otherwise 3001
-const port = window.location.hostname === 'dev.totem.live' ? 3003 : 3001
-let instance, socket;
+// use 3003 for dev.totem.live otherwise 3001 for production
+const port = hostname === 'dev.totem.live'
+    ? 3003
+    : 3001
+const defaultServerURL = `${hostname}:${port}`
 const MODULE_KEY = 'messaging'
 const PREFIX = 'totem_'
 // include any ChatClient property that is not a function or event that does not have a callback
@@ -64,72 +76,15 @@ export const referralCode = code => {
 
 // Returns a singleton instance of the websocket client
 // Instantiates the client if not already done
-export const getClient = () => {
+export const getClient = (...args) => {
     if (instance) return instance
     // automatically login to messaging service
     const { id, secret } = getUser() || {}
 
-    instance = new ChatClient()
-    // attach a promise() functions to all event related methods. 
-    // promise() will take the exactly the same arguments as the orginal event method.
-    // however the callback is optional here as promise() will add an interceptor callback anyway.
+    instance = new ChatClient(...args)
     //
-    // Example: use of client.message
-    //     without promise:
-    //          client.messate('hello universe!', (err, arg0, arg1) => console.log({err, arg0, arg1}))
-    //     with promise:
-    //          try {
-    //              const result = await client.message.promise('hello universe!')
-    //          } catch(errMsg) { 
-    //              console.log(errMsg)
-    //          }
-    //
-    Object.keys(instance)
-        .forEach(key => {
-            const func = instance[key]
-            if (!isFn(func) || nonCbs.includes(key)) return
-            func.promise = function () {
-                const args = [...arguments]
-                return new Promise(async (resolve, reject) => {
-                    try {
-                        // last argument must be a callback
-                        let callbackIndex = args.length - 1
-                        const originalCallback = args[callbackIndex]
-                        // if last argument is not a callback increment index to add a new callback
-                        // on page reload callbacks stored by queue service will become null, due to JSON spec
-                        if (!isFn(originalCallback) && originalCallback !== null) callbackIndex++
-                        args[callbackIndex] = (...cbArgs) => {
-                            // first argument indicates whether there is an error.
-                            const err = translateError(cbArgs[0])
-                            isFn(originalCallback) && originalCallback.apply({}, cbArgs)
-                            if (!!err) return reject(err)
-                            const result = cbArgs.slice(1)
-                            // resolver only takes a single argument
-                            // if callback is invoked with more than one value (excluding error message),
-                            // then resolve with an array of value arguments, otherwise, resolve with only the result value.
-                            resolve(result.length > 1 ? result : result[0])
-                        }
-
-                        // functions allowed during maintenace mode
-                        const maintenanceModeKeys = [
-                            'maintenanceMode',
-                            'login'
-                        ]
-                        const doWait = rxIsInMaintenanceMode.value && !maintenanceModeKeys.includes(key)
-                        if (doWait) {
-                            console.info('Waiting for maintenance mode to be deactivated')
-                            await subjectAsPromise(rxIsInMaintenanceMode, false)[0]
-                            console.info('Maintenance mode is now deactivated')
-                        }
-                        const emitted = func.apply(instance, args)
-                        // reject if one or more requests 
-                        if (!emitted) reject(textsCap.invalidRequest)
-                    } catch (err) {
-                        reject(err)
-                    }
-                })
-            }
-        })
+    // Object.keys(instance)
+    //     .forEach(key => promisify(key))
 
     instance.onConnect(async () => {
         const active = await instance.maintenanceMode.promise(null, null)
@@ -138,7 +93,7 @@ export const getClient = () => {
         // auto login on connect to messaging service
         !!id && instance.login
             .promise(id, secret)
-            .then(() => console.log(new Date().toISOString(), 'Logged into messaging service'))
+            .then(() => console.log(new Date().toISOString(), 'Logged into Totem Messaging Service'))
             .catch(console.error)
     })
     instance.onConnectError(() => {
@@ -150,6 +105,53 @@ export const getClient = () => {
         rxIsInMaintenanceMode.next(active)
     })
     return instance
+}
+
+const promisify = (func) => {
+    if (!isFn(func)) return
+
+    const params = getFuncParams(func)
+    // callback function index
+    let cbIndex = params.indexOf('cb')
+    if (cbIndex === -1) cbIndex = params.indexOf('callback')
+    if (cbIndex === -1) cbIndex = params.length - 1 // assume last item is the callback
+
+    return function promise() {
+        const args = [...arguments]
+        return new Promise(async (resolve, reject) => {
+            try {
+                const originalCallback = args[cbIndex]
+                args[cbIndex] = (...cbArgs) => {
+                    // first argument indicates whether there is an error.
+                    const err = translateError(cbArgs[0])
+                    isFn(originalCallback) && originalCallback.apply({}, cbArgs)
+                    if (!!err) return reject(err)
+                    const result = cbArgs.slice(1)
+                    // resolver only takes a single argument
+                    // if callback is invoked with more than one value (excluding error message),
+                    // then resolve with an array of value arguments, otherwise, resolve with only the result value.
+                    resolve(result.length > 1 ? result : result[0])
+                }
+
+                // functions allowed during maintenace mode
+                const maintenanceModeKeys = [
+                    'maintenanceMode',
+                    'login'
+                ]
+                const doWait = rxIsInMaintenanceMode.value && !maintenanceModeKeys.includes(key)
+                if (doWait) {
+                    console.info('Waiting for maintenance mode to be deactivated')
+                    await subjectAsPromise(rxIsInMaintenanceMode, false)[0]
+                    console.info('Maintenance mode is now deactivated')
+                }
+                const emitted = func.apply(instance, args)
+                // reject if one or more requests 
+                if (!emitted) reject(textsCap.invalidRequest)
+            } catch (err) {
+                reject(err)
+            }
+        })
+    }
 }
 
 /**
@@ -179,12 +181,13 @@ export const translateError = err => {
 }
 
 // Make sure to always keep the callback as the last argument
-export class ChatClient {
+class ChatClient {
     constructor(url) {
-        this.url = url || `${window.location.hostname}:${port}`
+        this.url = url || defaultServerURL
+        console.log(this.url)
         socket = ioClient(this.url, {
             transports: ['websocket'],
-            // secure: true,
+            secure: true,
             // rejectUnauthorized: false,
         })
 
@@ -321,7 +324,8 @@ export class ChatClient {
         // @userIds    array: User IDs without '@' sign
         // @message    string: encrypted or plain text message
         // @encrypted  bool: determines whether @message requires decryption
-        this.message = (receiverIds, msg, encrypted, cb) => isFn(cb) && socket.emit('message',
+        this.message = (receiverIds, msg, encrypted, cb) => isFn(cb) && socket.emit(
+            'message',
             receiverIds,
             msg,
             encrypted,
@@ -345,7 +349,11 @@ export class ChatClient {
         // @cb          function: args =>
         //                  @err        string: error message, if any
         //                  @messages   array: most recent messages
-        this.messageGetRecent = (lastMsgTs, cb) => isFn(cb) && socket.emit('message-get-recent', lastMsgTs, cb)
+        this.messageGetRecent = (lastMsgTs, cb) => isFn(cb) && socket.emit(
+            'message-get-recent',
+            lastMsgTs,
+            cb
+        )
 
         // Set group name
         this.messageGroupName = (receiverIds, name, cb) => isFn(cb) && socket.emit('message-group-name',
@@ -581,6 +589,31 @@ export class ChatClient {
             'crowdsale-kyc-publicKey',
             cb,
         )
+
+        // attach a .promise() function to all event related methods. 
+        // promise() will take the exactly the same arguments as the orginal event method.
+        // however the callback is optional here as promise() will add an interceptor callback anyway.
+        //
+        // Example: use of client.message method
+        //     Invoke without promise:
+        //          client.message(
+        //              ['user1'],
+        //              'hello universe!',
+        //              false,
+        //              (...results) => console.log({ ...results })
+        //          )
+        //     Invoke with promise:
+        //          await client
+        //              .message
+        //              .promise(['user1', 'hello universe!', false)
+        //              .then(console.log)
+        //              .catch(console.error)
+        Object.keys(this)
+            .forEach(key => {
+                if (!isFn(this[key]) || nonCbs.includes(key)) return
+                this[key].promise = promisify(this[key])
+            })
+
     }
 
     /**
@@ -624,4 +657,4 @@ export class ChatClient {
             cb(err, data)
         })
 }
-export default getClient()
+// export default {} //getClient()

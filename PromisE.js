@@ -196,20 +196,24 @@ PromisE.timeout = (...args) => {
 }
 
 const getAbortSignal = timeout => {
-    const AbortController = require('abort-controller')
-    const abortCtrl = new AbortController()
+    let abortCtrl
+    try {
+        abortCtrl = new AbortController()
+    } catch (err) {
+        abortCtrl = new require('abort-controller')
+    }
     setTimeout(() => abortCtrl.abort(), timeout)
     return abortCtrl.signal
 }
 const fetcher = async (url, options) => {
-    let fetch2
+    let _fetch
     try {
-        fetch2 = fetch
+        _fetch = fetch
     } catch (_) {
         // required if nodejs
-        fetch2 = require('node-fetch')
+        _fetch = require('node-fetch')
     }
-    fetch2.Promise = PromisE
+    _fetch.Promise = PromisE
 
-    return fetch2(url, options)
+    return _fetch(url, options)
 }
