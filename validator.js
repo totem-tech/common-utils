@@ -223,11 +223,14 @@ export const validate = (value, config, customMessages = {}) => {
                 break
             case 'url':
                 try {
+                    if (!isStr(value)) return errorMsgs.url
+
                     const url = new URL(value)
+                    // Hack to fix comparison failure due to a trailing slash automatically added by `new URL()`
+                    if (url.href.endsWith('/') && !value.endsWith('/')) value += '/'
+
                     // catch any auto-correction by `new URL()`. 
-                    // Eg: spaces in the domain name being replaced by`%20` or missing `/` in protocol being auto added
-                    if (!isStr(value)) return
-                    if (value.endsWith(url.hostname)) value += '/'
+                    // Eg: spaces in the domain name being replaced by`%20` or missing `//` in protocol being auto added
                     if (url.href !== value) return errorMsgs.url
                 } catch (e) {
                     return errorMsgs.url
