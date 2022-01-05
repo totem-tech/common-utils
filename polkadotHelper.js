@@ -1,6 +1,5 @@
 import { ApiPromise, ApiRx, WsProvider } from '@polkadot/api'
-import Keyring from '@polkadot/keyring/'
-import createPair from '@polkadot/keyring/pair'
+import Keyring, { createPair } from '@polkadot/keyring'
 import { bytesToHex } from './convert'
 import {
     isFn, isArr, isDefined, isObj, isStr, isValidNumber,

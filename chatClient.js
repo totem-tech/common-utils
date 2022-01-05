@@ -184,7 +184,6 @@ export const translateError = err => {
 class ChatClient {
     constructor(url) {
         this.url = url || defaultServerURL
-        console.log(this.url)
         socket = ioClient(this.url, {
             transports: ['websocket'],
             secure: true,

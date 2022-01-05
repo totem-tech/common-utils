@@ -3,7 +3,7 @@
  */
 import { BehaviorSubject, Subject } from 'rxjs'
 import PromisE from './PromisE'
-import { hasValue, isDefined, isFn, isSubjectLike, isValidNumber } from './utils'
+import { hasValue, isDefined, isFn, isObj, isSubjectLike, isValidNumber } from './utils'
 
 const useEffect = (...args) => require('react').useEffect(...args)
 const useReducer = (...args) => require('react').useReducer(...args)
