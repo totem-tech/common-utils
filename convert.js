@@ -118,8 +118,6 @@ export const addressToStr = (address, ignoreChecksum, ss58Format) => fallbackIfF
     fallbackIfFails(ss58Decode, [address, ignoreChecksum, ss58Format]) && address || '',
 )
 
-
-
 /**
  * @name    csvToArrr
  * @summary Convert CSV/TSV (Comma/Tab Seprated Value) string to Array
