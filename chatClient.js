@@ -81,13 +81,12 @@ export const getClient = (...args) => {
     // automatically login to messaging service
     const { id, secret } = getUser() || {}
 
+    // create a new instance
     instance = new ChatClient(...args)
-    //
-    // Object.keys(instance)
-    //     .forEach(key => promisify(key))
 
+    // on successful conenction login using user credentials and check if messaging server is in maintenance mode
     instance.onConnect(async () => {
-        const active = await instance.maintenanceMode.promise(null, null)
+        const active = await instance.maintenanceMode.promise()
         rxIsInMaintenanceMode.next(active)
         rxIsConnected.next(true)
         // auto login on connect to messaging service
