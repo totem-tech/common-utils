@@ -234,10 +234,11 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowSubjectU
             }
             if (!isFn(valueModifier)) return setState({ value: newValue })
 
-            PromisE(valueModifier(newValue)).then(newValue => {
-                if (newValue === useRxSubject.IGNORE_UPDATE) return
-                setState({ value: newValue })
-            })
+            PromisE(valueModifier(newValue))
+                .then(newValue => {
+                    if (newValue === useRxSubject.IGNORE_UPDATE) return
+                    setState({ value: newValue })
+                })
         })
         return () => subscribed.unsubscribe()
     }, [])
@@ -255,17 +256,23 @@ useRxSubject.IGNORE_UPDATE = Symbol('ignore-rx-subject-update')
 /**
  * @name    unsubscribe
  * @summary unsubscribe to multiple RxJS subscriptions
- * @param   {Object|Array} subscriptions 
+ * @param   {Object|Array|Function} x 
  */
-export const unsubscribe = (subscriptions = {}) => Object.values(subscriptions)
-    .forEach(x => {
-        try {
-            if (!x) return
-            const fn = isFn(x)
-                ? x
-                : isFn(x.unsubscribe)
-                    ? x.unsubscribe
-                    : null
-            fn && fn()
-        } catch (e) { } // ignore
-    })
+export const unsubscribe = (x = {}) => {
+    if (!x) return
+    if (isFn(x)) return x()
+    if (isFn(x?.unsubscribe)) return x.unsubscribe()
+
+    Object.values(x)
+        .forEach(x => {
+            try {
+                if (!x) return
+                const fn = isFn(x)
+                    ? x
+                    : isFn(x.unsubscribe)
+                        ? x.unsubscribe
+                        : null
+                fn && fn()
+            } catch (e) { } // ignore
+        })
+}
