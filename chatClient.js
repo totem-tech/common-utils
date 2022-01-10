@@ -3,32 +3,27 @@ import ioClient from 'socket.io-client'
 import { translated } from './languageHelper'
 import storage from './storageHelper'
 import { subjectAsPromise } from './reactHelper'
-import { getFuncParams, isFn, isObj, isStr, objWithoutKeys } from './utils'
+import { isAsyncFn, isFn, isInteger, isObj, isStr, isValidNumber, objWithoutKeys } from './utils'
+import PromisE from './PromisE'
 
-const textsCap = translated({
-    invalidRequest: 'invalid request',
-}, true)[1]
-
-let instance, socket, hostname;
+let instance, socket, hostname
+let port = 3001
 const TOTEM_LIVE = 'totem.live'
 try {
     hostname = window.location.hostname
     if (hostname !== 'localhost' && !hostname.endsWith(TOTEM_LIVE)) throw 'use prod'
+    // use 3003 for dev.totem.live otherwise 3001 for production
+    port = hostname === 'dev.totem.live'
+        ? 3003
+        : port
 } catch (err) {
     // use production URL as default where `window` is not available
     // or if not accessed from totem.live
     hostname = TOTEM_LIVE
 }
-// chat server port
-// use 3003 for dev.totem.live otherwise 3001 for production
-const port = hostname === 'dev.totem.live'
-    ? 3003
-    : 3001
 const defaultServerURL = `${hostname}:${port}`
 const MODULE_KEY = 'messaging'
 const PREFIX = 'totem_'
-// include any ChatClient property that is not a function or event that does not have a callback
-const nonCbs = ['isConnected', 'disconnect']
 // read or write to messaging settings storage
 const rw = value => storage.settings.module(MODULE_KEY, value) || {}
 export const rxIsConnected = new BehaviorSubject(false)
@@ -46,13 +41,47 @@ try {
         rw({ user: JSON.parse(oldData) })
     }
 } catch (e) { }
-// remove trollbox chat history items
+// remove legacy trollbox chat history items
 if (rw().history) rw({ history: null })
 //- migrate end
 
-// retrieves user credentails from local storage
-export const getUser = () => rw().user
-export const setUser = (user = {}) => rw({ user })
+
+// Returns a singleton instance of the websocket client
+// Instantiates the client if not already done
+export const getClient = (...args) => {
+    if (instance) return instance
+    // automatically login to messaging service
+    const { id, secret } = getUser() || {}
+
+    // create a new instance
+    instance = new ChatClient(...args)
+
+    // on successful conenction login using user credentials and check if messaging server is in maintenance mode
+    instance.onConnect(async () => {
+        try {
+            window.client = instance
+            console.log('getClient onConnect')
+            const active = await instance.maintenanceMode()
+            rxIsInMaintenanceMode.next(active)
+            rxIsConnected.next(true)
+            // auto login on connect to messaging service
+            !!id && instance.login(id, secret)
+                .then(() => console.log(new Date().toISOString(), 'Logged into Totem Messaging Service'))
+        } catch (err) {
+            console.error(err)
+        }
+    })
+    instance.onConnectError(() => {
+        rxIsConnected.next(false)
+        !!id && rxIsLoggedIn.next(false)
+    })
+    instance.onMaintenanceMode(active => {
+        console.log('onMaintenanceMode', active)
+        rxIsInMaintenanceMode.next(active)
+    })
+    return instance
+}
+
 /**
  * @name    referralCode
  * @summary get/set referral code to LocalStorage
@@ -74,84 +103,48 @@ export const referralCode = code => {
         .referralCode
 }
 
-// Returns a singleton instance of the websocket client
-// Instantiates the client if not already done
-export const getClient = (...args) => {
-    if (instance) return instance
-    // automatically login to messaging service
-    const { id, secret } = getUser() || {}
+/**
+ * @name    setUser
+ * @summary retrieves user credentails from local storage
+ * 
+ * @returns {Object} user
+ */
+export const getUser = () => rw().user
+/**
+ * @name    setUser
+ * @summary saves user credentails from local storage
+ * 
+ * @param   {Object}    user
+ * 
+ * @returns {Object} user
+ */
+export const setUser = (user = {}) => rw({ user })
 
-    // create a new instance
-    instance = new ChatClient(...args)
-
-    // on successful conenction login using user credentials and check if messaging server is in maintenance mode
-    instance.onConnect(async () => {
-        const active = await instance.maintenanceMode.promise()
-        rxIsInMaintenanceMode.next(active)
-        rxIsConnected.next(true)
-        // auto login on connect to messaging service
-        !!id && instance.login
-            .promise(id, secret)
-            .then(() => console.log(new Date().toISOString(), 'Logged into Totem Messaging Service'))
-            .catch(console.error)
-    })
-    instance.onConnectError(() => {
-        rxIsConnected.next(false)
-        !!id && rxIsLoggedIn.next(false)
-    })
-    instance.onMaintenanceMode(active => {
-        console.log('onMaintenanceMode', active)
-        rxIsInMaintenanceMode.next(active)
-    })
-    return instance
-}
-
-const promisify = (func) => {
-    if (!isFn(func)) return
-
-    const params = getFuncParams(func)
-    // callback function index
-    let cbIndex = params.indexOf('cb')
-    if (cbIndex === -1) cbIndex = params.indexOf('callback')
-    if (cbIndex === -1) cbIndex = params.length - 1 // assume last item is the callback
-
-    return function promise() {
-        const args = [...arguments]
-        return new Promise(async (resolve, reject) => {
-            try {
-                const originalCallback = args[cbIndex]
-                args[cbIndex] = (...cbArgs) => {
-                    // first argument indicates whether there is an error.
-                    const err = translateError(cbArgs[0])
-                    isFn(originalCallback) && originalCallback.apply({}, cbArgs)
-                    if (!!err) return reject(err)
-                    const result = cbArgs.slice(1)
-                    // resolver only takes a single argument
-                    // if callback is invoked with more than one value (excluding error message),
-                    // then resolve with an array of value arguments, otherwise, resolve with only the result value.
-                    resolve(result.length > 1 ? result : result[0])
+const emitAsPromise = (event, args = [], resultModifier, onError) =>
+    new Promise((resolve, reject) => {
+        try {
+            const interceptor = async (err, ...result) => {
+                if (!!err) {
+                    err = translateError(err)
+                    if (isFn(onError)) onError(err)
+                    return reject(err)
                 }
 
-                // functions allowed during maintenace mode
-                const maintenanceModeKeys = [
-                    'maintenanceMode',
-                    'login'
-                ]
-                const doWait = rxIsInMaintenanceMode.value && !maintenanceModeKeys.includes(key)
-                if (doWait) {
-                    console.info('Waiting for maintenance mode to be deactivated')
-                    await subjectAsPromise(rxIsInMaintenanceMode, false)[0]
-                    console.info('Maintenance mode is now deactivated')
-                }
-                const emitted = func.apply(instance, args)
-                // reject if one or more requests 
-                if (!emitted) reject(textsCap.invalidRequest)
-            } catch (err) {
-                reject(err)
+                result = result.length > 1
+                    ? result // if multiple values returned from the backend resolve with an array
+                    : result[0] // otherwise resolve with single value
+                if (isFn(resultModifier)) result = await resultModifier(result)
+                resolve(result)
             }
-        })
-    }
-}
+            args = [...args, interceptor]
+            socket.emit(event, ...args)
+        } catch (err) {
+            console.log(`Unexpected error occurd on chatClient.${event}()`, err)
+            err = translateError(`${err}`.replace('Error: ', ''))
+            isFn(onError) && onError(err)
+            reject(err)
+        }
+    })
 
 /**
  * @name    translateInterceptor
@@ -170,7 +163,7 @@ export const translateError = err => {
         return keys.forEach(key => err[key] = translateError(err[key]))
     }
 
-    // translate if there is any error message
+    // translate if there is any labeled error message
     const separator = ' => '
     if (!err.includes(separator)) return translated({ err })[0].err
 
@@ -198,421 +191,438 @@ class ChatClient {
         this.disconnect = () => socket.disconnect()
         this.onError = cb => socket.on('error', cb)
 
-        // add/get company by wallet address
-        //
-        // Params:
-        // @hash       string
-        // @company    object  : if not supplied will return existing company by @identity 
-        //                 required keys:
-        //                       'countryCode',          // 2 letter country code
-        //                       'identity',
-        //                       'name',                 // name of the company
-        //                       'registrationNumber',   // company registration number for the above country
-        // @cb         function: params =>
-        //                 @err    string/null/object : error message or null if success or existing company if @company not supplied
-        this.company = (hash, company, cb) => isFn(cb) && socket.emit('company', hash, company, cb)
-        // search companies
-        //
-        // Params:
-        // @query                   string
-        // @searchParentIdentity    boolean: if false will search for both identity and parentIdentity
-        // @cb                      function: params =>
-        //                              @err    string/null : error message or null if success
-        //                              @result Map         : Map of companies with identity as key
-        this.companySearch = (query, searchParentIdentity, cb) => isFn(cb) && socket.emit('company-search',
-            query,
-            searchParentIdentity,
-            (err, result) => cb(err, new Map(result)),
-        )
+        // Request funds : deprecated
+        // this.faucetRequest = (address, cb) => isFn(cb) && socket.emit('faucet-request', address, cb)
 
-        // Get list of all countries
-        //
-        // Params:
-        // @hash    string: hash generated by the Map of existing countries to compare with the ones stored on the server
-        // @cb      function
-        this.countries = (hash, cb) => isFn(cb) && socket.emit('countries',
-            hash,
-            (err, countries) => cb(err, new Map(countries)),
-        )
+        // /**
+        //  * @name    crowdsaleCheckDeposits
+        //  * @summary check and retrieve user's crowdsale deposits
+        //  *
+        //  * @param {Function}    cb  callback function arguments:
+        //  *                          @err        string: if request failed
+        //  *                          @result     object:
+        //  *                              @result.deposits    object: deposit amounts for each allocated addresses
+        //  *                              @result.lastChecked string: timestamp of last checked
+        //  *
+        //  */
+        // this.crowdsaleCheckDeposits = (cached = true, cb) => isFn(cb) && socket.emit(
+        //     'crowdsale-check-deposits',
+        //     cached,
+        //     cb,
+        // )
 
-        // Currency conversion
-        //
-        // Params:
-        // @from    string: source currency ID
-        // @to      string: target currency ID
-        // @amount  number: amount in source currency
-        // @cb      function: args:
-        //              @err                string: message in case of error. Otherwise, null.
-        //              @convertedAmount    number: amount in target currency
-        this.currencyConvert = (from, to, amount, cb) => isFn(cb) && socket.emit('currency-convert',
-            from,
-            to,
-            amount,
-            cb,
-        )
+        // /**
+        //  * @name    crowdsaleConstants
+        //  * @summary retrieve crowdsale related constants for use with calcuation of allocation and multiplier levels
+        //  *
+        //  * @param {Function}    cb  callback function arguments:
+        //  *                          @err        string: if request failed
+        //  *                          @result     object:
+        //  *                              @result.Level_NEGOTIATE_Entry_USD   Number: amount in USD for negotiation
+        //  *                              @result.LEVEL_MULTIPLIERS   Array: multipliers for each level
+        //  *                              @result.LEVEL_ENTRY_USD     Array: minimum deposit amount in USD for each level
+        //  */
+        // this.crowdsaleConstants = cb => isFn(cb) && socket.emit(
+        //     'crowdsale-constants',
+        //     cb,
+        // )
+        // /**
+        //  * @name    crowdsaleDAA
+        //  * @summary request new or retrieve exisitng deposit address
+        //  *
+        //  * @param   {String}    blockchain  ticker of the Blockchain to request/retrieve address of
+        //  * @param   {String}    ethAddress  use `0x0` to retrieve existing address.
+        //  *                                  If the @blockchain is `ETH`, user's Ethereum address for whitelisting.
+        //  *                                  Otherwise, leave an empty string.
+        //  * @param   {Function}  cb          callback function arguments:
+        //  *                                  @err     string: if request failed
+        //  *                                  @address string: deposit address
+        //  */
+        // this.crowdsaleDAA = (blockchain, ethAddress, cb) => isFn(cb) && socket.emit(
+        //     'crowdsale-daa',
+        //     blockchain,
+        //     ethAddress,
+        //     cb,
+        // )
 
-        // Get a list of all supported currencies
-        // 
-        // Params:
-        // @tickersHash string: (optional) hash generated using the sorted array of currency tickers
-        // @calblack    function: args =>
-        //                  @err    string: message in case of error. Otherwise, null.
-        //                  @list   map: list of all currenies (objects)
-        this.currencyList = (hash, cb) => isFn(cb) && socket.emit('currency-list', hash, cb)
+        // /**
+        //  * @name    crowdsaleKYC
+        //  * @summary register for crowdsale or check if already registered
+        //  *
+        //  * @param   {Object|Boolean}    kycData use `true` to check if user already registered.
+        //  *                                      Required object properties:
+        //  *                                      @email      string
+        //  *                                      @familyName string
+        //  *                                      @givenName  string
+        //  *                                      @identity   string
+        //  *                                      @location   object
+        //  * @param   {Function}          cb      arguments:
+        //  *                                      @err        string
+        //  *                                      @publicKey  string
+        //  */
+        // this.crowdsaleKYC = (kycData, cb) => isFn(cb) && socket.emit(
+        //     'crowdsale-kyc',
+        //     kycData,
+        //     cb,
+        // )
 
-        this.currencyPricesByDate = (date, currencyIds, cb) => isFn(cb) && socket.emit('currency-prices-by-date',
-            date,
-            currencyIds,
-            cb,
-        )
+        // /**
+        //  * @name    crowdsaleKYCPublicKey
+        //  * @summary get Totem Live Association's encryption public key
+        //  *
+        //  * @param   {Function}          cb      arguments:
+        //  *                                      @err        string
+        //  *                                      @publicKey  string
+        //  */
+        // this.crowdsaleKYCPublicKey = cb => isFn(cb) && socket.emit(
+        //     'crowdsale-kyc-publicKey',
+        //     cb,
+        // )
 
-        // Request funds
-        this.faucetRequest = (address, cb) => isFn(cb) && socket.emit('faucet-request', address, cb)
+        // add support for legacy `.promise`
+        Object
+            .keys(this)
+            .forEach(key => {
+                const func = this[key]
 
-        // Check if User ID Exists
-        this.idExists = (userId, cb) => isFn(cb) && socket.emit('id-exists', userId, cb)
+                if (!isAsyncFn(func)) return
+            })
 
-        // Check if User ID Exists
-        this.isUserOnline = (userId, cb) => isFn(cb) && socket.emit('is-user-online', userId, cb)
+        // converts callback based emits to promise
+        this.emitter = PromisE.getSocketEmitter(socket, 15000, 0, null)
+    }
 
-        this.glAccounts = (accountNumbers, cb) => isFn(cb) && socket.emit('gl-accounts', accountNumbers, cb)
+    /**
+     * @name    company
+     * @summary fetch or create a company
+     * 
+     * @param   {String} id                         ID (AKA hash) of the company entry
+     * @param   {Object} company                    if falsy, will retrieve company by id 
+     * @param   {String} company.countryCode        2 letter country code
+     * @param   {String} company.identity           blockchain identity of the company
+     * @param   {String} company.name               name of the company
+     * @param   {String} company.registrationNumber company registration number for the above countryntry
+     * 
+     * @returns {Object} company
+     */
+    company = async (hash, company) => await this.emitter('company', [hash, company])
 
-        // FOR BUILD MODE ONLY
-        // Retrieve a list of error messages used in the messaging service
-        //
-        // Params:
-        // @cb      function: args => 
-        //                  @err        string: error message if request fails
-        //                  @messages   array
-        this.languageErrorMessages = cb => isFn(cb) && socket.emit('language-error-messages', cb)
+    /**
+     * @name    companySearch
+     * @summary search companies
+     *
+     * @param   {String}    query
+     * @param   {Boolean}   searchParentIdentity if false will search for both identity and parentIdentity
+     *  
+     * @returns {Map}
+     */
+    companySearch = (query, searchParentIdentity) => this.emitter(
+        'company-search',
+        [query, searchParentIdentity],
+        // convert 2D array back to Map
+        result => new Map(result),
+    )
 
-        // retrieve a list of translated application texts for a specific language
-        //
-        // Params: 
-        // @langCode    string: 2 digit language code
-        // @hash        string: (optional) hash of client's existing translated texts' array to compare whether update is required.
-        // @cb          function: arguments =>
-        //              @error  string/null: error message, if any. Null indicates no error.
-        //              @list   array/null: list of translated texts. Null indicates no update required.
-        this.languageTranslations = (langCode, hash, cb) => isFn(cb) && socket.emit('language-translations',
-            langCode,
-            hash,
-            cb,
-        )
+    /**
+     * @name    countries
+     * @summary fetch/update a list of all countries
+     * 
+     * @param   {String}    hash    hash of the cached list (sorted) of countries. 
+     *                              If supplied hash matches the server's latest list hash, result will be empty.
+     * 
+     * @returns {Map}
+     */
+    countries = hash => this.emitter(
+        'countries',
+        [hash],
+        countries => new Map(countries),
+    )
 
-        /**
-         * @name    maintenanceMode
-         * @summary check/enable/disable maintenance mode. Only admin users will be able change mode.
-         * 
-         * @param   {Boolean}     active
-         * @param   {Function}    cb 
-         */
-        this.maintenanceMode = (active, cb) => isFn(cb) && socket.emit(eventMaintenanceMode, active, cb)
-        /**
-         * @name    onMaintenanceMode
-         * @summary event received whenever messaging service is in/out of maintenance mode
-         * 
-         * @param   {Function} cb args: @active Boolean
-         */
-        this.onMaintenanceMode = cb => socket.on(eventMaintenanceMode, cb)
+    /**
+     * @name    currencyConvert
+     * @summary convert an amount from one currency to another
+     * 
+     * @param   {String}    from    source currency ID
+     * @param   {String}    to      target currency ID
+     * @param   {Number}    amount  amount to convert
+     * 
+     * @returns {Number}
+     */
+    currencyConvert = async (from, to, amount) => await this.emitter(
+        'currency-convert',
+        [from, to, amount]
+    )
 
-        // Send chat messages
-        //
-        // Params:
-        // @userIds    array: User IDs without '@' sign
-        // @message    string: encrypted or plain text message
-        // @encrypted  bool: determines whether @message requires decryption
-        this.message = (receiverIds, msg, encrypted, cb) => isFn(cb) && socket.emit(
-            'message',
-            receiverIds,
-            msg,
-            encrypted,
-            cb,
-        )
-        // receive chat messages
-        //
-        // 
-        // Params:
-        // @cb  function: callback arguments => 
-        //          @senderId       string: 
-        //          @receiverIds    array: User IDs without '@' sign
-        //          @message        string: encrypted or plain text message
-        //          @encrypted      bool: determines whether @message requires decryption
-        this.onMessage = cb => isFn(cb) && socket.on('message', cb)
+    /**
+     * @name    currencyList
+     * @summary fetch/update a list of all countries
+     * 
+     * @param   {String} hash   hash of the local cached list of countries.
+     *                          If server's version of the hash mathes this, 
+     *                          it indicates local cache is uppdated and
+     *                          an empty result will be returned.
+     * @returns {Map}
+     */
+    currencyList = async (hash) => await this.emitter('currency-list', [hash])
 
-        // Send chat messages
-        //
-        // Params:
-        // @lastMsgTs   string: timestamp of most recent message sent/received
-        // @cb          function: args =>
-        //                  @err        string: error message, if any
-        //                  @messages   array: most recent messages
-        this.messageGetRecent = (lastMsgTs, cb) => isFn(cb) && socket.emit(
-            'message-get-recent',
-            lastMsgTs,
-            cb
-        )
+    /**
+     * @name    currencyPricesByDate
+     * @summary fetch price of currencies on a specific date
+     * 
+     * @param   {String}    date
+     * @param   {Array}     currencyIds 
+     * 
+     * @returns {Array}
+     */
+    currencyPricesByDate = async (date, currencyIds) => await this.emitter(
+        'currency-prices-by-date',
+        [date, currencyIds]
+    )
 
-        // Set group name
-        this.messageGroupName = (receiverIds, name, cb) => isFn(cb) && socket.emit('message-group-name',
-            receiverIds,
-            name,
-            cb,
-        )
+    /**
+     * @name    idExists
+     * @summary Check if User ID Exists
+     * 
+     * @returns {Boolean}
+     */
+    idExists = async (userId) => await this.emitter('id-exists', [userId])
 
-        /**
-         * @name    newsletterSignup
-         * @summary sign up to newsletter and updates
-         * 
-         * @param   {Object}    values required fields: name and email
-         * @param   {Function}  cb
-         */
-        this.newsletterSignup = (values, cb) => isFn(cb) && socket.emit('newsletter-signup', values, cb)
+    /**
+     * @name    isUserOnline
+     * @summary Check if User is online
+     * 
+     * @returns {Boolean}
+     */
+    isUserOnline = async (userId) => await this.emitter('is-user-online', [userId])
 
-        // Send notification
-        //
-        // Params:
-        // @toUserIds   array    : receiver User ID(s)
-        // @type        string   : parent notification type. Eg: timeKeeping
-        // @childType   string   : child notification type. Eg: invitation
-        // @message     string   : message to be displayed (unless custom message required). can be encrypted later on
-        // @data        object   : information specific to the type of notification
-        // @cb          function : callback function
-        //                         Params:
-        //                         @err string: error message if failed or rejected
-        this.notify = (toUserIds, type, childType, message, data, cb) => isFn(cb) && socket.emit('notification',
+    /**
+     * @name    glAccounts
+     * @summary fetch global ledger accounts by account number
+     * 
+     * @param   {Array} accountNumbers
+     * 
+     * @returns {*}
+     */
+    glAccounts = async (accountNumbers) => await this.emitter('gl-accounts', [accountNumbers])
+
+    /**
+     * @name    languageErrorMessages
+     * @summary Retrieve a list of error messages used in the messaging service. FOR BUILD MODE ONLY.
+     * @returns 
+     */
+    languageErrorMessages = async () => await this.emitter('language-error-messages', [])
+
+    /**
+     * @name    languageTranslations
+     * @summary retrieve a list of translated application texts for a specific language
+     * 
+     * @param   {String} langCode   2 digit language code
+     * @param   {String} hash       (optional) hash cached translated texts' array.
+     *                              If matches with servers hash, will return empty result.
+     * 
+     * @returns {Array}
+     */
+    languageTranslations = async (langCode, hash) => await this.emitter(
+        'language-translations',
+        [langCode, hash],
+    )
+
+    /**
+     * @name    login
+     * @summary user login
+     * 
+     * @param   {String} id 
+     * @param   {String} secret
+     *  
+     * @returns {Object} data. Eg: roles etc.
+     */
+    login = (id, secret) => this.emitter(
+        'login',
+        [id, secret],
+        async (data) => {
+            // store user roles etc data sent from server
+            setUser({ ...getUser(), ...data })
+            // wait until maintenance mode is turned off
+            rxIsInMaintenanceMode.value && await subjectAsPromise(rxIsInMaintenanceMode, false)
+            rxIsLoggedIn.next(true)
+        },
+        err => console.log('Login failed', err)
+    )
+
+    /**
+     * @name    maintenanceMode
+     * @summary check/enable/disable maintenance mode. Only admin users will be able change mode.
+     * 
+     * @param   {Boolean}     active
+     * @param   {Function}    cb 
+     */
+    maintenanceMode = async (active) => await this.emitter(eventMaintenanceMode, [active])
+
+    /**
+     * @name    onMaintenanceMode
+     * @summary listen for server maintenance status changes
+     * 
+     * @param   {Function} cb args: @active Boolean
+     */
+    onMaintenanceMode = cb => isFn(cb) && socket.on(eventMaintenanceMode, cb)
+
+    /**
+     * @name   message
+     * @summary Send chat messages
+     *
+     * @param  {Array}     userIds    User IDs without '@' sign
+     * @param  {String}    message    encrypted or plain text message
+     * @param  {Bool}      encrypted  determines whether `message` requires decryption. 
+     *                                (Encryption to be implemented)
+     * 
+     * @returns {*}
+     */
+    message = async (receiverIds, msg, encrypted) => await this.emitter(
+        'message',
+        [receiverIds, msg, encrypted],
+    )
+
+    /**
+     * @name    onMessage
+     * @summary listen for new chat messages
+     * 
+     * @param   {Function} cb callback arguments => 
+     *                          senderId    {String}  : curent user's ID
+     *                          receiverIds {Array}   : User IDs without '@' sign
+     *                          message     {String}  : encrypted or plain text message
+     *                          encrypted   {Bool}    : determines whether @message requires decryption
+     */
+    onMessage = cb => isFn(cb) && socket.on('message', cb)
+
+    /**
+     * @name    messageGetRecent
+     * @summary fetch recent chat messages
+     * 
+     * @param   {String}    lastMsgTs   most recent previous message's timestamp
+     * 
+     * @returns {Array} messages
+     */
+    messageGetRecent = async (lastMsgTs) => await this.emitter(
+        'message-get-recent',
+        [lastMsgTs],
+    )
+
+    /**
+     * @name    messageGroupName
+     * @summary set name of a group chat
+     * 
+     * @param   {Array}     receiverIds list of all user IDs belonging to the group
+     * @param   {String}    name        new group name
+     * 
+     * @returns {*}
+     */
+    messageGroupName = async (receiverIds, name) => await this.emitter(
+        'message-group-name',
+        [receiverIds, name],
+    )
+
+    /**
+     * @name    newsletterSignup
+     * @summary sign up to newsletter and updates
+     * 
+     * @param   {Object}    values required fields: name and email
+     * @param   {Function}  cb
+     */
+    newsletterSignup = async (values) => await this.emitter('newsletter-signup', [values])
+
+    /**
+     * @name    notify
+     * @summary Send notification
+     * 
+     * @param   {Array}   toUserIds   receiver User ID(s)
+     * @param   {String}  type        parent notification type. Eg: timeKeeping
+     * @param   {String}  childType   child notification type. Eg: invitation
+     * @param   {String}  message     message to be displayed
+     * @param   {Object}  data        information specific to the type of notification
+     * 
+     * @returns {*}
+     */
+    notify = async (toUserIds, type, childType, message, data) => await this.emitter(
+        'notification',
+        [
             toUserIds,
             type,
             childType,
             message,
             data,
-            cb,
-        )
-        // Receive notification. 
-        //
-        // Params:
-        // @cb function: callback function
-        //          Arguments:
-        //          @id         string: notification ID
-        //          @senderId   string: sender user ID
-        //          @type       string: parent notification type
-        //          @childType  string: child notification type
-        //          @message    string: notification message
-        //          @data       object: information specific to the notification @type and @childType
-        //          @tsCreated  date: notification creation timestamp
-        //          @cbConfirm  function: a function to confirm receipt
-        this.onNotify = cb => isFn(cb) && socket.on('notification', cb)
-        this.notificationGetRecent = (ts, cb) => isFn(cb) && socket.emit(
-            'notification-get-recent',
-            ts,
-            (err, result) => cb(err, new Map(result))
-        )
-        // Mark notification as read or deleted
-        //
-        // Params:
-        // @id      string: Notification ID
-        // @read    boolean: marks as read or unread
-        // @deleted boolean: marks as deleted or undeleted
-        // @cb      function: callback args =>
-        //              @err    string: error message, if any
-        //              @
-        this.notificationSetStatus = (id, read, deleted, cb) => isFn(cb) && socket.emit(
-            'notification-set-status',
-            id,
-            read,
-            deleted,
-            cb
-        )
+        ],
+    )
+    /**
+     * @name    onNotify
+     * @summary listen for new notification
+     * 
+     * @param   {Function} cb   callback arguments:
+     *                          - id         string     : notification ID
+     *                          - senderId   string     : sender user ID
+     *                          - type       string     : parent notification type
+     *                          - childType  string     : child notification type
+     *                          - message    string     : notification message
+     *                          - data       object     : extra info specific to `type` and `childType`
+     *                          - tsCreated  date       : notification creation timestamp
+     *                          - cbConfirm  function   : a function to confirm receipt
+     */
+    onNotify = cb => isFn(cb) && socket.on('notification', cb)
 
-        /**
-         * @name    project
-         * @summary add/get/update project
-         *
-         * 
-         * @param {String}   projectId   Project ID
-         * @param {Object}   project
-         * @param {Boolean}  create      whether to create or update project
-         * @param {Function} cb          
-         */
-        this.project = (projectId, project, create, cb) => socket.emit('project',
-            projectId,
-            project,
-            create,
-            cb,
-        )
-        // retrieve projects by an array of hashes
-        this.projectsByHashes = (projectIds, cb) => isFn(cb) && socket.emit(
-            'projects-by-hashes',
-            projectIds,
-            (err, res, notFoundHashes) => cb(err, new Map(res), notFoundHashes),
-        )
+    /**
+     * @name    notificationGetRecent
+     * @summary retrieve a list of recent notification
+     * 
+     * @param   {String}    tsLast  (optional) timestamp of the most recent previously received notification
+     * 
+     * @returns {Map}
+     */
+    notificationGetRecent = async (ts) => await this.emitter(
+        'notification-get-recent',
+        [ts],
+        result => new Map(result),
+    )
 
-        /**
-         * @name    rewardsClaim
-         * @summary retrieves a verificaiton
-         * 
-         * @param   {String}    platform    social media platform name. Eg: twitter
-         * @param   {String}    handle      user's social media handle/username
-         * @param   {String}    postId      social media post ID
-         * @param   {Function}  cb          Callback function expected arguments:
-         *                                  @err    String: error message if query failed
-         *                                  @code   String: hex string
-         */
-        this.rewardsClaim = (platform, handle, postId, cb) => isFn(cb) && socket.emit(
-            'rewards-claim',
-            platform,
-            handle,
-            postId,
-            cb
-        )
+    /**
+     * @name    notificationSetStatus
+     * @summary Mark notification as read or deleted
+     * 
+     * @param   {String}    id      Notification ID
+     * @param   {Boolean}   read    marks as read or unread. Optional if `deleted = true`
+     * @param   {Boolean}   deleted (optional) marks as deleted or undeleted
+     */
+    notificationSetStatus = async (id, read, deleted) => await this.emitter(
+        'notification-set-status',
+        [id, read, deleted],
+    )
 
-        /**
-         * @name    rewardsGetData
-         * @summary retrieves all received rewards by the user
-         *
-         * @param   {Function}  cb  Callback function expected arguments:
-         *                          @err     String: error message if query failed
-         *                          @rewards Object:
-         */
-        this.rewardsGetData = cb => isFn(cb) && socket.emit('rewards-get-data', cb)
+    /**
+     * @name    project
+     * @summary add/get/update project
+     *
+     * 
+     * @param {String}   projectId   Project ID
+     * @param {Object}   project
+     * @param {Boolean}  create      whether to create or update project
+     * @param {Function} cb          
+     */
+    project = async (projectId, project, create) => await this.emitter(
+        'project',
+        [projectId, project, create],
+    )
 
-        /**
-         * @name task
-         * @summary add/update task details to messaging service
-         * 
-         * @param {String}      id ID of the task
-         * @param {Object}      task 
-         * @param {String}      ownerAddress
-         * @param {Function}    cb callback function expected arguments:
-         *                  @err    String: error message if query failed
-         */
-        this.task = (id, task, ownerAddress, cb) => isFn(cb) && socket.emit('task', id, task, ownerAddress, cb)
-
-        /**
-         * @name    taskGetById
-         * @summary retrieve a list of tasks details by Task IDs
-         * 
-         * @param   {String|Array}  ids single or array of Task IDs
-         * @param   {Function}      cb Callback function expected arguments:
-         *                      @err    String: error message if query failed
-         *                      @result Map: list of tasks with details
-         */
-        this.taskGetById = (ids, cb) => isFn(cb) && socket.emit(
-            'task-get-by-id',
-            ids,
-            (err, result) => cb(err, new Map(result)),
-        )
-
-        /**
-         * @name    crowdsaleCheckDeposits
-         * @summary check and retrieve user's crowdsale deposits
-         * 
-         * @param {Function}    cb  callback function arguments:
-         *                          @err        string: if request failed
-         *                          @result     object: 
-         *                              @result.deposits    object: deposit amounts for each allocated addresses
-         *                              @result.lastChecked string: timestamp of last checked
-         * 
-         */
-        this.crowdsaleCheckDeposits = (cached = true, cb) => isFn(cb) && socket.emit(
-            'crowdsale-check-deposits',
-            cached,
-            cb,
-        )
-
-        /**
-         * @name    crowdsaleConstants
-         * @summary retrieve crowdsale related constants for use with calcuation of allocation and multiplier levels
-         * 
-         * @param {Function}    cb  callback function arguments:
-         *                          @err        string: if request failed
-         *                          @result     object:
-         *                              @result.Level_NEGOTIATE_Entry_USD   Number: amount in USD for negotiation
-         *                              @result.LEVEL_MULTIPLIERS   Array: multipliers for each level
-         *                              @result.LEVEL_ENTRY_USD     Array: minimum deposit amount in USD for each level 
-         */
-        this.crowdsaleConstants = cb => isFn(cb) && socket.emit(
-            'crowdsale-constants',
-            cb,
-        )
-        /**
-         * @name    crowdsaleDAA
-         * @summary request new or retrieve exisitng deposit address
-         * 
-         * @param   {String}    blockchain  ticker of the Blockchain to request/retrieve address of
-         * @param   {String}    ethAddress  use `0x0` to retrieve existing address.
-         *                                  If the @blockchain is `ETH`, user's Ethereum address for whitelisting.
-         *                                  Otherwise, leave an empty string.
-         * @param   {Function}  cb          callback function arguments:
-         *                                  @err     string: if request failed
-         *                                  @address string: deposit address
-         */
-        this.crowdsaleDAA = (blockchain, ethAddress, cb) => isFn(cb) && socket.emit(
-            'crowdsale-daa',
-            blockchain,
-            ethAddress,
-            cb,
-        )
-
-        /**
-         * @name    crowdsaleKYC
-         * @summary register for crowdsale or check if already registered
-         * 
-         * @param   {Object|Boolean}    kycData use `true` to check if user already registered.
-         *                                      Required object properties:
-         *                                      @email      string
-         *                                      @familyName string
-         *                                      @givenName  string
-         *                                      @identity   string
-         *                                      @location   object
-         * @param   {Function}          cb      arguments:
-         *                                      @err        string
-         *                                      @publicKey  string
-         */
-        this.crowdsaleKYC = (kycData, cb) => isFn(cb) && socket.emit(
-            'crowdsale-kyc',
-            kycData,
-            cb,
-        )
-
-        /**
-         * @name    crowdsaleKYCPublicKey
-         * @summary get Totem Live Association's encryption public key
-         * 
-         * @param   {Function}          cb      arguments:
-         *                                      @err        string
-         *                                      @publicKey  string
-         */
-        this.crowdsaleKYCPublicKey = cb => isFn(cb) && socket.emit(
-            'crowdsale-kyc-publicKey',
-            cb,
-        )
-
-        // attach a .promise() function to all event related methods. 
-        // promise() will take the exactly the same arguments as the orginal event method.
-        // however the callback is optional here as promise() will add an interceptor callback anyway.
-        //
-        // Example: use of client.message method
-        //     Invoke without promise:
-        //          client.message(
-        //              ['user1'],
-        //              'hello universe!',
-        //              false,
-        //              (...results) => console.log({ ...results })
-        //          )
-        //     Invoke with promise:
-        //          await client
-        //              .message
-        //              .promise(['user1', 'hello universe!', false)
-        //              .then(console.log)
-        //              .catch(console.error)
-        Object.keys(this)
-            .forEach(key => {
-                if (!isFn(this[key]) || nonCbs.includes(key)) return
-                this[key].promise = promisify(this[key])
-            })
-
-    }
+    /**
+     * @name    projectsByHashes
+     * @summary retrieve projects by an IDs (AKA hashes)
+     * 
+     * @param   {Array} projectIds
+     * 
+     * @returns {Array} [projects, notFoundIds]
+     */
+    projectsByHashes = async (projectIds) => await this.emitter(
+        'projects-by-hashes',
+        [projectIds],
+        ([projects, notFoundIds]) => [new Map(projects), notFoundIds],
+    )
 
     /**
      * @name    register
@@ -624,35 +634,73 @@ class ChatClient {
      * @param   {String}    referredBy  (optional) referrer user ID
      * @param   {Function}  cb 
      */
-    register = (id, secret, address, referredBy, cb) => isFn(cb) && socket.emit('register',
-        id,
-        secret,
-        address,
-        referredBy,
-        err => {
-            if (!err) {
-                setUser({ id, secret })
-                rxIsLoggedIn.next(true)
-                rxIsRegistered.next(true)
-            }
-            cb(err)
+    register = (id, secret, address, referredBy) => this.emitter(
+        'register',
+        [
+            id,
+            secret,
+            address,
+            referredBy,
+        ],
+        () => {
+            setUser({ id, secret })
+            rxIsLoggedIn.next(true)
+            rxIsRegistered.next(true)
         },
     )
 
-    login = (id, secret, cb) => isFn(cb) && socket.emit('login',
-        id,
-        secret,
-        async (err, data) => {
-            const isLoggedIn = !err
-            // store user roles etc data sent from server
-            isLoggedIn && setUser({ ...getUser(), ...data })
+    /**
+     * @name    rewardsClaim
+     * @summary retrieves a verificaiton
+     * 
+     * @param   {String}    platform    social media platform name. Eg: twitter
+     * @param   {String}    handle      user's social media handle/username
+     * @param   {String}    postId      social media post ID
+     * @param   {Function}  cb          Callback function expected arguments:
+     *                                  @err    String: error message if query failed
+     *                                  @code   String: hex string
+     */
+    rewardsClaim = async (platform, handle, postId) => await this.emitter(
+        'rewards-claim',
+        [platform, handle, postId],
+    )
 
-            // wait until maintenance mode is turned off
-            rxIsInMaintenanceMode.value && await subjectAsPromise(rxIsInMaintenanceMode, false)
+    /**
+     * @name    rewardsGetData
+     * @summary retrieves all received rewards by the user
+     * 
+     * @returns {Object}    rewards data
+     */
+    rewardsGetData = async () => await this.emitter('rewards-get-data')
 
-            if (isLoggedIn !== rxIsLoggedIn.value) rxIsLoggedIn.next(isLoggedIn)
-            err && console.log('Login failed', err)
-            cb(err, data)
-        })
+    /**
+     * @name task
+     * @summary add/update task details to messaging service
+     * 
+     * @param {String}      id              ID of the task
+     * @param {Object}      task            
+     * @param {String}      ownerAddress    identity that created the task
+     */
+    task = async (id, task, ownerAddress) => await this.emitter(
+        'task',
+        [id, task, ownerAddress],
+    )
+
+    /**
+     * @name    taskGetById
+     * @summary retrieve a list of tasks details' (off-chain data) by Task IDs
+     * 
+     * @param   {String|Array}  ids single or array of Task IDs
+     * @param   {Function}      cb Callback function expected arguments:
+     *                      @err    String: error message if query failed
+     *                      @result Map: list of tasks with details
+     * 
+     * @returns {Map} list of task details'
+     */
+    taskGetById = async (ids) => await this.emitter(
+        'task-get-by-id',
+        [ids],
+        result => new Map(result),
+    )
 }
 // export default {} //getClient()

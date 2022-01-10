@@ -165,6 +165,7 @@ export const isFn = x => typeof x === 'function'
 export const isHash = x => HASH_REGEX.test(`${x}`)
 export const isHex = x => HEX_REGEX.test(`${x}`)
 export const isInteger = x => Number.isInteger(x)
+export const isPositiveInteger = x => isInteger(x) && x > 0
 export const isMap = x => x instanceof Map
 export const isNodeJS = () => {
 	try {

@@ -1,4 +1,4 @@
-import { isAsyncFn, isPromise, isFn, isObj, isInteger } from "./utils"
+import { isAsyncFn, isPromise, isFn, isObj, isInteger, isValidNumber, isPositiveInteger } from "./utils"
 /*
  * List of optional node-modules and the functions used by them:
  * Module Name          : Function Name
@@ -117,10 +117,97 @@ PromisE.deferred = () => {
  * @summary simply a setTimeout as a promise
  * 
  * @param   {Number} delay
+ * @param   {*}      result (optional) specify a value to resolve with.
+ *                          Default: the value of delay
  * 
  * @returns {PromisE}
  */
-PromisE.delay = delay => PromisE(resolve => setTimeout(resolve, delay))
+PromisE.delay = (delay, result = delay) => new PromisE(resolve =>
+    setTimeout(() => resolve(result), delay)
+)
+
+/**
+ * @name    PromisE.emitAsPromise
+ * @summary a wrapper function for socket.io emitter to eliminate the need to use callbacks. 
+ * 
+ * @param   {Object} socket         'socket.io-client' client instance.
+ * @param   {Number} timeoutGlobal  (optional) default timeout for all events emitted using the returned callback
+ * @param   {Number} errorArgIndex  (optional) index of the callback argument that contains server error message.
+ *                                  Use non-integer value to indicate that error message will not be provided
+ *                                  as a direct argument by server. Eg: error message is a property of an object. 
+ *                                  In that case, error should be thrown manually inside the `resultModifier` function.
+ *                                  Default: `0` (this assumes that emitted message will resolve)
+ *  
+ * @param   {Number} callbackIndex  (optional) index of the emitter parameter that is expected to be a callback
+ *                                  Default: `null` (callback will be place at the end of `args` array)
+ * 
+ * @returns {Function}  callback function when invoked returns a promise
+ *                      Callback Arguments:
+ *                      - evenName       String: 
+ *                      - args           Array:
+ *                      - resultModifier Function:
+ *                      - onError        Function
+ *                      - timemoutLocal  Number:  overrides `timeoutGlobal`
+ * 
+ * @example Example 1: A simple message sent to the socket server with 15 seconds timeout
+ * ```javascript
+ * const socket = require('socket.io-client')(....)
+ * const emitter = PromisE.getSocketEmitter(socket, 15000, 0)
+ * const result = await emitter('message', ['Hello world'])
+ * ```
+ * 
+ * @example Example 2: Handle time out
+ * ```javascript
+ * const resultPromise = emitter('message', ['Hello world'])
+ * resultPromise.catch(err => {
+ *     if (resultPromise.timeout) alert('Request is taking longer than expected')
+ *      resultPromise
+ *          .promise
+ *          .then(result => alert('Finally, got the result!'))
+ * })
+ * ```
+ */
+PromisE.getSocketEmitter = (socket, timeoutGlobal, errorArgIndex = 0, callbackIndex = null) => {
+    return (eventName, args = [], resultModifier, onError, timeoutLocal) => {
+        const timeout = isPositiveInteger(timeoutLocal)
+            ? timeoutLocal
+            : timeoutGlobal
+        const promise = new Promise((resolve, reject) => {
+            try {
+                const interceptor = async (...result) => {
+                    const err = isInteger(errorArgIndex) && result.splice(errorArgIndex, 1)
+                    if (!!err) {
+                        if (isFn(onError)) onError(err)
+                        return reject(err)
+                    }
+
+                    result = result.length > 1
+                        ? result // if multiple values returned from the backend resolve with an array
+                        : result[0] // otherwise resolve with single value
+                    if (isFn(resultModifier)) result = await resultModifier(result)
+                    resolve(result)
+                }
+                if (callbackIndex === null) {
+                    // last item is the callback 
+                    args = [...args, interceptor]
+                } else if (isFn(args[callbackIndex])) {
+                    // replace exising callback
+                    args[callbackIndex] = interceptor
+                } else {
+                    // inject the callback at specific index
+                    args.splice(callbackIndex, 0, interceptor)
+                }
+                socket.emit(eventName, ...args)
+            } catch (err) {
+                isFn(onError) && onError(err)
+                reject(err)
+            }
+        })
+        if (!isPositiveInteger(timeout)) return promise
+
+        return PromisE.timeout(timeout, promise)
+    }
+}
 
 // if timed out err.name will be 'AbortError''
 PromisE.fetch = async (url, options, timeout, asJson = true) => {
@@ -134,7 +221,7 @@ PromisE.fetch = async (url, options, timeout, asJson = true) => {
             ? await result.json()
             : result
     } catch (err) {
-        if (err.name === 'AbortError') throw 'Request timed out'
+        if (err.name === 'AbortError') throw new Error('Request timed out')
         throw err
     }
 }
@@ -147,49 +234,56 @@ PromisE.fetch = async (url, options, timeout, asJson = true) => {
  * 
  * @returns {PromisE}
  */
-PromisE.race = (...promises) => PromisE(Promise.race(promises))
+PromisE.race = (...promises) => PromisE(Promise.race(promises.flat()))
 
 /**
  * @name    PromisE.timeout
  * @summary times out a promise after specified timeout duration.
- *
- * Params:
+ * 
+ * @param {Number}      timeout  (optional) timeout duration in milliseconds. 
+ *                               Default: `10000`
  * @param {...Promise}  promise  promise/function: one or more promises as individual arguments
- * @param {Number}      timeout  timeout duration in milliseconds. If not supplied will fail immediately.
- *                               If falsy, will use `10000`   
  * 
  * @example Example 1: multiple promises
- * <BR>
- *
  * ```javascript
- *    PromisE.timeout( Promise.resolve(1), 30000)
+ *    PromisE.timeout(30000, Promise.resolve(1))
  *    // Result: 1
  * ```
  *
  * @example Example 2: multiple promises
- * <BR>
  *
  * ```javascript
- *    PromisE.timeout( Promise.resolve(1), Promise.resolve(2), Promise.resolve(3), 30000)
+ *    PromisE.timeout(30000, Promise.resolve(1), Promise.resolve(2), Promise.resolve(3))
  *    // Result: [ 1, 2, 3 ]
  * ```
+ * 
+ * @example Example 3: timeout
+ * ```javascript
+ *  PromisE.timeout(PromisE.delay(20000))
  *
- * @returns {PromisE}
+ * @returns {PromisE} resultPromise
  */
 PromisE.timeout = (...args) => {
-    const timeout = args.slice(-1) || 10000
+    const timeoutIndex = args.findIndex(isValidNumber)
+    const timeout = timeoutIndex >= 0
+        && args.splice(timeoutIndex, 1)
+        || 10000
     // use all arguments except last one
-    const promiseArgs = args.slice(0, -1)
+    const promiseArgs = args
     const promise = promiseArgs.length === 1
         ? PromisE(promiseArgs[0]) // makes sure single promise resolves to a single result
         : PromisE.all(promiseArgs)
     const timeoutPromise = new PromisE((_, reject) =>
         // only reject if it's still pending
-        setTimeout(() => promise.pending && reject('Timed out'), timeout)
+        setTimeout(() => {
+            if (!promise.pending) return
+            resultPromise.timeout = true
+            reject('Timed out')
+        }, timeout)
     )
-    const resultPromise = PromisE(Promise.race([promise, timeoutPromise]))
+    const resultPromise = PromisE.race([promise, timeoutPromise])
     // attach the timoutPromise so that it can be used to determined whether the error was 
-    // due to timeout or request failure by checking `timtoutPromise.rejected === true`
+    // due to timeout or request failure by checking `timeoutPromise.rejected === true`
     resultPromise.timeout = timeoutPromise
     resultPromise.promise = promise
     return resultPromise
