@@ -1,13 +1,14 @@
 import DataStorage from './DataStorage'
 import storage from './storageHelper'
-import { clearClutter, downloadFile, generateHash, getUrlParam, textCapitalize } from './utils'
+import { clearClutter, downloadFile, generateHash, getUrlParam, isNodeJS, textCapitalize } from './utils'
 
-const translations = new DataStorage('totem_static_translations')
+export const translations = new DataStorage('totem_static_translations')
 export const EN = 'EN'
 const MODULE_KEY = 'language'
 const rw = value => storage.settings.module(MODULE_KEY, value) || {}
 let _selected = rw().selected || EN
-export const BUILD_MODE = getUrlParam('build-mode').toLowerCase() == 'true'
+const isNode = isNodeJS()
+export const BUILD_MODE = !isNode && getUrlParam('build-mode', window.location.href).toLowerCase() == 'true'
     && window.location.hostname !== 'totem.live'
 export const languages = Object.freeze({
     BN: 'Bengali',
@@ -30,17 +31,19 @@ export const languages = Object.freeze({
 // downloadTextListCSV generates a CSV file with all the unique application texts
 // that can be used to translate by opening the file in Google Drive
 // NB: this function should not be used when BUILD_MODE is false (URL param 'build-mode' not 'true')
-export const downloadTextListCSV = !BUILD_MODE ? null : () => {
-    const langCodes = [EN, ...Object.keys(languages).filter(x => x != EN)]
-    const rest = langCodes.slice(1)
-    const cols = textCapitalize('abcdefghijklmnopqrstuvwxyz').split('')
-    const str = langCodes.join(',') + '\n' + (window.enList || []).map((x, i) => {
-        const rowNo = i + 2
-        const functions = rest.map((_, c) => `"=GOOGLETRANSLATE($A${rowNo}, $A$1, ${cols[c + 1]}$1)"`).join(',')
-        return `"${clearClutter(x)}", ` + functions
-    }).join(',\n')
-    downloadFile(str, `English-texts-${new Date().toISOString()}.csv`, 'text/csv')
-}
+export const downloadTextListCSV = !BUILD_MODE
+    ? null
+    : () => {
+        const langCodes = [EN, ...Object.keys(languages).filter(x => x != EN)]
+        const rest = langCodes.slice(1)
+        const cols = textCapitalize('abcdefghijklmnopqrstuvwxyz').split('')
+        const str = langCodes.join(',') + '\n' + (window.enList || []).map((x, i) => {
+            const rowNo = i + 2
+            const functions = rest.map((_, c) => `"=GOOGLETRANSLATE($A${rowNo}, $A$1, ${cols[c + 1]}$1)"`).join(',')
+            return `"${clearClutter(x)}", ` + functions
+        }).join(',\n')
+        downloadFile(str, `English-texts-${new Date().toISOString()}.csv`, 'text/csv')
+    }
 
 // retrieve latest translated texts from server and save to local storage
 /**
