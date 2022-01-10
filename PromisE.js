@@ -168,23 +168,28 @@ PromisE.delay = (delay, result = delay) => new PromisE(resolve =>
  * ```
  */
 PromisE.getSocketEmitter = (socket, timeoutGlobal, errorArgIndex = 0, callbackIndex = null) => {
-    return (eventName, args = [], resultModifier, onError, timeoutLocal) => {
+    return (eventName, args = [], resultModifier, errorModifier, timeoutLocal) => {
         const timeout = isPositiveInteger(timeoutLocal)
             ? timeoutLocal
             : timeoutGlobal
+        const getError = err => isFn(errorModifier)
+            && errorModifier(err)
+            || err
         const promise = new Promise((resolve, reject) => {
             try {
                 const interceptor = async (...result) => {
-                    const err = isInteger(errorArgIndex) && result.splice(errorArgIndex, 1)
-                    if (!!err) {
-                        if (isFn(onError)) onError(err)
-                        return reject(err)
-                    }
+                    try {
+                        let err = isInteger(errorArgIndex) && result.splice(errorArgIndex, 1)[0]
+                        if (!!err) return reject(getError(err))
 
-                    result = result.length > 1
-                        ? result // if multiple values returned from the backend resolve with an array
-                        : result[0] // otherwise resolve with single value
-                    if (isFn(resultModifier)) result = await resultModifier(result)
+                        result = result.length > 1
+                            ? result // if multiple values returned from the backend resolve with an array
+                            : result[0] // otherwise resolve with single value
+
+                        if (isFn(resultModifier)) result = await resultModifier(result)
+                    } catch (err) {
+                        console.log({ interceptorError: err })
+                    }
                     resolve(result)
                 }
                 if (callbackIndex === null) {
@@ -199,12 +204,10 @@ PromisE.getSocketEmitter = (socket, timeoutGlobal, errorArgIndex = 0, callbackIn
                 }
                 socket.emit(eventName, ...args)
             } catch (err) {
-                isFn(onError) && onError(err)
-                reject(err)
+                reject(getError(err))
             }
         })
         if (!isPositiveInteger(timeout)) return promise
-
         return PromisE.timeout(timeout, promise)
     }
 }

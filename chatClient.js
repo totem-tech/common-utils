@@ -59,8 +59,6 @@ export const getClient = (...args) => {
     // on successful conenction login using user credentials and check if messaging server is in maintenance mode
     instance.onConnect(async () => {
         try {
-            window.client = instance
-            console.log('getClient onConnect')
             const active = await instance.maintenanceMode()
             rxIsInMaintenanceMode.next(active)
             rxIsConnected.next(true)
@@ -288,8 +286,22 @@ class ChatClient {
                 if (!isAsyncFn(func)) return
             })
 
-        // converts callback based emits to promise
-        this.emitter = PromisE.getSocketEmitter(socket, 15000, 0, null)
+        // converts callback based emits to promise. With 30 seconds timeout
+        this._emitter = PromisE.getSocketEmitter(socket, 30000, 0, null)
+        // add an interceptor to translate all error messages from the server to the selected language (if any)
+        this.emitter = (event, args = [], resultModifier, onError, timeoutLocal) => {
+            return this._emitter(
+                event,
+                args,
+                resultModifier,
+                err => {
+                    const translatedErr = translateError(err)
+                    isFn(onError) && onError(translatedErr, err)
+                    return translatedErr
+                },
+                timeoutLocal,
+            )
+        }
     }
 
     /**
