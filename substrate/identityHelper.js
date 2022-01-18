@@ -68,6 +68,7 @@ export class IdentityHelper {
 		this.extension = new PolkadotExtensionHelper(dAppName)
 		const result = await this.extension.enable()
 		const removeInjected = ignoreAddresses => {
+			const removed = []
 			this.map(([address, { uri }]) => {
 				// if injected identity was removed from PolkadotJS extension,
 				// remove from identity storage as well
@@ -75,7 +76,12 @@ export class IdentityHelper {
 					&& !ignoreAddresses.includes(address)
 				if (!shouldRemove) return
 				this.remove(address)
+				removed.push(address)
 			})
+
+			// if removed item was selected, set the first item as selected identity
+			const { address: selected } = this.getSelected() || {}
+			this.rxSelected.next(selected)
 		}
 		if (!result.length) {
 			removeInjected([])
