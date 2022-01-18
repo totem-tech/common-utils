@@ -8,6 +8,7 @@ import {
     isArr2D,
     isNodeJS,
     deferred,
+    hasValue,
 } from '../utils'
 import keyringHelper, { KeyringHelper } from './keyringHelper'
 
@@ -45,19 +46,45 @@ export const texts = {
  *                                      Default: `300000`
  * @param   {KeyringHelper} keyringHelper1 (optional) if undefined, will use global keyring
  * @param   {Object}        textOverrides   Internal message overrides. Eg: useful when using a different language.
+ * @param   {Object}        unit        (optional) token unit display settings.
+ * @param   {Number}        unit.amount (optional) number of tokens per unit.
+ *                                      Default: 1e10
+ * @param   {Number}        unit.decimals (optional) number of decimal places.
+ *                                      Default: 4
+ * @param   {String}        unit.name   (optional) ticker/unit name.
+ *                                      Default: 'DOT'
+ *                                      
  */
 export default class BlockchainHelper {
-    constructor(nodeUrls, title, disconnectDelay = 300000, keyringHelper1 = keyringHelper, textOverrides) {
+    constructor(
+        nodeUrls,
+        title,
+        disconnectDelay = 300000,
+        keyringHelper1 = keyringHelper,
+        textOverrides,
+        unit = {},
+    ) {
         this.autoDisconnect = disconnectDelay > 0
         this.connection = {}
         this.disconnectDelay = this.autoDisconnect && disconnectDelay
+        this.keyringHelper = keyringHelper1
+        this.nodeUrls = hasValue(nodeUrls)
+            ? nodeUrls
+            : ['wss://rpc.polkadot.io']
         this.texts = {
             ...texts,
             ...textOverrides,
         }
-        this.nodeUrls = nodeUrls || ['wss://rpc.polkadot.io']
         this.title = title || 'Polkadot Blockchain Network'
-        this.keyringHelper = keyringHelper1
+        // this.unitAmount = unitAmount
+        // this.unitDecimals = unitDecimals
+        // this.unitName = unitName
+        const {
+            amount = 1e10,
+            decimals = 4,
+            name = 'DOT',
+        } = unit
+        this.unit = { amount, decimals, name }
     }
 
     /**

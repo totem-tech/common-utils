@@ -90,31 +90,35 @@ export default class DataStorage {
      * @param {Map}       initialValue (optional) Default: new Map()
      */
     constructor(name, disableCache = false, initialValue, onChange) {
-        let data = (name && read(name)) || initialValue
-        data = !isMap(data) ? new Map() : data
-        this.name = name
+        name = isStr(name) && name
         this.disableCache = name && disableCache
+        // pre-load data from storage
+        let data = !this.disableCache
+            && (name && read(name))
+            || initialValue
+        data = !isMap(data)
+            ? new Map()
+            : data
+        this.name = name
         this.rxData = this.disableCache
             ? new Subject()
             : new BehaviorSubject(data)
         this.size = data.size
-        this.save = true
-        this.rxData.subscribe(data => {
-            this.name && this.save && write(this.name, data)
-            this.save = true
+        // automatically write to storage
+        name && this.rxData.subscribe(data => {
+            this.name && write(this.name, data)
             this.size = data.size
             isFn(onChange) && onChange(data)
         })
         if (this.disableCache) return
 
         // update cached data from localStorage throughout the application only when triggered
-        rxForeUpdateCache.subscribe(refresh => {
-            const doRefresh = !this.name
-                ? false
-                : isArr(refresh)
-                    ? refresh.includes(this.name)
-                    : refresh === true
+        name && rxForeUpdateCache.subscribe(refresh => {
+            const doRefresh = isArr(refresh)
+                ? refresh.includes(this.name)
+                : refresh === true
             if (!doRefresh) return
+
             const data = read(this.name)
             this.size = data.size
             this.rxData.next(data)

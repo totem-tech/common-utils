@@ -1,7 +1,8 @@
 import { BehaviorSubject } from 'rxjs'
 import DataStorage from '../DataStorage'
-import { isObj, isStr, objClean, objHasKeys } from '../utils'
+import { isArr, isNodeJS, isObj, isStr, objClean, objHasKeys } from '../utils'
 import keyringHelper from './keyringHelper'
+import PolkadotExtensionHelper from './polkadotExtensionHelper'
 
 export const USAGE_TYPES = Object.freeze({
 	PERSONAL: 'personal',
@@ -10,8 +11,6 @@ export const USAGE_TYPES = Object.freeze({
 export const REQUIRED_KEYS = Object.freeze([
 	'address',
 	'name',
-	'type',
-	'uri',
 ])
 // list of all properties used in idenities
 export const VALID_KEYS = Object.freeze([
@@ -21,54 +20,22 @@ export const VALID_KEYS = Object.freeze([
 	'fileBackupTS', // most recent file backup timestamp
 	'locationId',
 	'selected',
+	'source',
 	'tags',
+	'type',
+	'uri',
 	'usageType',
 ])
 
 export class IdentityHelper {
 	constructor(keyring, type = 'sr25519', storageKey = 'totem_identities') {
+		this.extension = null
 		this.identities = new DataStorage(storageKey)
 		this.keyring = keyring || keyringHelper.keyring
 		this.rxIdentities = this.identities.rxData
 		this.rxSelected = new BehaviorSubject()
 		this.type = type || keyringHelper.type
-		setTimeout(this.init)
-	}
-
-	/**
-	 * @name	init
-	 * @summary create first identity if none created already
-	 */
-	init = (retries = 10) => {
-		if (retries < 0) return
-		if (!this.getAll().length) {
-			// generate a new seed
-			const seed = this.generateUri()
-			if (!seed) {
-				console.log({ seed })
-				setTimeout(() => this.init(retries - 1), 1000)
-				return
-			}
-
-			const uri = `${seed}/totem/0/0`
-			const { address } = this.addFromUri(uri, this.type) || {}
-			// in case `wasm-crypto` hasn't been initiated yet, try again after a second
-			if (!address) {
-				console.log({ address })
-				setTimeout(() => this.init(retries - 1), 1000)
-				return
-			}
-
-			const identity = {
-				address,
-				name: 'Default',
-				usageType: USAGE_TYPES.PERSONAL,
-				uri,
-			}
-			this.set(address, identity)
-		}
-
-		this.rxSelected.next(this.getSelected().address)
+		setTimeout(() => this.init(10))
 	}
 
 	/**
@@ -92,6 +59,77 @@ export class IdentityHelper {
 	}
 
 	/**
+	 * @name	enableExtionsion
+	 * @summary enables use of PolkadotJS Extension and automatically inject identities.
+	 * @description requires node module: '@polkadot/extension-dapp'
+	 */
+	enableExtionsion = async (dAppName) => {
+		if (isNodeJS()) return
+		this.extension = new PolkadotExtensionHelper(dAppName)
+		const result = await this.extension.enable()
+		const removeInjected = ignoreAddresses => {
+			this.map(([address, { uri }]) => {
+				// if injected identity was removed from PolkadotJS extension,
+				// remove from identity storage as well
+				const shouldRemove = uri === null
+					&& !ignoreAddresses.includes(address)
+				if (!shouldRemove) return
+				this.remove(address)
+			})
+		}
+		if (!result.length) {
+			removeInjected([])
+			return result
+		}
+		// extension is enabled
+		this.extension.accounts(accounts => {
+			const addresses = accounts.map(account => {
+				const {
+					address,
+					meta: {
+						name,
+						source,
+					},
+					type,
+				} = account
+				const existingItem = this.get(address)
+				if (!!existingItem && existingItem.uri !== null) return address
+
+				// inject external identity without uri
+				const entry = {
+					address,
+					name,
+					source,
+					type,
+					uri: null,
+				}
+				this.set(address, entry)
+				return address
+			})
+			removeInjected(addresses)
+		})
+		return result
+	}
+
+	/**
+	 * @name find
+	 * @summary find an identity by name or address
+	 * 
+	 * @param	{String} addressOrName 
+	 * 
+	 * @returns {Object}
+	 */
+	find = addressOrName => this.identities.find(
+		{
+			address: addressOrName,
+			name: addressOrName,
+		},
+		true,
+		false,
+		true,
+	)
+
+	/**
 	 * @name	generateUri
 	 * @summary generate random mnemonic
 	 * 
@@ -102,8 +140,7 @@ export class IdentityHelper {
 			return require('bip39').generateMnemonic()
 		} catch (err) {
 			// error will occur if wasm-crypto is not initialised or invalid URI passed
-			// console.log('services.identity.addFromUri()', err)
-			console.log(err)
+			console.warn('Failed to generate URI', err)
 		}
 	}
 
@@ -138,22 +175,41 @@ export class IdentityHelper {
 		|| this.getAll()[0] // return first identity if none selected
 
 	/**
-	 * @name find
-	 * @summary find an identity by name or address
-	 * 
-	 * @param	{String} addressOrName 
-	 * 
-	 * @returns {Object}
+	 * @name	init
+	 * @summary create first identity if none created already
 	 */
-	find = addressOrName => this.identities.find(
-		{
-			address: addressOrName,
-			name: addressOrName
-		},
-		true,
-		false,
-		true,
-	)
+	init = (retries = 10) => {
+		if (retries < 0) return
+		if (!this.getAll().length) {
+			// generate a new seed
+			const seed = this.generateUri()
+			if (!seed) {
+				setTimeout(() => this.init(retries - 1), 1000)
+				return
+			}
+
+			const uri = `${seed}/totem/0/0`
+			const { address } = this.addFromUri(uri, this.type) || {}
+			// in case `wasm-crypto` hasn't been initiated yet, try again after a second
+			if (!address) {
+				setTimeout(() => this.init(retries - 1), 1000)
+				return
+			}
+
+			const identity = {
+				address,
+				name: 'Default',
+				usageType: USAGE_TYPES.PERSONAL,
+				uri,
+			}
+			this.set(address, identity)
+		}
+
+		const { address: selected } = this.getSelected() || {}
+		this.rxSelected.next(selected)
+	}
+
+	map = (...args) => this.identities.map(...args)
 
 	/**
 	 * @name    remove
@@ -194,6 +250,20 @@ export class IdentityHelper {
 	 * @param   {String} address
 	 * @param   {Object} identity In case of update, will be merged with existing values.
 	 *                            See `VALID_KEYS` for a list of accepted properties
+	 * 
+	 * @param	{String}  identity.address		SS58 decoded address
+	 * @param	{String}  identity.name			name of the identity
+	 * @param	{String}  identity.type			(optional) identity type
+	 * 											Default: `'sr25519'`
+	 * @param	{Object}  identity.uri			Full seed including mnemonic and derivation path.
+	 * 											Use `null` if identity is imported from PolkadotJS extension.
+	 * @param	{String}  identity.usageType	(optional) Accepted values: 'personal' or 'business'
+	 * 											Default: `'personal'`
+	 * @param	{String}  identity.locationId	(optional)
+	 * @param	{Boolean} identity.selected		(optional)	
+	 * 											Default: `false`
+	 * @param	{Array}	  identity.tags			(optional) tags for categorisation. 
+	 * 											Default: `[]`
 	 *
 	 * @returns {Object} returns the identity added/updated. If undefined, identity add/update failed.
 	 */
@@ -201,11 +271,20 @@ export class IdentityHelper {
 		if (!isStr(address) || !isObj(identity)) return
 
 		const existingItem = this.get(address)
-		if (!existingItem && objHasKeys(identity, REQUIRED_KEYS, true)) return
-
-		const { selected, type, usageType } = identity
-		const isUsageTypeValid = Object.values(USAGE_TYPES).includes(usageType)
-		identity.type = type || 'sr25519'
+		// check if identity object contains all the required properties
+		const valid = !!existingItem || objHasKeys(
+			identity,
+			REQUIRED_KEYS.filter(key =>
+				key !== 'uri' || identity.uri !== null
+			),
+			true,
+		)
+		if (!valid) return
+		const { selected, type, usageType } = identity || {}
+		const isUsageTypeValid = Object
+			.values(USAGE_TYPES)
+			.includes(usageType)
+		identity.type = type || this.type
 		identity.selected = !!selected
 		identity.usageType = !isUsageTypeValid
 			? USAGE_TYPES.PERSONAL
@@ -220,7 +299,7 @@ export class IdentityHelper {
 
 	/**
 	 * @name    setSelected
-	 * @summary set selected identity
+	 * @summary set default/selected identity
 	 *
 	 * @param {String} address identity/wallet address
 	 */
@@ -245,6 +324,12 @@ export class IdentityHelper {
 		this.set(address, identity)
 		this.rxSelected.next(address)
 	}
+
+	sort = (...args) => this.identities.sort(...args)
+
+	toArray = (...args) => this.identities.toArray(...args)
+
+	toString = (...args) => this.identities.toString(...args)
 }
 
 // default/global identities

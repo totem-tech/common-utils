@@ -127,6 +127,7 @@ export const subjectAsPromise = (subject, expectedValue, timeout) => {
                 ? expectedValue(value) === value
                 : isDefined(expectedValue)
                     ? value === expectedValue
+                    || expectedValue === subjectAsPromise.anyValueSymbol && hasValue(value)
                     : true
             if (!isExpectedValue) return
             unsubscribe()
@@ -140,6 +141,7 @@ export const subjectAsPromise = (subject, expectedValue, timeout) => {
     })
     return [promise, unsubscribe]
 }
+subjectAsPromise.anyValueSymbol = Symbol('any-value')
 
 /**
  * @name    reducer
