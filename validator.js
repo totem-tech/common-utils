@@ -22,9 +22,9 @@ export let messages = {
     array: 'valid array required',
     boolean: 'boolean value required',
     date: 'valid date required',
-    dateMax: 'date date cannot be after',
-    dateMin: 'date cannot be before',
-    decimals: 'number exceeds maximum allowed decimals',
+    dateMax: 'value must be smaller or equal to',
+    dateMin: 'value must be greater or equal to',
+    decimals: 'value exceeds maximum allowed decimals',
     email: 'valid email address required',
     hash: 'valid cryptographic hash string required',
     hex: 'valid hexadecimal string required',
@@ -34,8 +34,8 @@ export let messages = {
     lengthMax: 'maximum length exceeded',
     lengthMin: 'minimum length required',
     number: 'valid number required',
-    numberMax: 'number exceeds maximum allowed',
-    numberMin: 'number is less than minimum required',
+    numberMax: 'value must be smaller or equal to',
+    numberMin: 'value must be greater or euqal to',
     object: 'valid object required',
     regex: 'invalid string pattern',
     regexError: 'regex validation failed',
@@ -67,6 +67,12 @@ export const TYPES = Object.freeze({
     string: 'string',
     url: 'url',
 })
+
+const errorConcat = (message, ...suffix) => {
+    if (!isStr(message)) return message
+
+    return [message, ...suffix].join(' ')
+}
 
 /**
  * @name    setMessages
@@ -162,8 +168,8 @@ export const validate = (value, config, customMessages = {}) => {
                 // Eg: 2020-02-30 is auto corrected to 2021-03-02)
                 if (isStr(value) && date.toISOString().split('T')[0] !== value.replace(' ', 'T').split('T')[0])
                     return errorMsgs.date
-                if (max && new Date(max) < date) return `${errorMsgs.dateMax} ${max}`
-                if (min && new Date(min) > date) return `${errorMsgs.dateMin} ${min}`
+                if (max && new Date(max) < date) return errorConcat(errorMsgs.dateMax, max)
+                if (min && new Date(min) > date) return errorConcat(errorMsgs.dateMin, min)
                 break
             case 'email':
                 if (!isStr(value) || !emailPattern.test(value)) return errorMsgs.email
@@ -189,15 +195,21 @@ export const validate = (value, config, customMessages = {}) => {
                 break
             case 'number':
                 if (!isValidNumber(value)) return errorMsgs.number
-                if (isValidNumber(min) && value < min) return errorMsgs.numberMin
-                if (isValidNumber(max) && value > max) return errorMsgs.numberMax
+                if (isValidNumber(min) && value < min) return errorConcat(
+                    errorMsgs.min || errorMsgs.numberMin,
+                    min,
+                )
+                if (isValidNumber(max) && value > max) return errorConcat(
+                    errorMsgs.max || errorMsgs.numberMax,
+                    max,
+                )
                 if (isValidNumber(decimals) && decimals >= 0) {
                     if (decimals === 0) {
                         if (!isInteger(value)) return errorMsgs.integer
                         break
                     }
                     const len = (value.toString().split('.')[1] || '').length
-                    if (len > decimals) return `${errorMsgs.decimals}: ${decimals}`
+                    if (len > decimals) return errorConcat(errorMsgs.decimals, decimals)
                 }
                 break
             case 'object':
@@ -264,13 +276,13 @@ export const validate = (value, config, customMessages = {}) => {
 
         // validate array/integer/number/string length
         const len = (valueIsArr ? value : `${value}`).length
-        if (isValidNumber(maxLength) && len > maxLength) return `${errorMsgs.lengthMax}: ${maxLength}`
-        if (isValidNumber(minLength) && len < minLength) return `${errorMsgs.lengthMin}: ${minLength}`
+        if (isValidNumber(maxLength) && len > maxLength) return errorConcat(errorMsgs.lengthMax, maxLength)
+        if (isValidNumber(minLength) && len < minLength) return errorConcat(errorMsgs.lengthMin, minLength)
 
         // valid according to the config
         return null
     } catch (err) {
-        return `${errorMsgs.unexpectedError}. ${err}`
+        return errorConcat(errorMsgs.unexpectedError, '\n', err)
     }
 }
 

@@ -2,7 +2,7 @@ import { BehaviorSubject } from 'rxjs'
 import DataStorage from '../DataStorage'
 import { isArr, isNodeJS, isObj, isStr, objClean, objHasKeys } from '../utils'
 import keyringHelper from './keyringHelper'
-import PolkadotExtensionHelper from './polkadotExtensionHelper'
+import PolkadotExtensionHelper from './ExtensionHelper'
 
 export const USAGE_TYPES = Object.freeze({
 	PERSONAL: 'personal',

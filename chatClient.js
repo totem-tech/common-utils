@@ -118,31 +118,31 @@ export const getUser = () => rw().user
  */
 export const setUser = (user = {}) => rw({ user })
 
-const emitAsPromise = (event, args = [], resultModifier, onError) =>
-    new Promise((resolve, reject) => {
-        try {
-            const interceptor = async (err, ...result) => {
-                if (!!err) {
-                    err = translateError(err)
-                    if (isFn(onError)) onError(err)
-                    return reject(err)
-                }
+// const emitAsPromise = (event, args = [], resultModifier, onError) =>
+//     new Promise((resolve, reject) => {
+//         try {
+//             const interceptor = async (err, ...result) => {
+//                 if (!!err) {
+//                     err = translateError(err)
+//                     if (isFn(onError)) onError(err)
+//                     return reject(err)
+//                 }
 
-                result = result.length > 1
-                    ? result // if multiple values returned from the backend resolve with an array
-                    : result[0] // otherwise resolve with single value
-                if (isFn(resultModifier)) result = await resultModifier(result)
-                resolve(result)
-            }
-            args = [...args, interceptor]
-            socket.emit(event, ...args)
-        } catch (err) {
-            console.log(`Unexpected error occurd on chatClient.${event}()`, err)
-            err = translateError(`${err}`.replace('Error: ', ''))
-            isFn(onError) && onError(err)
-            reject(err)
-        }
-    })
+//                 result = result.length > 1
+//                     ? result // if multiple values returned from the backend resolve with an array
+//                     : result[0] // otherwise resolve with single value
+//                 if (isFn(resultModifier)) result = await resultModifier(result)
+//                 resolve(result)
+//             }
+//             args = [...args, interceptor]
+//             socket.emit(event, ...args)
+//         } catch (err) {
+//             console.log(`Unexpected error occurd on chatClient.${event}()`, err)
+//             err = translateError(`${err}`.replace('Error: ', ''))
+//             isFn(onError) && onError(err)
+//             reject(err)
+//         }
+//     })
 
 /**
  * @name    translateInterceptor

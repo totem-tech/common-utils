@@ -9,6 +9,7 @@ import {
     isNodeJS,
     deferred,
     hasValue,
+    isSubjectLike,
 } from '../utils'
 import keyringHelper, { KeyringHelper } from './keyringHelper'
 
@@ -154,11 +155,13 @@ export default class BlockchainHelper {
      * @summary get free balance of one or more identities
      * 
      * @param   {String|Array}  addresses
-     * @param   {Function}      callback
+     * @param   {Function}      callback    (optional) to subscribe to the balance changes
+     * @param   {String}        apiFunc     (optional) only required if default balance storage is not used.
+     *                                      Default: `'api.query.system.account'`
      * 
      * @returns {Number|Array|Function}
      */
-    getBalance = async (addresses, callback) => {
+    getBalance = async (addresses, callback, apiFunc = 'api.query.system.account') => {
         addresses = isArr(addresses)
             ? addresses
             : [addresses]
@@ -177,7 +180,7 @@ export default class BlockchainHelper {
 
         const isMulti = addresses.length > 1
         if (doSubscribe) addresses.push(handleResult)
-        const result = await this.query('api.query.system.account', addresses, isMulti)
+        const result = await this.query(apiFunc, addresses, isMulti)
         return doSubscribe
             ? result
             : handleResult(result)
@@ -334,75 +337,45 @@ export default class BlockchainHelper {
     }
 
     /**
-     * @name    sign
-     * @summary sign a transaction
-     * 
-     * @param   {String}    address  Identity address from which to initiate the transaction
-     * 
-     * @returns {*} signed transaction
-     */
-    send = async (address, signedTx, rxStatus) => {
-        const sender = this.keyringHelper.getPair(address)
-        if (!sender) throw new Error(this.texts.errAddress404)
-        const { api } = await this.getConnection()
-
-
-    }
-
-    /**
-     * @name    sign
-     * @summary sign a transaction
-     * 
-     * @param   {String}    txFunc   API function to execute. Must start with "api.tx."
-     * @param   {Array}     funcArgs Arguments to be supplied to the `apiFunc`
-     * 
-     * @returns {*} signed transaction
-     */
-    sign = async (txFunc, funcArgs) => {
-        // DO NOT REMOVE. If txFunc is string this is used to extract the function from API instance
-        const { api } = await this.getConnection()
-        eval(api)
-
-        txFunc = isStr(txFunc) && txFunc.startsWith('api.tx.')
-            ? eval(txFunc)
-            : txFunc
-        if (!isFn(txFunc)) throw new Error(this.texts.errInvalidTxFunc)
-        const tx = txFunc(...funcArgs)
-        return tx
-    }
-
-    /**
      * @name    signAndSend
      * @summary initiate a transaction on the blockchain
      * 
+     * @param   {String} address    Identity address to send the transaction with.
+     * @param   {String} txFunc     Prepared transactin or path to unprepared transactin API function to be prepared 
+     *                              before execution. If path, it must start with "api.tx.".
+     * @param   {Array}  funcArgs   For unprepared transction, arguments to be suppiled to the transaction function.
+     * @param   {*}      rxStatus   (optional) RxJS subject to keep track of transaction status changes
+     * @param   {*}      signer     (optional) to sign a transaction using an external signer (eg: PolkadotJS Extension)
+     * 
+     * @returns {Array}  [blockHash, eventErrors]
      */
-    signAndSend = async (address, txFn, funcArgs = [], rxStatus) => {
-        const sender = this.keyringHelper.getPair(address)
+    signAndSend = async (address, txFunc, funcArgs = [], rxStatus, signer) => {
+        const sender = !!signer
+            ? address
+            : this.keyringHelper.getPair(address)
         this.log(this.texts.txInitiating)
+
+        const isSubject = isSubjectLike(rxStatus) && isFn(rxStatus.complete)
 
         return await new Promise(async (resolve, reject) => {
             try {
                 const { api } = await this.getConnection() // DO NOT REMOVE
-                txFn = isStr(txFn) && txFn.startsWith('api.tx.')
-                    ? eval(txFn)
-                    : txFn
-                if (!isFn(txFn)) return reject(this.texts.errInvalidTxFunc)
-                const tx = txFn(...funcArgs)
-                await tx.signAndSend(sender, result => {
+                const tx = await this.tx(txFunc, funcArgs)
+                const handleResult = result => {
                     const { events, status } = result
                     const isFuture = status.type !== 'Future'
-                    let hash = ''
+                    let blockHash = ''
                     this.log(this.texts.txStatus, status.type)
 
                     // notify
-                    rxStatus && rxStatus.next(result)
+                    isSubject && rxStatus.next(result)
 
                     // status.type = 'Future' means transaction will be executed in the future. 
                     // there is a transaction in the pool that hasn't finished execution. 
                     if (!status.isFinalized && isFuture) return
                     try {
                         // if status is "Future" block hash is not assigned yet!
-                        hash = status.asFinalized.toHex()
+                        blockHash = status.asFinalized.toHex()
                     } catch (e) { } // ignore error
 
                     // Extract custom errors from events
@@ -421,17 +394,51 @@ export default class BlockchainHelper {
                         }).filter(Boolean)
 
                     if (eventErrors.length > 0) {
-                        this.log(this.texts.txFailed, { blockHash: hash, eventErrors })
+                        this.log(this.texts.txFailed, { blockHash, eventErrors })
                         return reject(eventErrors.join(' | '))
                     }
 
-                    this.log(this.texts.txCompletedAtBlock, hash, isBrowser && { eventErrors } || '')
-                    rxStatus && rxStatus.complete()
-                    resolve([hash, eventErrors])
-                })
+                    this.log(
+                        this.texts.txCompletedAtBlock,
+                        blockHash,
+                        isBrowser && { eventErrors } || '',
+                    )
+                    isSubject && rxStatus.complete()
+                    resolve([blockHash, eventErrors])
+                }
+                const args = [
+                    sender,
+                    signer && { signer },
+                    handleResult
+                ].filter(Boolean)
+                await tx.signAndSend(...args)
             } catch (err) {
                 reject(err)
             }
         })
+    }
+
+    /**
+     * @name    tx
+     * @summary connects to blcokchain and prepares a transction to be executed
+     * 
+     * @param   {String}    txFunc   API function to execute. Must start with "api.tx."
+     * @param   {Array}     funcArgs Arguments to be supplied to the `apiFunc`
+     * 
+     * @returns {*} signed transaction
+     */
+    tx = async (txFunc, funcArgs) => {
+        if (hasValue(txFunc) && !isStr(txFunc)) return txFunc
+
+        const { api } = await this.getConnection()
+        // DO NOT REMOVE. If txFunc is string this is used to extract the function from API instance
+        eval(api)
+
+        txFunc = isStr(txFunc) && txFunc.startsWith('api.tx.')
+            ? eval(txFunc)
+            : txFunc
+        if (!isFn(txFunc)) throw new Error(this.texts.errInvalidTxFunc)
+        const tx = txFunc(...funcArgs)
+        return tx
     }
 }
