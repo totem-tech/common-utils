@@ -1,7 +1,7 @@
 import { BehaviorSubject } from 'rxjs'
 import DataStorage from '../DataStorage'
 import { isArr, isNodeJS, isObj, isStr, objClean, objHasKeys } from '../utils'
-import keyringHelper from './keyringHelper'
+import getKeyringHelper, { KeyringHelper } from './keyringHelper'
 import PolkadotExtensionHelper from './ExtensionHelper'
 
 export const USAGE_TYPES = Object.freeze({
@@ -30,11 +30,14 @@ export const VALID_KEYS = Object.freeze([
 export class IdentityHelper {
 	constructor(keyring, type = 'sr25519', storageKey = 'totem_identities') {
 		this.extension = null
-		this.identities = new DataStorage(storageKey)
-		this.keyring = keyring || keyringHelper.keyring
-		this.rxIdentities = this.identities.rxData
+		this.storage = new DataStorage(storageKey)
+		this.keyringHelper = !keyring
+			? getKeyringHelper()
+			: new KeyringHelper(type, keyring)
+		this.keyring = this.keyringHelper.keyring
+		this.rxIdentities = this.storage.rxData
 		this.rxSelected = new BehaviorSubject()
-		this.type = type || keyringHelper.type
+		this.type = this.keyringHelper.type
 		setTimeout(() => this.init(10))
 	}
 
@@ -125,7 +128,7 @@ export class IdentityHelper {
 	 * 
 	 * @returns {Object}
 	 */
-	find = addressOrName => this.identities.find(
+	find = addressOrName => this.storage.find(
 		{
 			address: addressOrName,
 			name: addressOrName,
@@ -158,7 +161,7 @@ export class IdentityHelper {
 	 * 
 	 * @returns {Object}
 	 */
-	get = address => this.identities.get(address)
+	get = address => this.storage.get(address)
 
 	/**
 	 * @name	get
@@ -168,7 +171,7 @@ export class IdentityHelper {
 	 * 
 	 * @returns {Object}
 	 */
-	getAll = () => this.identities.map(([_, x]) => ({ ...x }))
+	getAll = () => this.storage.map(([_, x]) => ({ ...x }))
 
 	/**
 	 * @name    getSelected
@@ -176,7 +179,7 @@ export class IdentityHelper {
 	 *
 	 * @returns {Object}
 	 */
-	getSelected = () => this.identities
+	getSelected = () => this.storage
 		.find({ selected: true }, true, true)
 		|| this.getAll()[0] // return first identity if none selected
 
@@ -215,7 +218,7 @@ export class IdentityHelper {
 		this.rxSelected.next(selected)
 	}
 
-	map = (...args) => this.identities.map(...args)
+	map = (...args) => this.storage.map(...args)
 
 	/**
 	 * @name    remove
@@ -223,9 +226,7 @@ export class IdentityHelper {
 	 *
 	 * @param   {String} address
 	 */
-	remove = address => {
-		this.identities.delete(address)
-	}
+	remove = address => { this.storage.delete(address) }
 
 	/**
 	 * @name	search
@@ -240,7 +241,7 @@ export class IdentityHelper {
 	 * @returns {Map}     result
 	 */
 	search = (keyValues, matchExact, matchAll, ignoreCase, limit) => {
-		return this.identities.search(
+		return this.storage.search(
 			keyValues,
 			matchExact,
 			matchAll,
@@ -298,7 +299,7 @@ export class IdentityHelper {
 		//  merge with existing values and get rid of any unwanted properties
 		identity = objClean({ ...existingItem, ...identity }, VALID_KEYS)
 		// save to the storage
-		this.identities.set(address, identity)
+		this.storage.set(address, identity)
 
 		return identity
 	}
@@ -324,18 +325,52 @@ export class IdentityHelper {
 			.from(arrSelected)
 			.forEach(([address, identity]) => {
 				identity.selected = false
-				this.identities.set(address, identity)
+				this.storage.set(address, identity)
 			})
 		identity.selected = true
 		this.set(address, identity)
 		this.rxSelected.next(address)
 	}
 
-	sort = (...args) => this.identities.sort(...args)
+	/**
+	 * @name    signature
+	 * @summary create a new signature using an idenitity from local storage or PolkadotJS extension
+	 * 
+	 * @param   {String|Uint8Array} address 
+	 * @param   {String|Uint8Array} message 
+	 * 
+	 * @returns {String} hex string
+	 */
+	signature = (address, message) => {
+		const identity = this.get(address)
+		if (!identity) return null
 
-	toArray = (...args) => this.identities.toArray(...args)
+		if (!!identity.uri) {
+			// local identity
+			const exists = this.keyringHelper.contains(address)
+			if (!exists) this.keyringHelper.add([identity.uri])
+			return this.keyringHelper.signature(address, message)
+		}
 
-	toString = (...args) => this.identities.toString(...args)
+		// injected identity
+		if (this.extension) return this.extension.signature(address, message)
+
+		return null
+	}
+
+	signatureVerify = (message, signature, address) => this
+		.keyringHelper
+		.signatureVerify(
+			message,
+			signature,
+			address,
+		)
+
+	sort = (...args) => this.storage.sort(...args)
+
+	toArray = (...args) => this.storage.toArray(...args)
+
+	toString = (...args) => this.storage.toString(...args)
 }
 
 // default/global identities

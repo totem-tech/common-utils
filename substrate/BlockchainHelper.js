@@ -1,4 +1,4 @@
-import { ApiPromise, WsProvider } from '@polkadot/api'
+import { formatNumber, shorten } from '../number'
 import {
     isFn,
     isArr,
@@ -10,8 +10,9 @@ import {
     deferred,
     hasValue,
     isSubjectLike,
+    isValidNumber,
 } from '../utils'
-import keyringHelper, { KeyringHelper } from './keyringHelper'
+import getKeyringHelper, { KeyringHelper } from './keyringHelper'
 
 // Indicates if run on a Browser or console using NodeJS
 const isBrowser = !isNodeJS()
@@ -61,10 +62,15 @@ export default class BlockchainHelper {
         nodeUrls,
         title,
         disconnectDelay = 300000,
-        keyringHelper1 = keyringHelper,
+        keyringHelper1 = getKeyringHelper(),
         textOverrides,
         unit = {},
     ) {
+        const {
+            amount = 1e10,
+            decimals = 4,
+            name = 'DOT',
+        } = unit
         this.autoDisconnect = disconnectDelay > 0
         this.connection = {}
         this.disconnectDelay = this.autoDisconnect && disconnectDelay
@@ -77,14 +83,6 @@ export default class BlockchainHelper {
             ...textOverrides,
         }
         this.title = title || 'Polkadot Blockchain Network'
-        // this.unitAmount = unitAmount
-        // this.unitDecimals = unitDecimals
-        // this.unitName = unitName
-        const {
-            amount = 1e10,
-            decimals = 4,
-            name = 'DOT',
-        } = unit
         this.unit = { amount, decimals, name }
     }
 
@@ -94,46 +92,19 @@ export default class BlockchainHelper {
      * @description `feeBase` and `feePerbyte` should already be set using `setDefaultConfig()`. 
      *              Otherwise, value `1` will be used for both.
      * 
-     * @param   {String}    func        path to API function. Should start with "api.tx."
+     * @param   {String}    txFunc        path to API function. Should start with "api.tx."
      * @param   {Array}     funcArgs    arguments to be supplied to the API function
-     * @param   {String}    address     (optional) identity address to be used to construct the transaction.
-     *                                  Address needs to be already in the keyring. If not, will use default.
-     *                                  Default: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY'
+     * @param   {String}    address     (optional) sender address.
      * 
      * @returns {Number}    estimated transaction fee plus existential deposit
      */
-    calculateFees = async (func, args, address) => {
-        const { api } = await this.getConnection()
-        if (!this.keyringHelper.contains(address)) {
-            // if keyring doesn't already contain the address supplied use Alice
-            this.keyringHelper.add(['//Alice'])
-            address = '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY'
-        }
-        const account = this.keyringHelper.getPair(address)
-        const [
-            nonce,
-            creationFee,
-            baseFee,
-            byteFee,
-            existentialDeposit,
-        ] = await query(api, api.queryMulti, [[
-            [api.query.system.accountNonce, address],
-            [api.query.balances.creationFee],
-            [api.query.balances.transactionBaseFee],
-            [api.query.balances.transactionByteFee],
-            [api.query.balances.existentialDeposit],
-        ]])
-        func = isStr(func) && func.startsWith('api.tx.')
-            ? eval(func)
-            : func
-        const tx = func(...args)
-        const signedHex = this.sanitise(await tx.sign(account, { nonce }))
-        const numBytes = signedHex.length / 2 - 1
-
-        return existentialDeposit
-            + creationFee
-            + baseFee
-            + byteFee * numBytes
+    calculateFees = async (txFunc, funcArgs, address, asString = true, decimals = 10) => {
+        const tx = await this.tx(txFunc, funcArgs)
+        const result = this.sanitise(
+            tx && await tx.paymentInfo([address])
+        )
+        const { partialFee } = result || {}
+        return this.formatAmount(partialFee, asString, decimals)
     }
 
     /**
@@ -149,6 +120,32 @@ export default class BlockchainHelper {
         provider.disconnect()
         console.log(`${this.title}: ${this.texts.disconnected}`)
     }, this.disconnectDelay)
+
+    /**
+     * @name    formatAmount
+     * 
+     * @param   {Number}            value  
+     * @param   {Boolean|String}    asString  (optional) whether to format as string. Accepts: true/false/'shorten'
+     * @param   {Number}            decimals  (optional) number of decimal places to be formatted.
+     *                                        Default: `this.unit.decimals`
+     * 
+     * @returns {String|Number}
+     */
+    formatAmount = (value, asString = false, decimals) => {
+        const { amount, decimals: _decimals, name } = this.unit
+        value = amount > 1
+            ? value / amount
+            : value
+
+        if (!asString) return value
+
+        if (!isValidNumber(decimals)) decimals = _decimals
+
+        const formatter = asString === 'shorten'
+            ? shorten
+            : formatNumber
+        return `${formatter(value, decimals)} ${name}`
+    }
 
     /**
      * @name    getBalance
@@ -217,6 +214,7 @@ export default class BlockchainHelper {
         }
 
         this.log(this.texts.connecting, this.nodeUrls)
+        const { ApiPromise, WsProvider } = require('@polkadot/api')
         provider = new WsProvider(this.nodeUrls, 100)
         this.connectPromise = ApiPromise.create({ provider })
 
@@ -330,7 +328,6 @@ export default class BlockchainHelper {
      */
     sanitise = value => {
         if (isObj(value) && isFn(value.toJSON)) {
-            // console.log('Got .toJSON()', value)
             return value.toJSON()
         }
         return JSON.parse(JSON.stringify(value))

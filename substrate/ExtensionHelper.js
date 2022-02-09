@@ -1,4 +1,5 @@
-import { isFn } from '../utils'
+import { bytesToHex, hexToBytes, ss58Decode, strToHex } from '../convert'
+import { isFn, isHex, isNodeJS, isStr, isUint8Arr } from '../utils'
 
 /**
  * @name    ExtensionHelper
@@ -8,8 +9,10 @@ import { isFn } from '../utils'
  */
 export default class ExtensionHelper {
     constructor(dAppName) {
-        this.web3 = require('@polkadot/extension-dapp')
+        if (isNodeJS()) throw new Error('PolkadotJS ExtensionHelper can only be used from a browser!')
+
         this.dAppName = dAppName
+        this.web3 = require('@polkadot/extension-dapp')
     }
 
     /**
@@ -36,6 +39,15 @@ export default class ExtensionHelper {
      */
     enable = async () => await this.web3.web3Enable(this.dAppName || 'Unnamed dapp')
 
+
+    /**
+     * @name    fromAddress
+     * @summary get injector from extension
+     * 
+     * @param   {String} address 
+     * 
+     * @returns {Object}
+     */
     fromAddress = async (address) => {
         try {
             return await this.web3.web3FromAddress(address)
@@ -44,13 +56,33 @@ export default class ExtensionHelper {
         }
     }
 
-    /**
-     * @name    get
-     * @summary get injector from extension
-     * @param {*} address 
-     * @returns 
-     */
-    get = async (address) => await this.fromAddress(address)
+    getSigner = async (address) => {
+        const { signer } = (await this.fromAddress(address)) || {}
+        return signer
+    }
 
     listRpcProviders = async () => await this.web3.web3ListRpcProviders()
+
+    /**
+     * @name    signature
+     * @summary create a signature using an identity from PolkadotJS extension. (User approval required)
+     * 
+     * @param   {String|Uint8Array} address 
+     * @param   {String|Uint8Array} message 
+     * 
+     * @returns {String} hex string
+     */
+    signature = async (address, message) => {
+        const signer = await this.getSigner(address)
+        const { signRaw } = signer || {}
+        if (!signRaw) return null
+
+        const { signature } = await signRaw({
+            address,
+            data: message,
+            // type: 'bytes' //???
+        })
+
+        return signature
+    }
 }
