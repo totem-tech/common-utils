@@ -1,20 +1,21 @@
 import { blake2b } from 'blakejs'
-import {
-    // secret key encryption
-    naclDecrypt as naclDecrypt1,
-    naclEncrypt as naclEncrypt1,
-    naclKeypairFromString,
-    naclKeypairFromSeed,
-    naclKeypairFromSecret,
-    // box encrypt
-    naclBoxKeypairFromSecret,
-    naclSeal,
-    naclOpen,
-    // singature
-    naclSign,
-    naclVerify,
-    randomAsU8a,
-} from '@polkadot/util-crypto'
+// import {
+//     // // secret key encryption
+//     // naclDecrypt as naclDecrypt1,
+//     // naclEncrypt as naclEncrypt1,
+//     // naclKeypairFromString,
+//     // naclKeypairFromSeed,
+//     // naclKeypairFromSecret,
+//     // // box encrypt
+//     // naclBoxKeypairFromSecret,
+
+//     // naclSeal,
+//     // naclOpen,
+//     // // singature
+//     // naclSign,
+//     // naclVerify,
+//     // randomAsU8a,
+// } from '@polkadot/util-crypto'
 import { isArr, isHex, isObj, isUint8Arr, objCopy } from "./utils"
 import {
     bytesToHex,
@@ -37,7 +38,7 @@ import {
  * @returns {String|Uint8Array} decrypted message
  */
 export const decrypt = (sealed, nonce, senderPublicKey, recipientSecretKey, asString = true) => {
-    const decrypted = naclOpen(
+    const decrypted = nacl().box.open(
         hexToBytes(sealed),
         hexToBytes(nonce),
         hexToBytes(senderPublicKey),
@@ -133,7 +134,7 @@ export const decryptObj = (obj, senderPublicKey, recipientSecretKey, keys, asStr
  * @returns Object `{sealed, nonce}`
  */
 export const encrypt = (message, senderSecretKey, recipientPublicKey, nonce, asHex = true) => {
-    const result = naclSeal(
+    const result = nacl().box(
         strToU8a(message),
         hexToBytes(senderSecretKey),
         hexToBytes(recipientPublicKey),
@@ -141,10 +142,12 @@ export const encrypt = (message, senderSecretKey, recipientPublicKey, nonce, asH
             ? hexToBytes(nonce)
             : newNonce(false),
     )
-    return !asHex ? result : {
-        sealed: bytesToHex(result.sealed),
-        nonce: bytesToHex(result.nonce)
-    }
+    return !asHex
+        ? result
+        : {
+            sealed: bytesToHex(result.sealed),
+            nonce: bytesToHex(result.nonce)
+        }
 }
 
 /**
@@ -316,7 +319,8 @@ export const encryptObj = (obj, secretKey, recipientPublicKey, keys, asHex = tru
  */
 export const encryptionKeypair = (keyData, asHex = true) => {
     const bytes = keyDataFromEncoded(keyData)
-    const pair = naclBoxKeypairFromSecret(blake2b(bytes, null, 32))
+    const { fromSecretKey } = nacl().box.keyPair
+    const pair = fromSecretKey(blake2b(bytes, null, 32))
     return !asHex
         ? pair
         : {
@@ -380,6 +384,13 @@ export const keyInfoFromKeyData = (keyData = '', ss58Format = 0, asHex = false) 
 }
 
 /**
+ * @name    nacl
+ * 
+ * @returns {Object}
+ */
+export const nacl = () => require('tweetnacl')
+
+/**
  * @name    newNonce
  * @summary generate a new random 24 bytes nonce
  * 
@@ -401,14 +412,17 @@ export const newNonce = (asHex = true) => randomBytes(24, asHex)
  * @returns {String|Uint8Array} String Hex if `asHex = true`, otherwise, Uint8Array
  */
 export const newSignature = (message, publicKey, secretKey, asHex = true) => {
-    const signature = naclSign(
+    const signature = nacl().sign.detached(
         message,
-        {
-            publicKey: hexToBytes(publicKey),
-            secretKey: hexToBytes(secretKey),
-        }
+        hexToBytes(secretKey),
+        // {
+        //     publicKey: hexToBytes(publicKey),
+        //     secretKey: hexToBytes(secretKey),
+        // }
     )
-    return !asHex ? signature : bytesToHex(signature)
+    return !asHex
+        ? signature
+        : bytesToHex(signature)
 }
 
 /**
@@ -474,7 +488,7 @@ export const secretBoxDecrypt = (encrypted, nonce, secret, asString = true) => {
  */
 export const secretBoxEncrypt = (message, secret, nonce, asHex = true) => {
     nonce = nonce || newNonce(false) // generate new nonce
-    const result = naclEncrypt1(
+    const result = nacl().box.open(
         strToU8a(message),
         hexToBytes(secret),
         hexToBytes(nonce),
@@ -497,7 +511,8 @@ export const secretBoxEncrypt = (message, secret, nonce, asHex = true) => {
  */
 export const signingKeyPair = (keyData, asHex = true) => {
     const bytes = keyDataFromEncoded(keyData)
-    const pair = naclKeypairFromSeed(blake2b(bytes, null, 32))
+    const { fromSeed } = nacl().sign.keyPair
+    const pair = fromSeed(blake2b(bytes, null, 32))
     return !asHex
         ? pair
         : {
@@ -516,7 +531,14 @@ export const signingKeyPair = (keyData, asHex = true) => {
  *
  * @returns {Boolean}
  */
-export const verifySignature = naclVerify
+export const verifySignature = (message, signature, publicKey) => {
+    const { verify } = nacl().sign.detached
+    return verify(
+        message,
+        signature,
+        publicKey,
+    )
+}
 
 export default {
     decrypt,
@@ -525,6 +547,7 @@ export default {
     encryptionKeypair,
     keyDataFromEncoded,
     keyInfoFromKeyData,
+    nacl,
     newNonce,
     newSignature,
     randomBytes,

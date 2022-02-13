@@ -58,7 +58,7 @@ export class IdentityHelper {
 		} catch (err) {
 			// error will occur if wasm-crypto is not initialised or invalid URI passed
 			// console.log('services.identity.addFromUri()', err)
-		}
+		} 
 	}
 
 	/**
