@@ -1,4 +1,4 @@
-import { isAsyncFn, isPromise, isFn, isObj, isInteger, isValidNumber, isPositiveInteger } from "./utils"
+import { isAsyncFn, isPromise, isFn, isObj, isInteger, isValidNumber, isPositiveInteger, isArr } from "./utils"
 /*
  * List of optional node-modules and the functions used by them:
  * Module Name          : Function Name
@@ -169,6 +169,9 @@ PromisE.delay = (delay, result = delay) => new PromisE(resolve =>
  */
 PromisE.getSocketEmitter = (socket, timeoutGlobal, errorArgIndex = 0, callbackIndex = null) => {
     return (eventName, args = [], resultModifier, errorModifier, timeoutLocal) => {
+        args = !isArr(args)
+            ? [args]
+            : args
         const timeout = isPositiveInteger(timeoutLocal)
             ? timeoutLocal
             : timeoutGlobal

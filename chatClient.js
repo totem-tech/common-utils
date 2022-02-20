@@ -3,7 +3,7 @@ import ioClient from 'socket.io-client'
 import { translated } from './languageHelper'
 import storage from './storageHelper'
 import { subjectAsPromise } from './reactHelper'
-import { isAsyncFn, isFn, isInteger, isObj, isStr, isValidNumber, objWithoutKeys } from './utils'
+import { isArr, isAsyncFn, isFn, isInteger, isObj, isStr, isValidNumber, objWithoutKeys } from './utils'
 import PromisE from './PromisE'
 
 let instance, socket, hostname
@@ -171,7 +171,7 @@ export const translateError = err => {
 }
 
 // Make sure to always keep the callback as the last argument
-class ChatClient {
+export class ChatClient {
     constructor(url) {
         this.url = url || defaultServerURL
         socket = ioClient(this.url, {
@@ -348,6 +348,23 @@ class ChatClient {
         'countries',
         [hash],
         countries => new Map(countries),
+    )
+
+    /**
+     * @name    crowdloan
+     * @summary fetch or update user contribution
+     * 
+     * @param   {String|Object} contribution identity or contribution data
+     * @param   {Nubmer}        contribution.amountContributed
+     * @param   {Nubmer}        contribution.amountPledged
+     * @param   {String}        contribution.identity
+     * @param   {String}        contribution.signature
+     * 
+     * @returns {Object}    contribution entry
+     */
+    crowdloan = async (contribution) => await this.emitter(
+        'crowdloan',
+        [contribution],
     )
 
     /**

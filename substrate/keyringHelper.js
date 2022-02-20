@@ -1,5 +1,5 @@
 import { bytesToHex, ss58Decode } from '../convert'
-import { isObj, isUint8Arr, objHasKeys } from '../utils'
+import { isObj, isStr, isUint8Arr, objHasKeys } from '../utils'
 
 /**
  * @name    KeyringHelper
@@ -91,7 +91,9 @@ export class KeyringHelper {
         const pair = this.getPair(address)
         if (!address) return null
 
-        return pair.sign(message)
+        if (!isStr(message)) message = JSON.stringify(message)
+        const signature = pair.sign(message)
+        return bytesToHex(signature)
     }
 
     /**
@@ -106,9 +108,15 @@ export class KeyringHelper {
      */
     signatureVerify = async (message, signature, address) => {
         const publicKey = ss58Decode(address)
+
+        if (!isStr(message)) message = JSON.stringify(message)
         return this
             .getPair(address, true)
-            .verify(message, signature, publicKey)
+            .verify(
+                message,
+                signature,
+                publicKey,
+            )
     }
 }
 

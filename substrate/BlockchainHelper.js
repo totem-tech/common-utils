@@ -118,7 +118,7 @@ export default class BlockchainHelper {
         if (!provider || !this.autoDisconnect && !force) return
 
         provider.disconnect()
-        console.log(`${this.title}: ${this.texts.disconnected}`)
+        this.log(this.texts.disconnected)
     }, this.disconnectDelay)
 
     /**
@@ -192,7 +192,7 @@ export default class BlockchainHelper {
      * @returns {Object} an object with the following properties: api, provider
      */
     getConnection = async () => {
-        let { provider } = this.connection || {}
+        let { api, provider } = this.connection || {}
         if (!!provider) {
             if (!provider.isConnected) {
                 this.log(this.texts.reconnecting)
@@ -201,11 +201,12 @@ export default class BlockchainHelper {
 
                 // Wait 2 seconds for reconnection and provider to be updated accordingly
                 await PromisE.delay(2000)
-
                 // wait another 3 seconds if still not connected
                 if (!provider.isConnected) await PromisE.delay(3000)
                 this.log(this.texts.reconnected, provider.isConnected)
             }
+            // wait until api is ready
+            await api.isReady
             return this.connection
         }
         if (this.connectPromise) {
@@ -218,10 +219,14 @@ export default class BlockchainHelper {
         provider = new WsProvider(this.nodeUrls, 100)
         this.connectPromise = ApiPromise.create({ provider })
 
-        const api = await this.connectPromise
+        api = await this.connectPromise
+
         this.connection.api = api
         this.connection.provider = provider
         this.log(this.texts.connected, isBrowser && this.connection)
+
+        // wait until api is ready
+        await api.isReady
         return this.connection
     }
 
@@ -273,7 +278,7 @@ export default class BlockchainHelper {
             // only add interceptor to process result
             args[args.length - 1] = result => {
                 const sanitised = this.sanitise(result)
-                print && console.log(func, sanitised)
+                print && this.log(func, sanitised)
                 cb(sanitised, result)
             }
         }
@@ -308,7 +313,7 @@ export default class BlockchainHelper {
         const result = isFn(fn)
             ? await fn.apply(null, args)
             : fn
-        !isSubscribe && print && console.log(this.sanitise(result))
+        !isSubscribe && print && this.log(this.sanitise(result))
 
         // auto disconnect, only if delay duration is specified
         this.deferredDisconnect()
@@ -340,24 +345,25 @@ export default class BlockchainHelper {
      * @param   {String} address    Identity address to send the transaction with.
      * @param   {String} txFunc     Prepared transactin or path to unprepared transactin API function to be prepared 
      *                              before execution. If path, it must start with "api.tx.".
-     * @param   {Array}  funcArgs   For unprepared transction, arguments to be suppiled to the transaction function.
-     * @param   {*}      rxStatus   (optional) RxJS subject to keep track of transaction status changes
+     * @param   {Array}  txArgs     For unprepared transction, arguments to be suppiled to the transaction function.
+     * @param   {*}      rxUpdater  (optional) RxJS subject to keep track of transaction progress.
      * @param   {*}      signer     (optional) to sign a transaction using an external signer (eg: PolkadotJS Extension)
      * 
      * @returns {Array}  [blockHash, eventErrors]
      */
-    signAndSend = async (address, txFunc, funcArgs = [], rxStatus, signer) => {
-        const sender = !!signer
-            ? address
-            : this.keyringHelper.getPair(address)
-        this.log(this.texts.txInitiating)
-
-        const isSubject = isSubjectLike(rxStatus) && isFn(rxStatus.complete)
-
-        return await new Promise(async (resolve, reject) => {
+    signAndSend = (address, txFunc, txArgs = [], rxUpdater, signer) => {
+        return new Promise(async (resolve, reject) => {
             try {
+                const sender = !!signer
+                    ? address
+                    : this.keyringHelper.getPair(address)
+                this.log(this.texts.txInitiating)
+
+                const isASubject = isSubjectLike(rxUpdater) && isFn(rxUpdater.complete)
+                if (!sender) throw new Error('Sender identity not found in the keyring')
+
                 const { api } = await this.getConnection() // DO NOT REMOVE
-                const tx = await this.tx(txFunc, funcArgs)
+                const tx = await this.tx(txFunc, txArgs)
                 const handleResult = result => {
                     const { events, status } = result
                     const isFuture = status.type !== 'Future'
@@ -365,7 +371,7 @@ export default class BlockchainHelper {
                     this.log(this.texts.txStatus, status.type)
 
                     // notify
-                    isSubject && rxStatus.next(result)
+                    isASubject && rxUpdater.next(result)
 
                     // status.type = 'Future' means transaction will be executed in the future. 
                     // there is a transaction in the pool that hasn't finished execution. 
@@ -390,25 +396,29 @@ export default class BlockchainHelper {
                             return error.toString()
                         }).filter(Boolean)
 
-                    if (eventErrors.length > 0) {
-                        this.log(this.texts.txFailed, { blockHash, eventErrors })
-                        return reject(eventErrors.join(' | '))
-                    }
+                    const success = eventErrors.length === 0
 
                     this.log(
-                        this.texts.txCompletedAtBlock,
+                        success
+                            ? this.texts.txCompletedAtBlock
+                            : this.texts.txFailed,
                         blockHash,
                         isBrowser && { eventErrors } || '',
                     )
-                    isSubject && rxStatus.complete()
-                    resolve([blockHash, eventErrors])
+
+                    // mark updater subject as completed
+                    isASubject && rxUpdater.complete()
+
+                    success
+                        ? resolve([blockHash, eventErrors])
+                        : reject(eventErrors.join(' | '))
                 }
                 const args = [
                     sender,
                     signer && { signer },
-                    handleResult
+                    handleResult,
                 ].filter(Boolean)
-                await tx.signAndSend(...args)
+                return await tx.signAndSend(...args)
             } catch (err) {
                 reject(err)
             }
@@ -419,13 +429,15 @@ export default class BlockchainHelper {
      * @name    tx
      * @summary connects to blcokchain and prepares a transction to be executed
      * 
-     * @param   {String}    txFunc   API function to execute. Must start with "api.tx."
-     * @param   {Array}     funcArgs Arguments to be supplied to the `apiFunc`
+     * @param   {String}    txFunc  API function to execute. Must start with "api.tx."
+     * @param   {Array}     txArgs  Arguments to be supplied to the `apiFunc`
      * 
      * @returns {*} signed transaction
      */
-    tx = async (txFunc, funcArgs) => {
-        if (hasValue(txFunc) && !isStr(txFunc)) return txFunc
+    tx = async (txFunc, txArgs) => {
+        if (hasValue(txFunc) && !isStr(txFunc)) {
+            return txFunc
+        }
 
         const { api } = await this.getConnection()
         // DO NOT REMOVE. If txFunc is string this is used to extract the function from API instance
@@ -435,7 +447,8 @@ export default class BlockchainHelper {
             ? eval(txFunc)
             : txFunc
         if (!isFn(txFunc)) throw new Error(this.texts.errInvalidTxFunc)
-        const tx = txFunc(...funcArgs)
+
+        const tx = await txFunc(...txArgs)
         return tx
     }
 }

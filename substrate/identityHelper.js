@@ -58,7 +58,7 @@ export class IdentityHelper {
 		} catch (err) {
 			// error will occur if wasm-crypto is not initialised or invalid URI passed
 			// console.log('services.identity.addFromUri()', err)
-		} 
+		}
 	}
 
 	/**
@@ -341,7 +341,8 @@ export class IdentityHelper {
 	 * 
 	 * @returns {String} hex string
 	 */
-	signature = (address, message) => {
+	signature = async (address, message) => {
+		if (!isStr(message)) message = JSON.stringify(message)
 		const identity = this.get(address)
 		if (!identity) return null
 
@@ -353,12 +354,12 @@ export class IdentityHelper {
 		}
 
 		// injected identity
-		if (this.extension) return this.extension.signature(address, message)
+		if (this.extension) return await this.extension.signature(address, message)
 
 		return null
 	}
 
-	signatureVerify = (message, signature, address) => this
+	signatureVerify = async (message, signature, address) => await this
 		.keyringHelper
 		.signatureVerify(
 			message,

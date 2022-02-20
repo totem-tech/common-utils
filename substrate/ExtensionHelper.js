@@ -80,7 +80,6 @@ export default class ExtensionHelper {
         const { signature } = await signRaw({
             address,
             data: message,
-            // type: 'bytes' //???
         })
 
         return signature

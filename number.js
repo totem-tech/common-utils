@@ -15,11 +15,14 @@ export const formatNumber = (value, decimals, locale, separator) => {
 	separator = separator || (1.1).toLocaleString(locale).replace(/[0-9]/g, '')
 	const int = parseInt(value)
 	let reminder = Math.abs(value - int)
+	const reminderX = reminder
 	if (reminder > 0) {
 		reminder = separator + `${reminder}`.split('.')[1]
-		reminder = decimals >= 0
-			? reminder.slice(0, decimals + 1)
-			: reminder
+		reminder = decimals === 0
+			? ''
+			: decimals > 0
+				? reminder.slice(0, decimals + 1)
+				: reminder
 	} else {
 		reminder = ''
 	}
