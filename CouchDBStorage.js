@@ -77,8 +77,17 @@ export default class CouchDBStorage {
      * @returns {CouchDBStorage}
      */
     constructor(connectionOrUrl, dbName, fields = []) {
-        this.connectionOrUrl = connectionOrUrl || process.env[`CouchDB_URL_${dbName}`]
-        // whethe to use the global connection or database specific
+        let url = (process.env[`CouchDB_URL_${dbName}`] || '').trim()
+        if (!!url && isStr(url)) {
+            url = new URL(url)
+            if (url.pathname !== '/') {
+                dbName = url.pathname.replace('/', '')
+            }
+            const { host, password, protocol, username } = url
+            url = `${protocol}//${username}:${password}@${host}`
+        }
+        this.connectionOrUrl = url || connectionOrUrl
+        // whether to use the global connection or database specific
         this.useGlobalCon = !this.connectionOrUrl
         this.db = null
         this.dbName = dbName
@@ -240,7 +249,6 @@ export default class CouchDBStorage {
         if (!isObj(con)) throw new Error('CouchDB: invalid connection')
 
         this.dbPromise = new PromisE((resolve, reject) => (async () => {
-
             try {
                 // retrieve a list of all database names
                 const dbNames = await con.db.list()
