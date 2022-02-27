@@ -37,20 +37,24 @@ export const clearClutter = x => x.split('\n')
 
 /**
  * @name	copyToClipboard
- * @summary copies text to clipboard. No compatible with NodeJS.
+ * @summary copies text to browser clipboard. Not compatible with NodeJS.
  * 
  * @param	{String} str 
  */
 export const copyToClipboard = str => {
-	const el = document.createElement('textarea')
-	el.value = str
-	el.setAttribute('readonly', '')
-	el.style.position = 'absolute'
-	el.style.left = '-9999px'
-	document.body.appendChild(el)
-	el.select()
-	document.execCommand('copy')
-	document.body.removeChild(el)
+	try {
+		window.navigator.clipboard.writeText(url)
+	} catch (e) {
+		const el = document.createElement('textarea')
+		el.value = str
+		el.setAttribute('readonly', '')
+		el.style.position = 'absolute'
+		el.style.left = '-9999px'
+		document.body.appendChild(el)
+		el.select()
+		document.execCommand('copy')
+		document.body.removeChild(el)
+	}
 }
 
 export const downloadFile = (content, fileName, contentType) => {
@@ -165,7 +169,6 @@ export const isFn = x => typeof x === 'function'
 export const isHash = x => HASH_REGEX.test(`${x}`)
 export const isHex = x => HEX_REGEX.test(`${x}`)
 export const isInteger = x => Number.isInteger(x)
-export const isPositiveInteger = x => isInteger(x) && x > 0
 export const isMap = x => x instanceof Map
 export const isNodeJS = () => {
 	try {
@@ -179,11 +182,31 @@ export const isObj = x => !!x && typeof x === 'object' && !isArr(x) && !isMap(x)
 export const isObjArr = x => isArr(x) && x.every(isObj)
 // Checks if argument is a Map of Objects. Each element type must be object, otherwise will return false.
 export const isObjMap = x => isMap(x) && Array.from(x).every(([_, v]) => isObj(v))
+export const isPositiveInteger = x => isInteger(x) && x > 0
 export const isPromise = x => x instanceof Promise
 export const isSet = x => x instanceof Set
 export const isStr = x => typeof x === 'string'
 export const isSubjectLike = x => isObj(x) && isFn(x.subscribe) && isFn(x.next)
 export const isUint8Arr = arr => arr instanceof Uint8Array
+export const isURL = x => x instanceof URL
+export const isValidURL = (x, strict = true) => {
+	try {
+		const isAStr = isStr(x)
+		const url = isURL(x)
+			? x
+			: new URL(x)
+		// If strict mode is set to `true` and if a string value provided, it must match resulting value of new URL(x).
+		// This can be used to ensure that a URL can be queried without altering.
+		if (!isAStr || !strict) return true
+		// catch any auto-correction by `new URL()`. 
+		// Eg: spaces in the domain name being replaced by`%20` or missing `/` in protocol being auto added
+		x = `${x}`
+		if (x.endsWith(url.hostname)) x += '/'
+		return url.href == x
+	} catch (e) {
+		return false
+	}
+}
 export const isValidNumber = x => typeof x == 'number' && !isNaN(x) && isFinite(x)
 export const hasValue = x => {
 	try {

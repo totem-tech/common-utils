@@ -1,11 +1,21 @@
-import { isAsyncFn, isPromise, isFn, isObj, isInteger, isValidNumber, isPositiveInteger, isArr } from "./utils"
+import {
+    isArr,
+    isAsyncFn,
+    isFn,
+    isInteger,
+    isObj,
+    isPositiveInteger,
+    isPromise,
+    isValidNumber,
+    isValidURL,
+} from './utils'
 /*
- * List of optional node-modules and the functions used by them:
- * Module Name          : Function Name
+ * List of optional node-modules and the functions required for NodeJS:
+ * Module Name     : Substitue For
  * ------------------------------------
- * abort-controller: PromisE.fetch
- * node-fetch      : PromisE.fetch
-*/
+ * abort-controller: AbortController
+ * node-fetch      : fetch
+ */
 
 /** 
  * @name PromisE
@@ -35,11 +45,13 @@ export default function PromisE(promise) {
             const args = [...arguments]
             // supplied is not a promise instance
             // check if it is an uninvoked async function
-            promise = isPromise(promise) ? promise : (
-                isAsyncFn(promise) ? promise.apply(null, args.slice(1)) : (
-                    isFn(promise) ? new Promise(promise) : Promise.resolve(promise)
-                )
-            )
+            promise = isPromise(promise)
+                ? promise
+                : isAsyncFn(promise)
+                    ? promise.apply(null, args.slice(1)) // pass rest of the arguments to the async function (args[0])
+                    : isFn(promise)
+                        ? new Promise(promise)
+                        : Promise.resolve(promise)
         } catch (err) {
             // something unexpected happened!
             promise = Promise.reject(err)
@@ -127,7 +139,7 @@ PromisE.delay = (delay, result = delay) => new PromisE(resolve =>
 )
 
 /**
- * @name    PromisE.emitAsPromise
+ * @name    PromisE.getSocketEmitter
  * @summary a wrapper function for socket.io emitter to eliminate the need to use callbacks. 
  * 
  * @param   {Object} socket         'socket.io-client' client instance.
@@ -159,11 +171,13 @@ PromisE.delay = (delay, result = delay) => new PromisE(resolve =>
  * @example Example 2: Handle time out
  * ```javascript
  * const resultPromise = emitter('message', ['Hello world'])
- * resultPromise.catch(err => {
+ * resultPromise
+ * .then(result => alert('Result received on time'))
+ * .catch(err => {
  *     if (resultPromise.timeout) alert('Request is taking longer than expected')
  *      resultPromise
  *          .promise
- *          .then(result => alert('Finally, got the result!'))
+ *          .then(result => alert('Finally, got the result after the timeout!'))
  * })
  * ```
  */
@@ -215,22 +229,62 @@ PromisE.getSocketEmitter = (socket, timeoutGlobal, errorArgIndex = 0, callbackIn
     }
 }
 
-// if timed out err.name will be 'AbortError''
+/**
+ * @name    PromisE.fetch
+ * @summary makes HTTP requests
+ * 
+ * @param   {String}    url 
+ * @param   {Object}    options 
+ * @param   {Number}    timeout 
+ * @param   {Boolean}   asJson 
+ * 
+ * @returns {*} result
+ */
 PromisE.fetch = async (url, options, timeout, asJson = true) => {
-    try {
-        options = isObj(options) ? options : {}
-        options.method = options.method || 'get'
-        if (isInteger(timeout)) options.signal = getAbortSignal(timeout)
+    if (!isValidURL(url)) throw new Error('Invalid URL')
+    // url = new URL(url)
+    options = isObj(options)
+        ? options
+        : {}
+    options.method = options.method || 'get'
+    if (isInteger(timeout)) options.signal = getAbortSignal(timeout)
 
-        const result = await fetcher(url, options)
-        return asJson
-            ? await result.json()
-            : result
-    } catch (err) {
-        if (err.name === 'AbortError') throw new Error('Request timed out')
-        throw err
-    }
+    const result = await fetch(url.toString(), options)
+        .catch(err =>
+            Promise.reject(
+                err.name === 'AbortError'
+                    ? new Error('Request timed out')
+                    : err
+            )
+        )
+    return asJson
+        ? await result.json()
+        : result
 }
+
+/**
+ * @name    PromisE.post
+ * @summary makes HTTP post requests
+ * 
+ * @param   {String}    url 
+ * @param   {Object}    data 
+ * @param   {Object}    options 
+ * @param   {Number}    timeout 
+ * @param   {Boolean}   asJson 
+ * 
+ * @returns {*} result
+ */
+PromisE.post = async (url, data, options, timeout, asJson = true) => await PromisE
+    .fetch(
+        url,
+        {
+            ...options,
+            body: JSON.stringify(data),
+            method: 'post',
+        },
+        timeout,
+        asJson
+    )
 
 /** 
  * @name    PromisE.race
@@ -252,21 +306,38 @@ PromisE.race = (...promises) => PromisE(Promise.race(promises.flat()))
  * 
  * @example Example 1: multiple promises
  * ```javascript
- *    PromisE.timeout(30000, Promise.resolve(1))
+ *    PromisE.timeout(
+ *      30000, // timeout duration
+ *      Promise.resolve(1)
+ *    )
  *    // Result: 1
  * ```
  *
  * @example Example 2: multiple promises
  *
  * ```javascript
- *    PromisE.timeout(30000, Promise.resolve(1), Promise.resolve(2), Promise.resolve(3))
+ *    PromisE.timeout(
+ *      30000, // timeout duration
+ *      Promise.resolve(1),
+ *      Promise.resolve(2),
+ *      Promise.resolve(3),
+ *    )
  *    // Result: [ 1, 2, 3 ]
  * ```
  * 
- * @example Example 3: timeout
+ * @example Example 3: default timeout duration 10 seconds
  * ```javascript
- *  PromisE.timeout(PromisE.delay(20000))
- *
+ *    const promise = PromisE.timeout(PromisE.delay(20000))
+ *    promise.catch(err => {
+ *          if (promise.timeout) {
+ *              // request timed out
+ *              alert('Request is taking longer than expected......')
+ *              promise.promise.then(result => alert(result))
+ *              return
+ *          }
+ *          alert(err)
+ *      })
+ *```
  * @returns {PromisE} resultPromise
  */
 PromisE.timeout = (...args) => {
@@ -288,32 +359,30 @@ PromisE.timeout = (...args) => {
         }, timeout)
     )
     const resultPromise = PromisE.race([promise, timeoutPromise])
-    // attach the timoutPromise so that it can be used to determined whether the error was 
-    // due to timeout or request failure by checking `timeoutPromise.rejected === true`
-    resultPromise.timeout = timeoutPromise
+    resultPromise.timeoutPromise = timeoutPromise
     resultPromise.promise = promise
     return resultPromise
 }
 
 const getAbortSignal = timeout => {
-    let abortCtrl
-    try {
-        abortCtrl = new AbortController()
-    } catch (err) {
-        abortCtrl = new require('abort-controller')
-    }
+    let abortCtrl = new AbortController()
+    // try {
+    //     abortCtrl = new AbortController()
+    // } catch (err) {
+    //     abortCtrl = new require('abort-controller')
+    // }
     setTimeout(() => abortCtrl.abort(), timeout)
     return abortCtrl.signal
 }
-const fetcher = async (url, options) => {
-    let _fetch
-    try {
-        _fetch = fetch
-    } catch (_) {
-        // required if nodejs
-        _fetch = require('node-fetch')
-    }
-    _fetch.Promise = PromisE
+// const fetcher = async (url, options) => {
+//     let _fetch
+//     try {
+//         _fetch = fetch
+//     } catch (_) {
+//         // required if nodejs
+//         _fetch = require('node-fetch')
+//     }
+//     _fetch.Promise = PromisE
 
-    return _fetch(url, options)
-}
+//     return _fetch(url, options)
+// }

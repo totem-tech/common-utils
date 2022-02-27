@@ -3,7 +3,7 @@
  */
 import { BehaviorSubject, Subject } from 'rxjs'
 import PromisE from './PromisE'
-import { hasValue, isDefined, isFn, isObj, isSubjectLike, isValidNumber } from './utils'
+import { hasValue, isArr, isDefined, isFn, isObj, isSubjectLike, isValidNumber } from './utils'
 
 const useEffect = (...args) => require('react').useEffect(...args)
 const useReducer = (...args) => require('react').useReducer(...args)
@@ -261,18 +261,17 @@ useRxSubject.IGNORE_UPDATE = Symbol('ignore-rx-subject-update')
  * @param   {Object|Array|Function} x 
  */
 export const unsubscribe = (x = {}) => {
-    if (!x) return
     if (isFn(x)) return x()
-    if (isFn(x?.unsubscribe)) return x.unsubscribe()
+    if (!isArr(x) || !isObj(x)) return
 
     Object.values(x)
-        .forEach(x => {
+        .forEach(val => {
             try {
-                if (!x) return
-                const fn = isFn(x)
-                    ? x
-                    : isFn(x.unsubscribe)
-                        ? x.unsubscribe
+                if (!val) return
+                const fn = isFn(val)
+                    ? val
+                    : val && isFn(val.unsubscribe)
+                        ? val.unsubscribe
                         : null
                 fn && fn()
             } catch (e) { } // ignore

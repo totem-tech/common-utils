@@ -12,17 +12,19 @@ import {
     isSubjectLike,
     isValidNumber,
 } from '../utils'
+import PromisE from '../PromisE'
 import getKeyringHelper, { KeyringHelper } from './keyringHelper'
 
 // Indicates if run on a Browser or console using NodeJS
 const isBrowser = !isNodeJS()
 export const texts = {
     // error messages
-    errAddress404: 'Address not found in the keyring',
+    errAddress404: 'address not found in the keyring',
     errConnectionFailed: 'connection failed',
-    errInvalidApiFunc: 'Invalid query API function',
-    errInvalidMutliArgsMsg: 'Failed to process arguments for multi-query',
-    errInvalidTxFunc: 'Invalid transaction API function',
+    errInvalidApiFunc: 'invalid query API function',
+    errInvalidMutliArgsMsg: 'failed to process arguments for multi-query',
+    errInvalidTxFunc: 'invalid transaction API function',
+    errBlockNumber: 'unexpected error while fetching block number',
     // Log messages
     connected: 'connected',
     connecting: 'connecting',
@@ -228,6 +230,27 @@ export default class BlockchainHelper {
         // wait until api is ready
         await api.isReady
         return this.connection
+    }
+
+    /**
+     * @name    getCurrentBlock
+     * @summary get the current block number
+     * 
+     * @param   {Function}  callback (optional) supply a callback function to subscribe to block nubmer changes
+     * 
+     * @returns {Number|Function} result or unsubscribe function
+     */
+    getCurrentBlock = async (callback) => {
+        if (!isFn(callback)) {
+            const res = await this.query('api.rpc.chain.getBlock')
+            try {
+                return res.block.header.number
+            } catch (err) {
+                this.log(this.texts.errBlockNumber, err)
+                return 0
+            }
+        }
+        return await this.query('api.rpc.chain.subscribeNewHeads', [res => callback(res.number)])
     }
 
     /**

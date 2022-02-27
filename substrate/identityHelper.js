@@ -1,6 +1,6 @@
 import { BehaviorSubject } from 'rxjs'
 import DataStorage from '../DataStorage'
-import { isArr, isNodeJS, isObj, isStr, objClean, objHasKeys } from '../utils'
+import { isNodeJS, isObj, isStr, objClean, objHasKeys } from '../utils'
 import getKeyringHelper, { KeyringHelper } from './keyringHelper'
 import PolkadotExtensionHelper from './ExtensionHelper'
 

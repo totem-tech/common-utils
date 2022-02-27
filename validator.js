@@ -15,6 +15,7 @@ import {
     isFn,
     isValidDate,
     objWithoutKeys,
+    isValidURL,
 } from './utils'
 
 export let messages = {
@@ -99,7 +100,7 @@ export const setMessages = msgObj => {
  * validate(123456, { max: 9999, min: 0, required: true, type: TYPES.number})
  * ```
  * 
- * @returns {String|Null} null if no errors. Otherwise, error message.
+ * @returns {String|Null} null if valid according to supplied config. Otherwise, validation error message.
  */
 export const validate = (value, config, customMessages = {}) => {
     const errorMsgs = {
@@ -234,16 +235,7 @@ export const validate = (value, config, customMessages = {}) => {
                 if (!isStr(value)) return errorMsgs.string
                 break
             case 'url':
-                try {
-                    const url = new URL(value)
-                    // catch any auto-correction by `new URL()`. 
-                    // Eg: spaces in the domain name being replaced by`%20` or missing `/` in protocol being auto added
-                    if (!isStr(value)) return
-                    if (value.endsWith(url.hostname)) value += '/'
-                    if (url.href !== value) return errorMsgs.url
-                } catch (e) {
-                    return errorMsgs.url
-                }
+                if (!isValidURL(value)) return errorMsgs.url
                 break
             default:
                 // validation for unlisted types by checking if the value is an instance of `type`
