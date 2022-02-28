@@ -66,7 +66,6 @@ export default class CrowdloanHelper {
         const isSubscribe = isFn(callback)
         const handleResult = (result = {}) => {
             if (result && formatted) {
-                result = result || {}
                 ['cap', 'deposit', 'raised']
                     .forEach(key => {
                         result[key] = this.formatAmount(
