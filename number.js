@@ -48,7 +48,7 @@ export const round = (value = 0, decimals = 0) => {
  * @summary formats number in short form. Eg: converts `1000` to `"1K"`
  * 
  * @param	{Number} value 
- * @param	{Number} decimals 
+ * @param	{Number} decimals	Default: `0`
  * 
  * @returns {String}
  */

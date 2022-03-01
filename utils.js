@@ -132,7 +132,8 @@ export const isArr = x => Array.isArray(x)
 export const isArr2D = x => isArr(x) && x.every(isArr)
 // checks if convertible to an array by using `Array.from(x)`
 export const isArrLike = x => isSet(x) || isMap(x) || isArr(x)
-export const isAsyncFn = x => x instanceof (async () => { }).constructor && x[Symbol.toStringTag] === "AsyncFunction"
+export const isAsyncFn = x => Object.prototype.toString.call(x) == '[object AsyncFunction]'
+//x instanceof (async () => { }).constructor && x[Symbol.toStringTag] === "AsyncFunction"
 export const isBool = x => typeof x === 'boolean'
 export const isBond = x => {
 	try {
@@ -177,7 +178,8 @@ export const isNodeJS = () => {
 		return true
 	}
 }
-export const isObj = x => !!x && typeof x === 'object' && !isArr(x) && !isMap(x) && !isSet(x)
+export const isObj = x => Object.prototype.toString.call(x) === '[object Object]'
+//!!x && typeof x === 'object' && !isArr(x) && !isMap(x) && !isSet(x)
 // Checks if argument is an Array of Objects. Each element type must be object, otherwise will return false.
 export const isObjArr = x => isArr(x) && x.every(isObj)
 // Checks if argument is a Map of Objects. Each element type must be object, otherwise will return false.

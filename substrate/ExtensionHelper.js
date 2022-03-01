@@ -32,6 +32,14 @@ export default class ExtensionHelper {
     }
 
     /**
+     * @name    checkInjected
+     * @summary check if PolkadotJS extension injection was successful
+     * 
+     * @returns {Boolean}
+     */
+    checkInjected = () => this.web3.isWeb3Injected
+
+    /**
      * @name    enable
      * @summary enable PolkadotJS extension
      * 
