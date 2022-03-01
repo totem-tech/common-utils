@@ -1,4 +1,4 @@
-import { isNodeJS } from './utils'
+import { isArr, isNodeJS } from './utils'
 
 export const DEVICE_TYPE = {
     desktop: 'desktop',
@@ -16,11 +16,12 @@ export const TABLET_REGEX = /(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i
  * @name    checkDevice
  * @summary check if device is of specific type
  * 
- * @param   {String} type   Valid types: desktop, mobile, table or nodejs
+ * @param   {String|Array} type   Valid types: desktop, mobile, table or nodejs
  * 
  * @returns {Boolean}
  */
-export const checkDevice = type => getDeviceType() === type
+export const checkDevice = type => [...isArr(type) ? type : [type]]
+    .includes(getDeviceType())
 
 /**
  * @name    getDeviceType
