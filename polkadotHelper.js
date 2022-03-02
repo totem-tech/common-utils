@@ -52,11 +52,17 @@ export const connect = (
     const timeoutMsg = config.errorMsgs.connectionTimeout
     const failedMsg = config.errorMsgs.connectionFailed
     const provider = new WsProvider(nodeUrl, autoConnect)
+
     if (!autoConnect) provider.connect()
     // auto reject if doesn't connect within specified duration
     const tId = setTimeout(() => !provider.isConnected() && reject(timeoutMsg), timeout)
     // reject if connection fails
-    provider.websocket.addEventListener('error', () => reject(failedMsg) | clearTimeout(tId))
+    provider.websocket.onerror = err => {
+        console.log(failedMsg, err)
+        clearTimeout(tId)
+        provider.disconnect()
+        reject(failedMsg)
+    }
     // instantiate the Polkadot API using the provider and supplied types
     ApiPromise.create({ provider, types }).then(api =>
         resolve({ api, keyring, provider }) | clearTimeout(tId),
