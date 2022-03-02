@@ -11,6 +11,7 @@ import {
     hasValue,
     isSubjectLike,
     isValidNumber,
+    isAsyncFn,
 } from '../utils'
 import PromisE from '../PromisE'
 import getKeyringHelper, { KeyringHelper } from './keyringHelper'
@@ -194,42 +195,38 @@ export default class BlockchainHelper {
      * @returns {Object} an object with the following properties: api, provider
      */
     getConnection = async () => {
+        if (this.connectPromise?.pending) return await this.connectPromise
+
         let { api, provider } = this.connection || {}
-        if (!!provider) {
-            if (!provider.isConnected) {
-                this.log(this.texts.reconnecting)
-                // Provider was disconnected. Attempt to reconnect
-                provider.connect()
+        const connectWithoutRetry = () => new PromisE((resolve, reject) =>
+            (async () => {
+                try {
+                    const { ApiPromise } = require('@polkadot/api')
+                    const { WsProvider } = require('@polkadot/rpc-provider')
+                    provider ??= new WsProvider(this.nodeUrls, false)
+                    if (!provider.isConnected) {
+                        this.log(this.texts.connecting, this.nodeUrls)
+                        const unsubscribe = provider.on('error', () => {
+                            this.log(this.texts.errConnectionFailed)
+                            unsubscribe()
+                            reject(`${this.title}: ${this.texts.errConnectionFailed}`)
+                        })
+                        await provider.connect()
+                        unsubscribe()
+                    }
+                    api ??= await ApiPromise.create({ provider })
+                    await api.ready
+                    this.connection.api = api
+                    this.connection.provider = provider
+                    resolve(this.connection)
+                } catch (err) {
+                    reject(err)
+                }
+            })()
+        )
 
-                // Wait 2 seconds for reconnection and provider to be updated accordingly
-                await PromisE.delay(2000)
-                // wait another 3 seconds if still not connected
-                if (!provider.isConnected) await PromisE.delay(3000)
-                this.log(this.texts.reconnected, provider.isConnected)
-            }
-            // wait until api is ready
-            await api.isReady
-            return this.connection
-        }
-        if (this.connectPromise) {
-            await this.connectPromise
-            return this.connection
-        }
-
-        this.log(this.texts.connecting, this.nodeUrls)
-        const { ApiPromise, WsProvider } = require('@polkadot/api')
-        provider = new WsProvider(this.nodeUrls, 100)
-        this.connectPromise = ApiPromise.create({ provider })
-
-        api = await this.connectPromise
-
-        this.connection.api = api
-        this.connection.provider = provider
-        this.log(this.texts.connected, isBrowser && this.connection)
-
-        // wait until api is ready
-        await api.isReady
-        return this.connection
+        this.connectPromise = connectWithoutRetry()
+        return await this.connectPromise
     }
 
     /**

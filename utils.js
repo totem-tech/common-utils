@@ -132,8 +132,9 @@ export const isArr = x => Array.isArray(x)
 export const isArr2D = x => isArr(x) && x.every(isArr)
 // checks if convertible to an array by using `Array.from(x)`
 export const isArrLike = x => isSet(x) || isMap(x) || isArr(x)
-export const isAsyncFn = x => Object.prototype.toString.call(x) == '[object AsyncFunction]'
+export const isAsyncFn = x => x instanceof (async () => { }).constructor && x[Symbol.toStringTag] === "AsyncFunction"
 //x instanceof (async () => { }).constructor && x[Symbol.toStringTag] === "AsyncFunction"
+//Object.prototype.toString.call(x) == '[object AsyncFunction]'
 export const isBool = x => typeof x === 'boolean'
 export const isBond = x => {
 	try {

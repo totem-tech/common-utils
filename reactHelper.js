@@ -1,6 +1,7 @@
 /*
  * a set of reusable React and state related utility functions
  */
+import { isPromise } from '@polkadot/util'
 import { BehaviorSubject, Subject } from 'rxjs'
 import PromisE from './PromisE'
 import { hasValue, isArr, isDefined, isFn, isObj, isSubjectLike, isValidNumber } from './utils'
@@ -228,8 +229,10 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowSubjectU
     })
 
     useEffect(() => {
+        let mounted = true
         let ignoreFirst = !(subject instanceof BehaviorSubject)
         const subscribed = subject.subscribe((newValue) => {
+            if (!mounted) return
             if (!ignoreFirst) {
                 ignoreFirst = true
                 if (firstValue === newValue) return
@@ -242,7 +245,11 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowSubjectU
                     setState({ value: newValue })
                 })
         })
-        return () => subscribed.unsubscribe()
+
+        return () => {
+            mounted = false
+            subscribed.unsubscribe()
+        }
     }, [])
 
     const setValue = newValue => !allowSubjectUpdate

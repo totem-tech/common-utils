@@ -39,7 +39,7 @@ import {
  *
  * @returns {PromisE} with 3 accessible boolean properties: pending, rejected, resolved
  */
-export default function PromisE(promise) {
+export default function PromisE(promise, log) {
     if (!(promise instanceof Promise)) {
         try {
             const args = [...arguments]
@@ -205,7 +205,7 @@ PromisE.getSocketEmitter = (socket, timeoutGlobal, errorArgIndex = 0, callbackIn
 
                         if (isFn(resultModifier)) result = await resultModifier(result)
                     } catch (err) {
-                        console.log({ interceptorError: err })
+                        console.log('PromisE.getSocketEmitter', { interceptorError: err })
                     }
                     resolve(result)
                 }
