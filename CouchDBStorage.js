@@ -282,7 +282,7 @@ export default class CouchDBStorage {
      *                               Default: true
      * @param   {Object}  extraProps (optional) extra properties to be supplied to to the mango query
      * @param   {Number}    timeout     query timeout duration in milliseconds.
-     *                                  Default: `15000`
+     *                                  Default: `30000`
      * 
      * @returns {Map|Array}
      */
@@ -303,11 +303,11 @@ export default class CouchDBStorage {
      * @param   {Number}    skip 
      * @param   {Object}    extraProps
      * @param   {Number}    timeout     query timeout duration in milliseconds.
-     *                                  Default: `15000`
+     *                                  Default: `30000`
      * 
      * @returns {Array}
      */
-    async searchRaw(selector = {}, limit = 0, skip = 0, extraProps = {}, timeout = 15000) {
+    async searchRaw(selector = {}, limit = 0, skip = 0, extraProps = {}, timeout = 30000) {
         const db = await this.getDB()
         const query = {
             fields: this.fields,
@@ -342,7 +342,7 @@ export default class CouchDBStorage {
      *
      * @returns {Object}
      */
-    async set(id, value, update = true, merge = true, timeout = 3000, updateTS = true) {
+    async set(id, value, update = true, merge = true, timeout = 10000, updateTS = true) {
         id = isStr(id)
             ? id
             : uuid.v1()
