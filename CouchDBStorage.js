@@ -23,6 +23,16 @@ export const getConnection = async (url, global = true) => {
     return con
 }
 
+const getConnectionUrl = url => {
+    url = new URL(url)
+    if (url.pathname !== '/') {
+        dbName = url.pathname.replace('/', '')
+    }
+    const { host, password, protocol, username } = url
+    url = `${protocol}//${username}:${password}@${host}`
+    return url
+}
+
 /**
  * @name    isCouchDBStorage
  * @summary checks if all arguments are instance of CouchDBStorage class
@@ -248,7 +258,7 @@ export default class CouchDBStorage {
         // database already initialized
         if (!isObj(con)) throw new Error('CouchDB: invalid connection')
 
-        this.dbPromise = new PromisE((resolve, reject) => (async () => {
+        this.dbPromise = this.dbPromise || new PromisE((resolve, reject) => (async () => {
             try {
                 // retrieve a list of all database names
                 const dbNames = await con.db.list()
@@ -256,10 +266,17 @@ export default class CouchDBStorage {
                 if (!dbNames.includes(dbName)) {
                     // database doesn't exist, create it
                     console.log('CouchDB: new database created. Name:', dbName)
-                    await con.db.create(dbName)
+                    await con.db
+                        .create(dbName)
+                        .catch(err =>
+                            `${err}`.includes('already exists')
+                                ? null
+                                : Promise.reject(err)
+                        )
                 }
+                this.db = await con.use(dbName)
+                resolve(this.db)
                 this.dbPromise = null
-                resolve(con.use(dbName))
             } catch (err) {
                 reject(err)
             }
