@@ -259,11 +259,13 @@ export const sanitise = x => JSON.parse(JSON.stringify(x)) // get rid of jargon
  */
 export const signAndSend = async (api, address, tx, nonce, rxStatus) => {
     const account = _keyring.getPair(address)
-    nonce = nonce || await query(api, api.query.system.accountNonce, address)
-    if (nonces[address] && nonces[address] >= nonce) {
-        nonce = nonces[address] + 1
+    if (!nonce) {
+        nonce = await query(api, api.query.system.accountNonce, address)
+        if (nonces[address] && nonces[address] >= nonce) {
+            nonce = nonces[address] + 1
+        }
+        nonces[address] = nonce
     }
-    nonces[address] = nonce
     console.log('Totem Blockchain: initiating transation', { nonce })
     return await new Promise(async (resolve, reject) => {
         try {
