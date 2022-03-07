@@ -69,7 +69,7 @@ export const decrypt = (sealed, nonce, senderPublicKey, recipientSecretKey, asSt
 export const decryptObj = (obj, senderPublicKey, recipientSecretKey, keys, asString = true) => {
     if (!isObj(obj)) return
 
-    const result = {...obj}
+    const result = { ...obj }
     const isBox = !!senderPublicKey
     const open = isBox
         ? decrypt
@@ -79,7 +79,7 @@ export const decryptObj = (obj, senderPublicKey, recipientSecretKey, keys, asStr
         ? Object.keys(result)
         // decrypt only specified properties
         : keys.filter(k => result.hasOwnProperty(k))
-    
+
     for (let i = 0; i < validKeys.length; i++) {
         const key = validKeys[i]
         const value = result[key]
@@ -92,7 +92,7 @@ export const decryptObj = (obj, senderPublicKey, recipientSecretKey, keys, asStr
                 .filter(k => k.startsWith(childKeyPrefix))
                 // get rid of prefix
                 .map(k => k.replace(new RegExp(childKeyPrefix), ''))
-            
+
             result[key] = decryptObj(
                 value,
                 senderPublicKey,
@@ -253,10 +253,10 @@ export const encryptObj = (obj, secretKey, recipientPublicKey, keys, asHex = tru
         : secretBoxEncrypt
     const validKeys = !isArr(keys)
         // encrypt all properties
-        ? Object.keys(result) 
+        ? Object.keys(result)
         //  encrypt only specified properties
         : keys.filter(k => result.hasOwnProperty(k))
-    
+
     for (let i = 0; i < validKeys.length; i++) {
         const key = validKeys[i]
         const value = result[key]
@@ -269,7 +269,7 @@ export const encryptObj = (obj, secretKey, recipientPublicKey, keys, asHex = tru
                 .filter(k => k.startsWith(childKeyPrefix))
                 // get rid of prefix
                 .map(k => k.replace(new RegExp(childKeyPrefix), ''))
-            
+
             result[key] = encryptObj(
                 value,
                 secretKey,
@@ -290,11 +290,11 @@ export const encryptObj = (obj, secretKey, recipientPublicKey, keys, asHex = tru
             false,
         )
         if (!encrypted && !sealed) {
-            console.log('Encryption failed!',{value})
+            console.log('Encryption failed!', { value })
             throw new Error('Encryption failed!')
         }
 
-        const bytes = new Uint8Array([ ...nonce, ...(encrypted || sealed) ])
+        const bytes = new Uint8Array([...nonce, ...(encrypted || sealed)])
         result[key] = !asHex
             ? bytes
             : bytesToHex(bytes)
@@ -337,7 +337,7 @@ export const encryptionKeypair = (keyData, asHex = true) => {
 export const keyDataFromEncoded = (encoded, asHex = false) => {
     // convert to Uint8Array if required
     encoded = hexToBytes(encoded)
-    
+
     // Convert PolkadotJS keyring's `encoded` to oo7-substrate `keyData`
     if (encoded.length > 96) {
         encoded = new Uint8Array([
@@ -364,7 +364,7 @@ export const keyDataFromEncoded = (encoded, asHex = false) => {
  * 
  * @returns {Object}    { address, publicKey, secretKey }
  */
-export const keyInfoFromKeyData = (keyData = '', ss58Format = 0, asHex = false) => {
+export const keyInfoFromKeyData = (keyData = '', ss58Format, asHex = false) => {
     let bytes = keyDataFromEncoded(keyData, false)
     const publicKey = bytes.slice(64, 96)
     const secretKey = bytes.slice(0, 64)

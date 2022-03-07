@@ -24,7 +24,7 @@ export const rxForeUpdateCache = new Subject()
 try {
     if (isNodeJS()) {
         // for NodeJS server
-        const STORAGE_PATH = process.env.STORAGE_PATH || './server/data'
+        const STORAGE_PATH = process.env.STORAGE_PATH || './data'
         storage = new require('node-localstorage')
             .LocalStorage(STORAGE_PATH, 500 * 1024 * 1024)
         const absolutePath = require('path')
@@ -38,7 +38,10 @@ try {
             setItem: () => { },
         }
     }
-} catch (_) { /* ignore error */ }
+} catch (err) {
+    /* ignore error if not nodejs */
+    if (isNodeJS() && err.message.toLowerCase().includes('no such file or directory')) throw err
+}
 
 /**
  * @name    read
