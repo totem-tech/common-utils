@@ -5,6 +5,8 @@ import { isObj, isStr, isArr, arrUnique, isMap, isValidNumber } from './utils'
 
 // globab connection for use with multiple databases
 let connection
+// all individual connections
+const connections = {}
 /**
  * @name    getConnection
  * @summary getConnection returns existing connection, if available.
@@ -18,8 +20,10 @@ let connection
 export const getConnection = async (url, global = true) => {
     if (global && connection) return connection
 
-    const con = await nano(url)
+    const con = connections[url] || await nano(url)
+    // set as global connection
     if (global) connection = con
+    connections[url] = con
     return con
 }
 
@@ -87,14 +91,23 @@ export default class CouchDBStorage {
      * @returns {CouchDBStorage}
      */
     constructor(connectionOrUrl, dbName, fields = []) {
+        // Global DB name prefix and suffix applied to all databases excluding 
+        const prefix = process.env.CouchDB_DBName_Prefix || ''
+        const suffix = process.env.CouchDB_DBName_Suffix || ''
+        dbName = `${prefix}${dbName}${suffix}`
+
+        // Connection/URL/DBName override for individual databases
         let url = (process.env[`CouchDB_URL_${dbName}`] || '').trim()
         if (!!url && isStr(url)) {
             url = new URL(url)
             if (url.pathname !== '/') {
+                // URL includes a DBName override 
                 dbName = url.pathname.replace('/', '')
             }
             const { host, password, protocol, username } = url
             url = `${protocol}//${username}:${password}@${host}`
+            // re-use existing connection to the same URL if available
+            url = connections[url] || url
         }
         this.connectionOrUrl = url || connectionOrUrl
         // whether to use the global connection or database specific
