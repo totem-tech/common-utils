@@ -41,13 +41,34 @@ class TwitterHelper {
     async getFollower(sourceHandle, targetHandle) {
         await this.getClient()
         const params = {
-            'source_screen_name': sourceHandle,
-            'target_screen_name': targetHandle,
+            source_screen_name: sourceHandle,
+            target_screen_name: targetHandle,
         }
         try {
             const { relationship = {} } = await this.client
                 .get('friendships/show', params)
             return relationship.target || {}
+        } catch (err) {
+            throw new Error(!err.errors
+                ? err
+                : this.joinTwitterErrors(err)
+            )
+        }
+    }
+
+    async getFollowersList(userHanlde, count = 200, cursor = -1, skipStatus = true, include_user_entities = false) {
+        await this.getClient()
+        const params = {
+            count,
+            cursor,
+            include_user_entities,
+            screen_name: userHanlde,
+            skipStatus,
+        }
+        try {
+            const result = await this.client
+                .get('followers/list', params)
+            return result || {}
         } catch (err) {
             throw new Error(!err.errors
                 ? err
