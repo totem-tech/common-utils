@@ -257,14 +257,16 @@ export const sanitise = x => JSON.parse(JSON.stringify(x)) // get rid of jargon
  * 
  * @returns {Array}   [blockHash, eventsArr]
  */
-export const signAndSend = async (api, address, tx, nonce, rxStatus) => {
+export const signAndSend = async (api, address, tx, nonce, rxStatus, tag) => {
     const account = _keyring.getPair(address)
-    nonce = nonce || await query(api, api.query.system.accountNonce, address)
-    if (nonces[address] && nonces[address] >= nonce) {
-        nonce = nonces[address] + 1
+    if (!nonce) {
+        nonce = await query(api, api.query.system.accountNonce, address)
+        if (nonces[address] && nonces[address] >= nonce) {
+            nonce = nonces[address] + 1
+        }
+        nonces[address] = nonce
     }
-    nonces[address] = nonce
-    console.log('Totem Blockchain: initiating transation', { nonce })
+    console.log('Totem Blockchain: initiating transation', tag, { nonce })
     return await new Promise(async (resolve, reject) => {
         try {
             const signed = await tx.sign(account, { nonce })
@@ -272,7 +274,7 @@ export const signAndSend = async (api, address, tx, nonce, rxStatus) => {
                 const { events, status } = result
                 const isFuture = status.type !== 'Future'
                 let hash = ''
-                console.log('Totem Blockchain: Transaction status', status.type)
+                console.log('Totem Blockchain: Transaction status', tag, status.type)
 
                 // notify
                 rxStatus && rxStatus.next(result)
@@ -293,7 +295,7 @@ export const signAndSend = async (api, address, tx, nonce, rxStatus) => {
                 }).filter(Boolean)
 
                 if (eventErrors.length > 0) {
-                    console.log('Totem Blockchain: Transaction failed!', { blockHash: hash, eventErrors })
+                    console.log('Totem Blockchain: Transaction failed!', tag, { blockHash: hash, eventErrors })
                     return reject(eventErrors.join(' | '))
                 }
 
@@ -304,7 +306,7 @@ export const signAndSend = async (api, address, tx, nonce, rxStatus) => {
                 }))
                     // exclude empty event data
                     .filter(event => event.data && event.data.length) || {}
-                console.log(`Totem Blockchain: Completed at block hash: ${hash}`, isNode ? '' : { eventsArr })
+                console.log(`Totem Blockchain: Completed at block hash: ${hash}`, tag, isNode ? '' : { eventsArr })
                 rxStatus && rxStatus.complete()
                 resolve([hash, eventsArr])
             })
