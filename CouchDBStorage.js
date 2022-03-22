@@ -7,6 +7,7 @@ import { isObj, isStr, isArr, arrUnique, isMap, isValidNumber } from './utils'
 let connection
 // all individual connections
 const connections = {}
+const debugTag = '[CouchDBStorage]'
 /**
  * @name    getConnection
  * @summary getConnection returns existing connection, if available.
@@ -27,15 +28,15 @@ export const getConnection = async (url, global = true) => {
     return con
 }
 
-const getConnectionUrl = url => {
-    url = new URL(url)
-    if (url.pathname !== '/') {
-        dbName = url.pathname.replace('/', '')
-    }
-    const { host, password, protocol, username } = url
-    url = `${protocol}//${username}:${password}@${host}`
-    return url
-}
+// const getConnectionUrl = url => {
+//     url = new URL(url)
+//     if (url.pathname !== '/') {
+//         dbName = url.pathname.replace('/', '')
+//     }
+//     const { host, password, protocol, username } = url
+//     url = `${protocol}//${username}:${password}@${host}`
+//     return url
+// }
 
 /**
  * @name    isCouchDBStorage
@@ -58,9 +59,6 @@ export const isCouchDBStorage = (...args) => args.flat()
  * @returns {Object}    doc
  */
 const setTs = (doc, existingDoc) => {
-    if (!doc) {
-        console.log({ doc, existingDoc })
-    }
     // add/update creation and update time
     doc.tsCreated = (existingDoc || doc).tsCreated || new Date()
     if (!!existingDoc || doc.tsUpdated) {
@@ -278,7 +276,7 @@ export default class CouchDBStorage {
                 // database already exists, use it
                 if (!dbNames.includes(dbName)) {
                     // database doesn't exist, create it
-                    console.log('CouchDB: new database created. Name:', dbName)
+                    console.log(`${debugTag} new database created: ${dbName}`)
                     await con.db
                         .create(dbName)
                         .catch(err =>
@@ -461,5 +459,35 @@ export default class CouchDBStorage {
         )
 
         return rows.map(x => x.doc)
+    }
+
+    /**
+     * @name    viewCreateMap
+     * @summary create/update a design document with a map function. Ignores if exact same function already exists.
+     * 
+     * @param   {String} designName 
+     * @param   {String} viewName 
+     * @param   {String} mapFunc    The map function as a string
+     * 
+     * @returns {Object}
+     */
+    async viewCreateMap(designName, viewName, mapFunc) {
+        // create design document to enable case-insensitive search of twitter handles
+        if (!designName.startsWith('_design/')) designName = `_design/${designName}`
+        const designDoc = await this.getDoc(designName) || {
+            _id: designName,
+            language: 'javascript',
+            views: {},
+        }
+        const view = designDoc.views[viewName]
+        // map function already exists
+        if (!!view && view.map === mapFunc) return
+
+        designDoc.views[viewName] = { map: mapFunc }
+        const action = designDoc._rev
+            ? 'Updating'
+            : 'Creating'
+        console.log(`${debugTag} ${action} design document: ${this.dbName}/${designName}`)
+        return await this.set(designName, designDoc)
     }
 }
