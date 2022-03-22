@@ -143,7 +143,11 @@ export const getClient = () => {
     })
     instance.onConnectError(() => {
         rxIsConnected.next(false)
-        !!id && rxIsLoggedIn.next(false)
+        rxIsLoggedIn.next(false)
+    })
+    socket.on('disconnect', () => {
+        rxIsConnected.next(false)
+        rxIsLoggedIn.next(false)
     })
     instance.onMaintenanceMode(active => {
         console.log('onMaintenanceMode', active)
