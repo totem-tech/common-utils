@@ -45,8 +45,7 @@ export default class ExtensionHelper {
      * 
      * @returns {*} result
      */
-    enable = async () => await this.web3.web3Enable(this.dAppName || 'Unnamed dapp')
-
+    enable = async () => await this.web3.web3Enable(this.dAppName || 'Unnamed DApp')
 
     /**
      * @name    fromAddress
@@ -64,6 +63,14 @@ export default class ExtensionHelper {
         }
     }
 
+    /**
+     * @name    getSigner
+     * @summary get transaction signer for an injected identity by address
+     * 
+     * @param   {String} address 
+     * 
+     * @returns {*} signer
+     */
     getSigner = async (address) => {
         const { signer } = (await this.fromAddress(address)) || {}
         return signer

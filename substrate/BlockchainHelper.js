@@ -46,9 +46,9 @@ export const texts = {
  * @param   {String}    title           name of the blockchain for use with logging.
  *                                      Default: `"Polkadot Blockchain Network"`
  * @param   {Number}    disconnectDelay Delay in number of milliseconds to wait before automatically disconnecting
- *                                      from the network after making a query. If not a positive integer,
+ *                                      from the network after making a query or transaction. If not a positive integer,
  *                                      will not auto-disconnect.
- *                                      Default: `300000`
+ *                                      Default: `0` (keep connected)
  * @param   {KeyringHelper} keyringHelper1 (optional) if undefined, will use global keyring
  * @param   {Object}        textOverrides   Internal message overrides. Eg: useful when using a different language.
  * @param   {Object}        unit        (optional) token unit display settings.
@@ -64,7 +64,7 @@ export default class BlockchainHelper {
     constructor(
         nodeUrls,
         title,
-        disconnectDelay = 300000,
+        disconnectDelay = 0,
         keyringHelper1 = getKeyringHelper(),
         textOverrides,
         unit = {},
@@ -112,17 +112,26 @@ export default class BlockchainHelper {
 
     /**
      * @name    disconnect
-     * @summary deferred disconnect from blockchain
-     * 
-     * @param   {Boolean}   force   set `true` if auto-disconnect is disabled and attempting to manually disconnect
+     * @summary disconnect from Blockchain network
      */
-    deferredDisconnect = deferred(force => {
-        const { provider } = this.connection
-        if (!provider || !this.autoDisconnect && !force) return
+    disconnect = () => {
+        const {
+            provider: p = {},
+        } = this.connection
 
-        provider.disconnect()
-        this.log(this.texts.disconnected)
-    }, this.disconnectDelay)
+        p.isConnected && p.disconnect()
+        return p.isConnected
+    }
+
+    /**
+     * @name    disconnectDeferred
+     * @summary deferred disconnect from blockchain only if auto-disconnect is enabled
+     */
+    disconnectDeferred = deferred(() => {
+        if (!this.autoDisconnect) return
+
+        this.disconnect() && this.log(this.texts.disconnected)
+    }, this.disconnectDelay, this)
 
     /**
      * @name    formatAmount
@@ -336,7 +345,7 @@ export default class BlockchainHelper {
         !isSubscribe && print && this.log(this.sanitise(result))
 
         // auto disconnect, only if delay duration is specified
-        this.deferredDisconnect()
+        this.disconnectDeferred()
 
         return isSubscribe
             ? result

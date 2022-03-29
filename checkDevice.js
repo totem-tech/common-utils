@@ -1,4 +1,4 @@
-import { isArr, isNodeJS } from './utils'
+import { isArr, isNodeJS, isObj } from './utils'
 
 export const DEVICE_TYPE = {
     desktop: 'desktop',
@@ -20,8 +20,27 @@ export const TABLET_REGEX = /(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i
  * 
  * @returns {Boolean}
  */
-export const checkDevice = type => [...isArr(type) ? type : [type]]
-    .includes(getDeviceType())
+export const checkDevice = type => (isArr(type) ? type : [type]).includes(getDeviceType())
+
+/**
+ * @name    checkSafari
+ * @summary check if browser is Apple Safari 
+ * 
+ * @param   {Boolean}   desktop check Safari desktop
+ *                      Default: `false`
+ * 
+ * @returns {Boolean}
+ */
+export const checkSafari = (desktop = false) => {
+    const { vendor = '', userAgent = '' } = navigator || {}
+    const isSafari = vendor.indexOf('Apple') > -1
+        && userAgent.indexOf('CriOS') == -1
+        && userAgent.indexOf('FxiOS') == -1
+
+    return !desktop
+        ? isSafari
+        : isSafari && isObj(window.safari)
+}
 
 /**
  * @name    getDeviceType

@@ -39,14 +39,14 @@ export const keyDataFromEncoded = (encoded, asHex = false) => {
  * 
  * @param   {String|Uint8Array} keyData 
  * @param   {Number}            ss58Format (optional) use to generate address for any supported parachain identity.
- *                                         Default: 0 (Polkadot)
+ *                                         Default: undefined (Substrate)
  * @param   {Boolean}           asHex      (optional) if true, will convert `publicKey` and `secretKey` to hex string.
  *                                         Otherwise, will leave as Uint8Array.
  *                                         Default: false
  * 
  * @returns {Object}    { address, publicKey, secretKey }
  */
-export const keyInfoFromKeyData = (keyData = '', ss58Format = 0, asHex = false) => {
+export const keyInfoFromKeyData = (keyData = '', ss58Format = undefined, asHex = false) => {
     let bytes = keyDataFromEncoded(keyData, false)
     const publicKey = bytes.slice(64, 96)
     const secretKey = bytes.slice(0, 64)

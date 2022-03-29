@@ -251,7 +251,9 @@ export default class CouchDBStorage {
                     await con.db.create(dbName)
                 }
                 this.dbPromise = null
-                resolve(con.use(dbName))
+
+                this.db = con.use(dbName)
+                resolve(this.db)
             } catch (err) {
                 reject(err)
             }

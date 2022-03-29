@@ -1,3 +1,4 @@
+import { cryptoWaitReady } from '@polkadot/util-crypto'
 import { BehaviorSubject } from 'rxjs'
 import DataStorage from '../DataStorage'
 import { isNodeJS, isObj, isStr, objClean, objHasKeys } from '../utils'
@@ -187,7 +188,8 @@ export class IdentityHelper {
 	 * @name	init
 	 * @summary create first identity if none created already
 	 */
-	init = (retries = 10) => {
+	init = async (retries = 10) => {
+		await cryptoWaitReady()
 		if (retries < 0) return
 		if (!this.getAll().length) {
 			// generate a new seed

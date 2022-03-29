@@ -1,13 +1,14 @@
-import { BehaviorSubject } from 'rxjs'
 import ioClient from 'socket.io-client'
+import { BehaviorSubject } from 'rxjs'
 import { translated } from './languageHelper'
-import storage from './storageHelper'
-import { subjectAsPromise } from './reactHelper'
-import { isArr, isAsyncFn, isFn, isInteger, isObj, isStr, isValidNumber, objWithoutKeys } from './utils'
 import PromisE from './PromisE'
+import { subjectAsPromise } from './reactHelper'
+import storage from './storageHelper'
+import { deferred, isAsyncFn, isFn, isObj, isStr, objWithoutKeys } from './utils'
 
 let instance, socket, hostname
 let port = 3001
+const DISCONNECT_DELAY_MS = parseInt(process.env.MESSAGING_SERVER_DISCONNECT_DELAY_MS || 300000)
 const TOTEM_LIVE = 'totem.live'
 try {
     hostname = window.location.hostname
@@ -45,7 +46,7 @@ try {
 if (rw().history) rw({ history: null })
 //- migrate end
 
-
+const log = (...args) => console.log(new Date().toLocaleTimeString(), 'Totem Messaging Service: ', ...args)
 // Returns a singleton instance of the websocket client
 // Instantiates the client if not already done
 export const getClient = (...args) => {
@@ -55,19 +56,27 @@ export const getClient = (...args) => {
 
     // create a new instance
     instance = new ChatClient(...args)
+    log('Connecting to', instance.url)
 
     // on successful conenction login using user credentials and check if messaging server is in maintenance mode
     instance.onConnect(async () => {
-        try {
-            const active = await instance.maintenanceMode()
-            rxIsInMaintenanceMode.next(active)
-            rxIsConnected.next(true)
-            // auto login on connect to messaging service
-            !!id && instance.login(id, secret)
-                .then(() => console.log(new Date().toISOString(), 'Logged into Totem Messaging Service'))
-        } catch (err) {
-            console.error(err)
-        }
+        log('Connected')
+        const active = await instance.maintenanceMode()
+            .catch(err => {
+                log('Failed to retrieve maintenance mode status', err)
+                return true
+            })
+        rxIsInMaintenanceMode.next(active)
+        rxIsConnected.next(true)
+        // auto login on connect to messaging service
+        !!id && instance.login(id, secret)
+            .then(() => log('Login success'))
+            // warn user if login fails. should not occur unless
+            // 1. user has wrong credentials stored in the localStorage
+            // 2. user has been deleted from the backend database (eg: deleted test account)
+            // 3. database error occured while logging in (connection failure, timeout etc)
+            // 4. there is a bug in the backend code
+            .catch(err => alert(`Totem Messaging Service: login failed! ${err}`))
     })
     instance.onConnectError(() => {
         rxIsConnected.next(false)
@@ -118,32 +127,6 @@ export const getUser = () => rw().user
  */
 export const setUser = (user = {}) => rw({ user })
 
-// const emitAsPromise = (event, args = [], resultModifier, onError) =>
-//     new Promise((resolve, reject) => {
-//         try {
-//             const interceptor = async (err, ...result) => {
-//                 if (!!err) {
-//                     err = translateError(err)
-//                     if (isFn(onError)) onError(err)
-//                     return reject(err)
-//                 }
-
-//                 result = result.length > 1
-//                     ? result // if multiple values returned from the backend resolve with an array
-//                     : result[0] // otherwise resolve with single value
-//                 if (isFn(resultModifier)) result = await resultModifier(result)
-//                 resolve(result)
-//             }
-//             args = [...args, interceptor]
-//             socket.emit(event, ...args)
-//         } catch (err) {
-//             console.log(`Unexpected error occurd on chatClient.${event}()`, err)
-//             err = translateError(`${err}`.replace('Error: ', ''))
-//             isFn(onError) && onError(err)
-//             reject(err)
-//         }
-//     })
-
 /**
  * @name    translateInterceptor
  * @summary translate error messages returned from messaging
@@ -180,14 +163,18 @@ export class ChatClient {
             // rejectUnauthorized: false,
         })
 
+        this.connect = () => socket.connect()
+        this.disconnect = () => socket.disconnect()
+        this.disconnectDeferred = deferred(() => {
+            log('Disconnecting due to inactivity')
+            this.disconnect()
+        }, DISCONNECT_DELAY_MS)
         this.isConnected = () => socket.connected
         this.onConnect = cb => socket.on('connect', cb)
-        this.onReconnect = cb => socket.on('reconnect', cb)
         // this.onConnectTimeout = cb => socket.on('connect_timeout', cb);
         this.onConnectError = cb => socket.on('connect_error', cb);
-        // this.onDisconnect = cb => socket.on('disonnect', cb)  // doesn't work
-        this.disconnect = () => socket.disconnect()
         this.onError = cb => socket.on('error', cb)
+        this.onReconnect = cb => socket.on('reconnect', cb)
 
         // Request funds : deprecated
         // this.faucetRequest = (address, cb) => isFn(cb) && socket.emit('faucet-request', address, cb)
@@ -287,10 +274,11 @@ export class ChatClient {
             })
 
         // converts callback based emits to promise. With 30 seconds timeout
-        this._emitter = PromisE.getSocketEmitter(socket, 30000, 0, null)
+        const _emit = PromisE.getSocketEmitter(socket, 30000, 0, null)
         // add an interceptor to translate all error messages from the server to the selected language (if any)
-        this.emitter = (event, args = [], resultModifier, onError, timeoutLocal) => {
-            return this._emitter(
+        this.emit = (event, args = [], resultModifier, onError, timeoutLocal) => {
+            if (!this.isConnected()) this.connect()
+            const promise = _emit(
                 event,
                 args,
                 resultModifier,
@@ -301,6 +289,9 @@ export class ChatClient {
                 },
                 timeoutLocal,
             )
+            // auto disconnect after 5 minutes of inactivity
+            promise.promise.finally(() => this.disconnectDeferred())
+            return promise
         }
     }
 
@@ -317,7 +308,7 @@ export class ChatClient {
      * 
      * @returns {Object} company
      */
-    company = async (hash, company) => await this.emitter('company', [hash, company])
+    company = async (hash, company) => await this.emit('company', [hash, company])
 
     /**
      * @name    companySearch
@@ -328,7 +319,7 @@ export class ChatClient {
      *  
      * @returns {Map}
      */
-    companySearch = (query, searchParentIdentity) => this.emitter(
+    companySearch = (query, searchParentIdentity) => this.emit(
         'company-search',
         [query, searchParentIdentity],
         // convert 2D array back to Map
@@ -344,7 +335,7 @@ export class ChatClient {
      * 
      * @returns {Map}
      */
-    countries = hash => this.emitter(
+    countries = hash => this.emit(
         'countries',
         [hash],
         countries => new Map(countries),
@@ -362,7 +353,7 @@ export class ChatClient {
      * 
      * @returns {Object}    contribution entry
      */
-    crowdloan = async (contribution) => await this.emitter(
+    crowdloan = async (contribution) => await this.emit(
         'crowdloan',
         [contribution],
     )
@@ -377,7 +368,7 @@ export class ChatClient {
      * 
      * @returns {Number}
      */
-    currencyConvert = async (from, to, amount) => await this.emitter(
+    currencyConvert = async (from, to, amount) => await this.emit(
         'currency-convert',
         [from, to, amount]
     )
@@ -392,7 +383,7 @@ export class ChatClient {
      *                          an empty result will be returned.
      * @returns {Map}
      */
-    currencyList = async (hash) => await this.emitter('currency-list', [hash])
+    currencyList = async (hash) => await this.emit('currency-list', [hash])
 
     /**
      * @name    currencyPricesByDate
@@ -403,7 +394,7 @@ export class ChatClient {
      * 
      * @returns {Array}
      */
-    currencyPricesByDate = async (date, currencyIds) => await this.emitter(
+    currencyPricesByDate = async (date, currencyIds) => await this.emit(
         'currency-prices-by-date',
         [date, currencyIds]
     )
@@ -414,7 +405,7 @@ export class ChatClient {
      * 
      * @returns {Boolean}
      */
-    idExists = async (userId) => await this.emitter('id-exists', [userId])
+    idExists = async (userId) => await this.emit('id-exists', [userId])
 
     /**
      * @name    isUserOnline
@@ -422,7 +413,7 @@ export class ChatClient {
      * 
      * @returns {Boolean}
      */
-    isUserOnline = async (userId) => await this.emitter('is-user-online', [userId])
+    isUserOnline = async (userId) => await this.emit('is-user-online', [userId])
 
     /**
      * @name    glAccounts
@@ -432,14 +423,14 @@ export class ChatClient {
      * 
      * @returns {*}
      */
-    glAccounts = async (accountNumbers) => await this.emitter('gl-accounts', [accountNumbers])
+    glAccounts = async (accountNumbers) => await this.emit('gl-accounts', [accountNumbers])
 
     /**
      * @name    languageErrorMessages
      * @summary Retrieve a list of error messages used in the messaging service. FOR BUILD MODE ONLY.
      * @returns 
      */
-    languageErrorMessages = async () => await this.emitter('language-error-messages', [])
+    languageErrorMessages = async () => await this.emit('language-error-messages', [])
 
     /**
      * @name    languageTranslations
@@ -451,7 +442,7 @@ export class ChatClient {
      * 
      * @returns {Array}
      */
-    languageTranslations = async (langCode, hash) => await this.emitter(
+    languageTranslations = async (langCode, hash) => await this.emit(
         'language-translations',
         [langCode, hash],
     )
@@ -465,7 +456,7 @@ export class ChatClient {
      *  
      * @returns {Object} data. Eg: roles etc.
      */
-    login = (id, secret) => this.emitter(
+    login = (id, secret) => this.emit(
         'login',
         [id, secret],
         async (data) => {
@@ -485,7 +476,7 @@ export class ChatClient {
      * @param   {Boolean}     active
      * @param   {Function}    cb 
      */
-    maintenanceMode = async (active) => await this.emitter(eventMaintenanceMode, [active])
+    maintenanceMode = async (active) => await this.emit(eventMaintenanceMode, [active])
 
     /**
      * @name    onMaintenanceMode
@@ -506,7 +497,7 @@ export class ChatClient {
      * 
      * @returns {*}
      */
-    message = async (receiverIds, msg, encrypted) => await this.emitter(
+    message = async (receiverIds, msg, encrypted) => await this.emit(
         'message',
         [receiverIds, msg, encrypted],
     )
@@ -531,7 +522,7 @@ export class ChatClient {
      * 
      * @returns {Array} messages
      */
-    messageGetRecent = async (lastMsgTs) => await this.emitter(
+    messageGetRecent = async (lastMsgTs) => await this.emit(
         'message-get-recent',
         [lastMsgTs],
     )
@@ -545,7 +536,7 @@ export class ChatClient {
      * 
      * @returns {*}
      */
-    messageGroupName = async (receiverIds, name) => await this.emitter(
+    messageGroupName = async (receiverIds, name) => await this.emit(
         'message-group-name',
         [receiverIds, name],
     )
@@ -557,7 +548,7 @@ export class ChatClient {
      * @param   {Object}    values required fields: name and email
      * @param   {Function}  cb
      */
-    newsletterSignup = async (values) => await this.emitter('newsletter-signup', [values])
+    newsletterSignup = async (values) => await this.emit('newsletter-signup', [values])
 
     /**
      * @name    notify
@@ -571,7 +562,7 @@ export class ChatClient {
      * 
      * @returns {*}
      */
-    notify = async (toUserIds, type, childType, message, data) => await this.emitter(
+    notify = async (toUserIds, type, childType, message, data) => await this.emit(
         'notification',
         [
             toUserIds,
@@ -605,7 +596,7 @@ export class ChatClient {
      * 
      * @returns {Map}
      */
-    notificationGetRecent = async (ts) => await this.emitter(
+    notificationGetRecent = async (ts) => await this.emit(
         'notification-get-recent',
         [ts],
         result => new Map(result),
@@ -619,7 +610,7 @@ export class ChatClient {
      * @param   {Boolean}   read    marks as read or unread. Optional if `deleted = true`
      * @param   {Boolean}   deleted (optional) marks as deleted or undeleted
      */
-    notificationSetStatus = async (id, read, deleted) => await this.emitter(
+    notificationSetStatus = async (id, read, deleted) => await this.emit(
         'notification-set-status',
         [id, read, deleted],
     )
@@ -634,7 +625,7 @@ export class ChatClient {
      * @param {Boolean}  create      whether to create or update project
      * @param {Function} cb          
      */
-    project = async (projectId, project, create) => await this.emitter(
+    project = async (projectId, project, create) => await this.emit(
         'project',
         [projectId, project, create],
     )
@@ -647,7 +638,7 @@ export class ChatClient {
      * 
      * @returns {Array} [projects, notFoundIds]
      */
-    projectsByHashes = async (projectIds) => await this.emitter(
+    projectsByHashes = async (projectIds) => await this.emit(
         'projects-by-hashes',
         [projectIds],
         ([projects, notFoundIds]) => [new Map(projects), notFoundIds],
@@ -663,7 +654,7 @@ export class ChatClient {
      * @param   {String}    referredBy  (optional) referrer user ID
      * @param   {Function}  cb 
      */
-    register = (id, secret, address, referredBy) => this.emitter(
+    register = (id, secret, address, referredBy) => this.emit(
         'register',
         [
             id,
@@ -689,7 +680,7 @@ export class ChatClient {
      *                                  @err    String: error message if query failed
      *                                  @code   String: hex string
      */
-    rewardsClaim = async (platform, handle, postId) => await this.emitter(
+    rewardsClaim = async (platform, handle, postId) => await this.emit(
         'rewards-claim',
         [platform, handle, postId],
     )
@@ -700,7 +691,7 @@ export class ChatClient {
      * 
      * @returns {Object}    rewards data
      */
-    rewardsGetData = async () => await this.emitter('rewards-get-data')
+    rewardsGetData = async () => await this.emit('rewards-get-data')
 
     /**
      * @name task
@@ -710,7 +701,7 @@ export class ChatClient {
      * @param {Object}      task            
      * @param {String}      ownerAddress    identity that created the task
      */
-    task = async (id, task, ownerAddress) => await this.emitter(
+    task = async (id, task, ownerAddress) => await this.emit(
         'task',
         [id, task, ownerAddress],
     )
@@ -726,7 +717,7 @@ export class ChatClient {
      * 
      * @returns {Map} list of task details'
      */
-    taskGetById = async (ids) => await this.emitter(
+    taskGetById = async (ids) => await this.emit(
         'task-get-by-id',
         [ids],
         result => new Map(result),

@@ -209,9 +209,9 @@ export const usePromise = (promise, resultModifier, errorModifier) => {
  *              If an async function is supplied, `ignoreFirst` will be assumed `false`.
  * @param   {*}         initialValue (optional) initial value where appropriate
  * @param   {Boolean}   allowSubjectUpdate whether to allow update of the subject or only state.
- *              CAUTION: if true and @subject is sourced from a DataStorage instance,
+ *              CAUTION: if true and subject is sourced from a DataStorage instance,
  *              it may override values in the LocalStorage values.
- *              Default: false
+ *              Default: `false`
  * 
  * @returns {Array}     [value, setvalue]
  */
