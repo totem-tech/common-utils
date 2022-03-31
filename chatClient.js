@@ -46,7 +46,7 @@ try {
 if (rw().history) rw({ history: null })
 //- migrate end
 
-const log = (...args) => console.log(new Date().toLocaleTimeString(), 'Totem Messaging Service: ', ...args)
+const log = (...args) => console.log(new Date().toLocaleTimeString(), 'Totem Messaging Service:', ...args)
 // Returns a singleton instance of the websocket client
 // Instantiates the client if not already done
 export const getClient = (...args) => {

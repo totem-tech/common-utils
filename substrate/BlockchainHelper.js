@@ -28,7 +28,7 @@ export const texts = {
     errBlockNumber: 'unexpected error while fetching block number',
     // Log messages
     connected: 'connected',
-    connecting: 'connecting',
+    connecting: 'connecting to',
     disconnected: 'disconnected',
     reconnecting: 'attempting to reconnect...',
     reconnected: 'reconnected',
@@ -214,7 +214,12 @@ export default class BlockchainHelper {
                     const { WsProvider } = require('@polkadot/rpc-provider')
                     provider ??= new WsProvider(this.nodeUrls, false)
                     if (!provider.isConnected) {
-                        this.log(this.texts.connecting, this.nodeUrls)
+                        this.log(
+                            this.texts.connecting,
+                            this.nodeUrls.length > 1
+                                ? this.nodeUrls
+                                : this.nodeUrls[0],
+                        )
                         const unsubscribe = provider.on('error', () => {
                             this.log(this.texts.errConnectionFailed)
                             unsubscribe()
