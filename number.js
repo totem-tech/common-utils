@@ -53,19 +53,20 @@ export const round = (value = 0, decimals = 0) => {
  * @returns {String}
  */
 export const shorten = (value, decimals = 0) => {
-	let divider, label
+	let label = ''
+	let divider = 1
 	if (value < 1e3) {
 		divider = 1
 		label = ''
-	} else if (value > 1e9) {
+	} else if (value >= 1e9) {
 		// billion
 		divider = 1e9
 		label = 'B'
-	} else if (value > 1e6) {
+	} else if (value >= 1e6) {
 		// million
 		divider = 1e6
 		label = 'M'
-	} else if (value > 1e3) {
+	} else if (value >= 1e3) {
 		// thousand
 		divider = 1e3
 		label = 'K'

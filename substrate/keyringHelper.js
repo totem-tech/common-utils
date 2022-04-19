@@ -82,8 +82,8 @@ export class KeyringHelper {
      * @name    signature
      * @summary create a new signature using an idenitity from the keyring
      * 
-     * @param   {String|Uint8Array} address 
-     * @param   {String|Uint8Array} message 
+     * @param   {String|Uint8Array} address Identity to sign the message with. Must be already in the keyring.
+     * @param   {String|Uint8Array} message Message to sign.
      * 
      * @returns {String} hex signature
      */
@@ -100,18 +100,18 @@ export class KeyringHelper {
      * @name    signatureVerify
      * @summary verify a signature created using any identity
      * 
-     * @param   {String|Uint8Array} message 
-     * @param   {String|Uint8Array} signature 
-     * @param   {String|Uint8Array} address 
+     * @param   {String|Uint8Array} message         Message to verify
+     * @param   {String|Uint8Array} signature       Signature to verify
+     * @param   {String|Uint8Array} signerAddress   Signers identity
      * 
      * @returns {Boolean}
      */
-    signatureVerify = async (message, signature, address) => {
-        const publicKey = ss58Decode(address)
+    signatureVerify = async (message, signature, signerAddress) => {
+        const publicKey = ss58Decode(signerAddress)
 
         if (!isStr(message)) message = JSON.stringify(message)
         return this
-            .getPair(address, true)
+            .getPair(signerAddress, true)
             .verify(
                 message,
                 signature,
