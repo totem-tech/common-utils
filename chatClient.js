@@ -51,8 +51,6 @@ const log = (...args) => console.log(new Date().toLocaleTimeString(), 'Totem Mes
 // Instantiates the client if not already done
 export const getClient = (...args) => {
     if (instance) return instance
-    // automatically login to messaging service
-    const { id, secret } = getUser() || {}
 
     // create a new instance
     instance = new ChatClient(...args)
@@ -68,8 +66,11 @@ export const getClient = (...args) => {
             })
         rxIsInMaintenanceMode.next(active)
         rxIsConnected.next(true)
+        if (!rxIsRegistered.value) return
+
         // auto login on connect to messaging service
-        !!id && instance.login(id, secret)
+        const { id, secret } = getUser() || {}
+        instance.login(id, secret)
             .then(() => log('Login success'))
             // warn user if login fails. should not occur unless
             // 1. user has wrong credentials stored in the localStorage
@@ -80,7 +81,7 @@ export const getClient = (...args) => {
     })
     instance.onConnectError(() => {
         rxIsConnected.next(false)
-        !!id && rxIsLoggedIn.next(false)
+        rxIsRegistered.value && rxIsLoggedIn.next(false)
     })
     instance.onMaintenanceMode(active => {
         console.log('onMaintenanceMode', active)
