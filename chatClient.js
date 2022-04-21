@@ -84,7 +84,7 @@ export const getClient = (...args) => {
         rxIsRegistered.value && rxIsLoggedIn.next(false)
     })
     instance.onMaintenanceMode(active => {
-        console.log('onMaintenanceMode', active)
+        console.log('MaintenanceMode', active)
         rxIsInMaintenanceMode.next(active)
     })
     return instance
@@ -475,7 +475,6 @@ export class ChatClient {
             // wait until maintenance mode is turned off
             rxIsInMaintenanceMode.value && await subjectAsPromise(rxIsInMaintenanceMode, false)
             rxIsLoggedIn.next(true)
-            console.log({ rxIsLoggedIn })
         },
         err => console.log('Login failed', err)
     )
