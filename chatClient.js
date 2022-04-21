@@ -66,8 +66,6 @@ export const referralCode = code => {
 // Instantiates the client if not already done
 export const getClient = () => {
     if (instance) return instance
-    // automatically login to messaging service
-    const { id, secret } = getUser() || {}
 
     instance = new ChatClient()
     // attach a promise() functions to all event related methods. 
@@ -135,15 +133,22 @@ export const getClient = () => {
         const active = await instance.maintenanceMode.promise(null, null)
         rxIsInMaintenanceMode.next(active)
         rxIsConnected.next(true)
+        if (!rxIsRegistered.value) return
+
         // auto login on connect to messaging service
-        !!id && instance.login
+        const { id, secret } = getUser() || {}
+        instance.login
             .promise(id, secret)
             .then(() => console.log(new Date().toISOString(), 'Logged into messaging service'))
             .catch(console.error)
     })
     instance.onConnectError(() => {
         rxIsConnected.next(false)
-        !!id && rxIsLoggedIn.next(false)
+        rxIsLoggedIn.next(false)
+    })
+    socket.on('disconnect', () => {
+        rxIsConnected.next(false)
+        rxIsLoggedIn.next(false)
     })
     instance.onMaintenanceMode(active => {
         console.log('onMaintenanceMode', active)
