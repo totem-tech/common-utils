@@ -1,6 +1,6 @@
+import nano from 'nano'
 import uuid from 'uuid'
 import PromisE from './PromisE'
-import nano from 'nano'
 import { isObj, isStr, isArr, arrUnique, isMap, isValidNumber } from './utils'
 
 // globab connection for use with multiple databases
@@ -8,6 +8,7 @@ let connection
 // all individual connections
 const connections = {}
 const debugTag = '[CouchDBStorage]'
+
 /**
  * @name    getConnection
  * @summary getConnection returns existing connection, if available.
@@ -27,16 +28,6 @@ export const getConnection = async (url, global = true) => {
     connections[url] = con
     return con
 }
-
-// const getConnectionUrl = url => {
-//     url = new URL(url)
-//     if (url.pathname !== '/') {
-//         dbName = url.pathname.replace('/', '')
-//     }
-//     const { host, password, protocol, username } = url
-//     url = `${protocol}//${username}:${password}@${host}`
-//     return url
-// }
 
 /**
  * @name    isCouchDBStorage
@@ -92,7 +83,8 @@ export default class CouchDBStorage {
         // Global DB name prefix and suffix applied to all databases excluding 
         const prefix = process.env.CouchDB_DBName_Prefix || ''
         const suffix = process.env.CouchDB_DBName_Suffix || ''
-        dbName = `${prefix}${dbName}${suffix}`
+        dbName = process.env[`CouchDB_DBName_Override_${dbName}`]
+            || `${prefix}${dbName}${suffix}`
 
         // Connection/URL/DBName override for individual databases
         let url = (process.env[`CouchDB_URL_${dbName}`] || '').trim()
