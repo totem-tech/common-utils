@@ -169,6 +169,7 @@ export class ChatClient {
         this.disconnectDeferred = deferred(() => {
             log('Disconnecting due to inactivity')
             this.disconnect()
+            rxIsLoggedIn.next(false)
         }, DISCONNECT_DELAY_MS)
         this.isConnected = () => socket.connected
         this.onConnect = cb => socket.on('connect', cb)
@@ -278,7 +279,17 @@ export class ChatClient {
         const _emit = PromisE.getSocketEmitter(socket, 30000, 0, null)
         // add an interceptor to translate all error messages from the server to the selected language (if any)
         this.emit = (event, args = [], resultModifier, onError, timeoutLocal) => {
-            if (!this.isConnected()) this.connect()
+            let loginPromise
+            if (!this.isConnected()) {
+                this.connect()
+                console.log({
+                    registered: rxIsRegistered.value
+                })
+                // if user is registered, on reconnect wait until login before making a new request
+                loginPromise = rxIsRegistered.value
+                    && event !== eventMaintenanceMode
+                    && subjectAsPromise(rxIsLoggedIn, true, timeoutLocal)[0]
+            }
             const promise = _emit(
                 event,
                 args,
@@ -289,8 +300,9 @@ export class ChatClient {
                     return translatedErr
                 },
                 timeoutLocal,
+                loginPromise,
             )
-            // auto disconnect after 5 minutes of inactivity
+            // auto disconnect after pre-configured period of inactivity
             promise.promise.finally(() => this.disconnectDeferred())
             return promise
         }
@@ -466,6 +478,7 @@ export class ChatClient {
             // wait until maintenance mode is turned off
             rxIsInMaintenanceMode.value && await subjectAsPromise(rxIsInMaintenanceMode, false)
             rxIsLoggedIn.next(true)
+            console.log({ rxIsLoggedIn })
         },
         err => console.log('Login failed', err)
     )

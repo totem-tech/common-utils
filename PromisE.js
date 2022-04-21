@@ -156,10 +156,11 @@ PromisE.delay = (delay, result = delay) => new PromisE(resolve =>
  * @returns {Function}  callback function when invoked returns a promise
  *                      Callback Arguments:
  *                      - evenName       String: 
- *                      - args           Array:
- *                      - resultModifier Function:
- *                      - onError        Function
- *                      - timemoutLocal  Number:  overrides `timeoutGlobal`
+ *                      - args           Array: (optional)
+ *                      - resultModifier Function: (optional)
+ *                      - onError        Function: (optional)
+ *                      - timemoutLocal  Number: (optional)  overrides `timeoutGlobal`
+ *                      - delayPromise   Promise: (optional) if supplied, will wait untils promise is finalized
  * 
  * @example Example 1: A simple message sent to the socket server with 15 seconds timeout
  * ```javascript
@@ -182,7 +183,7 @@ PromisE.delay = (delay, result = delay) => new PromisE(resolve =>
  * ```
  */
 PromisE.getSocketEmitter = (socket, timeoutGlobal, errorArgIndex = 0, callbackIndex = null) => {
-    return (eventName, args = [], resultModifier, errorModifier, timeoutLocal) => {
+    return (eventName, args = [], resultModifier, errorModifier, timeoutLocal, delayPromise) => {
         args = !isArr(args)
             ? [args]
             : args
@@ -219,7 +220,9 @@ PromisE.getSocketEmitter = (socket, timeoutGlobal, errorArgIndex = 0, callbackIn
                     // inject the callback at specific index
                     args.splice(callbackIndex, 0, interceptor)
                 }
-                socket.emit(eventName, ...args)
+                // if a promise is supplied wait until it's resolved
+                PromisE(delayPromise)
+                    .finally(() => socket.emit(eventName, ...args))
             } catch (err) {
                 reject(getError(err))
             }
