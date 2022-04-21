@@ -282,9 +282,6 @@ export class ChatClient {
             let loginPromise
             if (!this.isConnected()) {
                 this.connect()
-                console.log({
-                    registered: rxIsRegistered.value
-                })
                 // if user is registered, on reconnect wait until login before making a new request
                 loginPromise = rxIsRegistered.value
                     && event !== eventMaintenanceMode
