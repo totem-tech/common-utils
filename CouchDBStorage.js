@@ -434,23 +434,26 @@ export default class CouchDBStorage {
      * 
      * @param   {String} designName 
      * @param   {String} viewName 
-     * @param   {Object} params     (optional)
+     * @param   {Object} params         (optional)
+     * @param   {Object} includeDocs    (optional) use `false` for map-reduce functions.
+     *                                  Default: `true`
      * 
      * @returns {Array}
      */
-    async view(designName, viewName, params) {
+    async view(designName, viewName, params, includeDocs = true) {
         const db = await this.getDB()
         const { rows = [] } = await db.view(
             designName,
             viewName,
             {
-                include_docs: true,
+                include_docs: includeDocs,
                 ...params,
-
             },
         )
 
-        return rows.map(x => x.doc)
+        return includeDocs
+            ? rows.map(x => x.doc)
+            : rows
     }
 
     /**
@@ -460,10 +463,12 @@ export default class CouchDBStorage {
      * @param   {String} designName 
      * @param   {String} viewName 
      * @param   {String} mapFunc    The map function as a string
+     * @param   {String} reduceFunc (optional) redunce function as string. 
+     *                              Built-in reduce functions: '_approx_count_distinct', '_count', '_stats' and '_sum'
      * 
      * @returns {Object}
      */
-    async viewCreateMap(designName, viewName, mapFunc) {
+    async viewCreateMap(designName, viewName, mapFunc, reduceFunc) {
         // create design document to enable case-insensitive search of twitter handles
         if (!designName.startsWith('_design/')) designName = `_design/${designName}`
         const designDoc = await this.getDoc(designName) || {
@@ -473,9 +478,14 @@ export default class CouchDBStorage {
         }
         const view = designDoc.views[viewName]
         // map function already exists
-        if (!!view && view.map === mapFunc) return
+        if (!!view && view.map === mapFunc && view.reduce === reduceFunc) return
 
-        designDoc.views[viewName] = { map: mapFunc }
+        designDoc.views[viewName] = {
+            map: mapFunc
+        }
+        if (reduceFunc) {
+            designDoc.views[viewName].reduce = reduceFunc
+        }
         const action = designDoc._rev
             ? 'Updating'
             : 'Creating'
