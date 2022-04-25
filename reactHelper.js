@@ -1,7 +1,6 @@
 /*
  * a set of reusable React and state related utility functions
  */
-import { isPromise } from '@polkadot/util'
 import { BehaviorSubject, Subject } from 'rxjs'
 import PromisE from './PromisE'
 import { hasValue, isArr, isDefined, isFn, isObj, isSubjectLike, isValidNumber } from './utils'

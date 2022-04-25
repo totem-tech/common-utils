@@ -163,6 +163,7 @@ export class ChatClient {
             secure: true,
             // rejectUnauthorized: false,
         })
+        this.socket = socket
 
         this.connect = () => socket.connect()
         this.disconnect = () => socket.disconnect()
@@ -367,6 +368,25 @@ export class ChatClient {
         'crowdloan',
         [contribution],
     )
+
+    /**
+     * @name    onCrowdloanPledgeTotal
+     * @summary listen for changes on total pledged amount
+     * 
+     * @param   {Function} cb   Args: plegedTotal (number)
+     */
+    // crowdloanPledgeTotal = async () => await this.emit(
+    //     'crowdloan-pledged-total',
+    //     [],
+    // )
+
+    /**
+     * @name    onCrowdloanPledgeTotal
+     * @summary listen for changes on total pledged amount
+     * 
+     * @param   {Function} cb   Args: plegedTotal (number)
+     */
+    onCrowdloanPledgeTotal = cb => isFn(cb) && socket.on('crowdloan-pledged-total', cb)
 
     /**
      * @name    currencyConvert
