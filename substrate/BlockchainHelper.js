@@ -400,7 +400,6 @@ export default class BlockchainHelper {
                 const tx = await this.tx(txFunc, txArgs)
                 const handleResult = result => {
                     const { events, status } = result
-                    window.results = [...(window.results || []), result]
                     const isFuture = status.type !== 'Future'
                     let blockHash = ''
                     this.log(this.texts.txStatus, status.type)
