@@ -106,7 +106,7 @@ export const RecursiveShapeType = (propsTypes = {}, recursiveKey = 'children') =
  * @summary sugar for RxJS subject as promise and, optionally, wait until an expected value is received
  * 
  * @param   {Subject}           subject         RxJS subject or similar subscribable
- * @param   {*|Function}        expectedValue   (optional) if undefined, will resolve on first value received
+ * @param   {*|Function}        expectedValue   (optional) if undefined, will resolve as soon as any value is received
  * @param   {Number|Function}   timeout         (optional) will reject if no value received within given time
  * 
  * @returns {[Promise, Function]}   will reject with: 

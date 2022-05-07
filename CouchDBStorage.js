@@ -1,6 +1,6 @@
+import nano from 'nano'
 import uuid from 'uuid'
 import PromisE from './PromisE'
-import nano from 'nano'
 import { isObj, isStr, isArr, arrUnique, isMap, isValidNumber } from './utils'
 
 // globab connection for use with multiple databases
@@ -8,6 +8,7 @@ let connection
 // all individual connections
 const connections = {}
 const debugTag = '[CouchDBStorage]'
+
 /**
  * @name    getConnection
  * @summary getConnection returns existing connection, if available.
@@ -27,16 +28,6 @@ export const getConnection = async (url, global = true) => {
     connections[url] = con
     return con
 }
-
-// const getConnectionUrl = url => {
-//     url = new URL(url)
-//     if (url.pathname !== '/') {
-//         dbName = url.pathname.replace('/', '')
-//     }
-//     const { host, password, protocol, username } = url
-//     url = `${protocol}//${username}:${password}@${host}`
-//     return url
-// }
 
 /**
  * @name    isCouchDBStorage
@@ -92,7 +83,8 @@ export default class CouchDBStorage {
         // Global DB name prefix and suffix applied to all databases excluding 
         const prefix = process.env.CouchDB_DBName_Prefix || ''
         const suffix = process.env.CouchDB_DBName_Suffix || ''
-        dbName = `${prefix}${dbName}${suffix}`
+        dbName = process.env[`CouchDB_DBName_Override_${dbName}`]
+            || `${prefix}${dbName}${suffix}`
 
         // Connection/URL/DBName override for individual databases
         let url = (process.env[`CouchDB_URL_${dbName}`] || '').trim()
@@ -442,23 +434,26 @@ export default class CouchDBStorage {
      * 
      * @param   {String} designName 
      * @param   {String} viewName 
-     * @param   {Object} params     (optional)
+     * @param   {Object} params         (optional)
+     * @param   {Object} includeDocs    (optional) use `false` for map-reduce functions.
+     *                                  Default: `true`
      * 
      * @returns {Array}
      */
-    async view(designName, viewName, params) {
+    async view(designName, viewName, params, includeDocs = true) {
         const db = await this.getDB()
         const { rows = [] } = await db.view(
             designName,
             viewName,
             {
-                include_docs: true,
+                include_docs: includeDocs,
                 ...params,
-
             },
         )
 
-        return rows.map(x => x.doc)
+        return includeDocs
+            ? rows.map(x => x.doc)
+            : rows
     }
 
     /**
@@ -468,10 +463,12 @@ export default class CouchDBStorage {
      * @param   {String} designName 
      * @param   {String} viewName 
      * @param   {String} mapFunc    The map function as a string
+     * @param   {String} reduceFunc (optional) redunce function as string. 
+     *                              Built-in reduce functions: '_approx_count_distinct', '_count', '_stats' and '_sum'
      * 
      * @returns {Object}
      */
-    async viewCreateMap(designName, viewName, mapFunc) {
+    async viewCreateMap(designName, viewName, mapFunc, reduceFunc) {
         // create design document to enable case-insensitive search of twitter handles
         if (!designName.startsWith('_design/')) designName = `_design/${designName}`
         const designDoc = await this.getDoc(designName) || {
@@ -481,9 +478,14 @@ export default class CouchDBStorage {
         }
         const view = designDoc.views[viewName]
         // map function already exists
-        if (!!view && view.map === mapFunc) return
+        if (!!view && view.map === mapFunc && view.reduce === reduceFunc) return
 
-        designDoc.views[viewName] = { map: mapFunc }
+        designDoc.views[viewName] = {
+            map: mapFunc
+        }
+        if (reduceFunc) {
+            designDoc.views[viewName].reduce = reduceFunc
+        }
         const action = designDoc._rev
             ? 'Updating'
             : 'Creating'
