@@ -1,13 +1,16 @@
 import DataStorage from './DataStorage'
 import storage from './storageHelper'
-import { clearClutter, downloadFile, generateHash, getUrlParam, textCapitalize } from './utils'
+import { clearClutter, downloadFile, generateHash, getUrlParam, isNodeJS, textCapitalize } from './utils'
 
 const translations = new DataStorage('totem_static_translations')
 export const EN = 'EN'
 const MODULE_KEY = 'language'
 const rw = value => storage.settings.module(MODULE_KEY, value) || {}
 let _selected = rw().selected || EN
-export const BUILD_MODE = getUrlParam('build-mode').toLowerCase() == 'true'
+export const BUILD_MODE = isNodeJS()
+    ? process.env.BUILD_MODE
+    : getUrlParam('build-mode', window.location.href)
+        .toLowerCase() == 'true'
     && window.location.hostname !== 'totem.live'
 export const languages = Object.freeze({
     BN: 'Bengali',
@@ -21,6 +24,7 @@ export const languages = Object.freeze({
     KO: 'Korean',
     NL: 'Dutch',
     PL: 'Polish',
+    PT: 'Portuguese',
     RU: 'Russian',
     TR: 'Turkish',
     UK: 'Ukrainian',
