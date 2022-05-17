@@ -238,6 +238,8 @@ PromisE.getSocketEmitter = (socket, timeoutGlobal, errorArgIndex = 0, callbackIn
  * 
  * @param   {String}    url 
  * @param   {Object}    options 
+ * @param   {String}    options.method  request method: get, post...
+ *                                      Default: `"get"`
  * @param   {Number}    timeout 
  * @param   {Boolean}   asJson 
  * 
@@ -250,6 +252,11 @@ PromisE.fetch = async (url, options, timeout, asJson = true) => {
         ? options
         : {}
     options.method = options.method || 'get'
+    if (options.method === 'post') {
+        // set default content type to JSON
+        options.headers ??= {}
+        options.headers['Content-Type'] ??= 'application/json'
+    }
     if (isInteger(timeout)) options.signal = getAbortSignal(timeout)
 
     const result = await fetch(url.toString(), options)

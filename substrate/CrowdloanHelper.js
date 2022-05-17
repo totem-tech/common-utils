@@ -95,17 +95,36 @@ export default class CrowdloanHelper {
      * @summary fetch user contributions by identities
      * 
      * @param   {String|Array}  addresses 
-     * @param   {Number}        parachainId Default: `this.parachainId`
-     * @param   {Boolean}       asString    
-     * @param   {Number}        decimals 
+     * @param   {Boolean}       asString        (optional) Defaut: `false`
+     * @param   {Number}        decimals        (optional) Default: `this.blockchainHelper.unit.decimals`
+     * @param   {Number}        parachainId     (optional) Default: `this.parachainId`
+     * @param   {Function}      callback        (optional)
+     * @param   {Boolean}       includeParallel (optional) whether to include contributions made through Parallel
+     *                                          Finance Crowdloan DApp.
+     *                                          Default: `true`
      * 
      * @returns {Number|Map}    
      */
-    getUserContributions = async (addresses, asString, decimals, parachainId, callback) => {
+    getUserContributions = async (addresses, asString, decimals, parachainId, callback, includeParallel = true) => {
         const multi = isArr(addresses)
         parachainId ??= this.parachainId
         if (!multi) addresses = [addresses]
 
+        // fetch user contributions made through Parallel Finance
+        const resultsParallel = !includeParallel
+            ? []
+            : await Promise.all(
+                addresses.map(address =>
+                    this.getUserContributionsParallel(address, parachainId)
+                        .then(([_, amount]) => amount)
+                        .catch(err => {
+                            console.error(`Failed to retreive contributions from parallel for ${address}.`, err)
+                            return 0
+                        })
+                )
+            )
+
+        // convert addresses to hexes
         const idHexes = addresses.map(
             address => isHex(address)
                 ? address
@@ -115,8 +134,11 @@ export default class CrowdloanHelper {
                         : ss58Decode(address)
                 )
         )
+
         const handleResult = contributions => {
-            let result = new Map()
+            let result = new Map(
+                resultsParallel.map((amount = 0, i) => [addresses[i], amount])
+            )
             // convert hex amounts to number and format to correct unit values
             Object
                 .keys(contributions)
@@ -127,17 +149,21 @@ export default class CrowdloanHelper {
                         asString,
                         decimals,
                     )
-                    result.set(addresses[i], amountFormatted)
+                    const address = addresses[i]
+                    const amount = + amountFormatted
+                    result.set(address, amount)
                 })
 
             result = multi
                 ? result
                 : (Array.from(result)[0] || {})[1]
+
             return isFn(callback)
                 ? callback(result)
                 : result
 
         }
+        // fetch user contributions made directly to the relay chain
         const result = await this.query(
             'api.derive.crowdloan.ownContributions',
             [
@@ -150,6 +176,48 @@ export default class CrowdloanHelper {
         return isFn(callback)
             ? result
             : handleResult(result)
+    }
+
+    /**
+     * @name    getUserContributionsParallel
+     * @summary fetch user contributions made through Parallel Finance crowdloan DApp
+     * 
+     * @param   {String} address 
+     * @param   {Nubmer} parachainId 
+     * 
+     * @returns {Array} [Array, Number]
+     */
+    getUserContributionsParallel = async (address, parachainId, formatted = true) => {
+        parachainId ??= this.parachainId
+        const apiUrl = 'https://api.subquery.network/sq/parallel-finance/auction-subquery'
+        const body = {
+            query: `query {
+                dotContributions(filter: {
+                    account: { equalTo: "${address}" },
+                    paraId: { equalTo: ${parachainId} }
+                }) {
+                    nodes {
+                        id
+                        blockHeight
+                        paraId
+                        account
+                        amount
+                    } 
+                } 
+            }`
+        }
+        const options = {
+            body: JSON.stringify(body),
+            method: 'post',
+        }
+        const result = await PromisE.fetch(apiUrl, options)
+        const contributions = result?.data?.dotContributions?.nodes || []
+        const sum = contributions
+            .reduce((sum, next) => {
+                if (formatted) next.amount = this.formatAmount(next.amount, false)
+                return sum + next.amount
+            }, 0)
+        return [contributions, sum]
     }
 
     /**
