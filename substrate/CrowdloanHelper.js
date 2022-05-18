@@ -115,7 +115,7 @@ export default class CrowdloanHelper {
             ? []
             : await Promise.all(
                 addresses.map(address =>
-                    this.getUserContributionsParallel(address, parachainId)
+                    this.getUserContributionsParallel(address, parachainId, false)
                         .then(([_, amount]) => amount)
                         .catch(err => {
                             console.error(`Failed to retreive contributions from parallel for ${address}.`, err)
@@ -143,14 +143,14 @@ export default class CrowdloanHelper {
             Object
                 .keys(contributions)
                 .forEach((idHex, i) => {
-                    const amountHex = contributions[idHex]
-                    const amountFormatted = this.formatAmount(
-                        Number(amountHex),
+                    const amountOnChain = Number(contributions[idHex])
+                    const address = addresses[i]
+                    const amountParallel = (result.get(address) || 0)
+                    const amount = this.formatAmount(
+                        amountParallel + amountOnChain,
                         asString,
                         decimals,
                     )
-                    const address = addresses[i]
-                    const amount = + amountFormatted
                     result.set(address, amount)
                 })
 
@@ -216,7 +216,9 @@ export default class CrowdloanHelper {
         const contributions = result?.data?.dotContributions?.nodes || []
         const sum = contributions
             .reduce((sum, next) => {
-                if (formatted) next.amount = this.formatAmount(next.amount, false)
+                next.amount = formatted
+                    ? this.formatAmount(next.amount, false)
+                    : parseInt(next.amount)
                 return sum + next.amount
             }, 0)
         return [contributions, sum]
