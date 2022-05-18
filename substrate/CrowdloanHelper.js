@@ -189,6 +189,8 @@ export default class CrowdloanHelper {
      */
     getUserContributionsParallel = async (address, parachainId, formatted = true) => {
         parachainId ??= this.parachainId
+        // convert address to Polkadot format (required for the API to work)
+        address = ss58Encode(address, 0)
         const apiUrl = 'https://api.subquery.network/sq/parallel-finance/auction-subquery'
         const body = {
             query: `query {
