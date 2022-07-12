@@ -139,21 +139,32 @@ export default class CrowdloanHelper {
             let result = new Map(
                 resultsParallel.map((amount = 0, i) => [addresses[i], amount])
             )
-            // convert hex amounts to number and format to correct unit values
+            // include on-chain contributions to the results map
             Object
                 .keys(contributions)
                 .forEach((idHex, i) => {
+                    // convert hex amounts to number
                     const amountOnChain = Number(contributions[idHex])
                     const address = addresses[i]
-                    const amountParallel = (result.get(address) || 0)
-                    const amount = this.formatAmount(
+                    const amountParallel = result.get(address) || 0
+                    result.set(
+                        address,
                         amountParallel + amountOnChain,
-                        asString,
-                        decimals,
                     )
-                    result.set(address, amount)
                 })
 
+            // format amounts to correct unit and decimal values
+            result = new Map(
+                Array.from(result)
+                    .map(([address, amount]) => [
+                        address,
+                        this.formatAmount(
+                            amount,
+                            asString,
+                            decimals,
+                        ),
+                    ])
+            )
             result = multi
                 ? result
                 : (Array.from(result)[0] || {})[1]
