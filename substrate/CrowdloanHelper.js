@@ -204,6 +204,8 @@ export default class CrowdloanHelper {
                         paraId
                         account
                         amount
+                        isValid
+                        transactionExecuted
                     } 
                 } 
             }`
@@ -215,6 +217,7 @@ export default class CrowdloanHelper {
         const result = await PromisE.fetch(apiUrl, options)
         const contributions = result?.data?.dotContributions?.nodes || []
         const sum = contributions
+            .filter(x => x.isValid && x.transactionExecuted)
             .reduce((sum, next) => {
                 next.amount = formatted
                     ? this.formatAmount(next.amount, false)
