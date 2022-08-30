@@ -466,6 +466,18 @@ export class ChatClient {
         )
 
         /**
+         * @name    handleClaimKapex
+         * @summary Handle claim requests to migrate Meccano testnet reward tokens to Kapex chain.
+         * This is to simply mark that the user has completed the required tasks.
+         * At the end of the claim period, all requests will be validated and checked for fradulent claims.
+         * 
+         * @param   {String}    identity    Substrate identity that completed the tasks and to distribute $KAPEX.
+         * @param   {Function}  callback    callback function expected arguments:
+         *                                  @err    String: error message if query failed
+         */
+        this.rewardsClaimKAPEX = (identity, cb) => isFn(cb) && socket.emit('rewards-claim-kapex', identity, cb)
+
+        /**
          * @name    rewardsGetData
          * @summary retrieves all received rewards by the user
          *
@@ -483,7 +495,7 @@ export class ChatClient {
          * @param {Object}      task 
          * @param {String}      ownerAddress
          * @param {Function}    cb callback function expected arguments:
-         *                  @err    String: error message if query failed
+         *                      @err    String: error message if query failed
          */
         this.task = (id, task, ownerAddress, cb) => isFn(cb) && socket.emit('task', id, task, ownerAddress, cb)
 
