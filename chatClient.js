@@ -448,7 +448,7 @@ export class ChatClient {
 
         /**
          * @name    rewardsClaim
-         * @summary retrieves a verificaiton
+         * @summary submits social rewards claim
          * 
          * @param   {String}    platform    social media platform name. Eg: twitter
          * @param   {String}    handle      user's social media handle/username
@@ -471,9 +471,11 @@ export class ChatClient {
          * This is to simply mark that the user has completed the required tasks.
          * At the end of the claim period, all requests will be validated and checked for fradulent claims.
          * 
-         * @param   {String}    identity    Substrate identity that completed the tasks and to distribute $KAPEX.
-         * @param   {Function}  callback    callback function expected arguments:
-         *                                  @err    String: error message if query failed
+         * @param   {Boolea|Object} data.checkEligible  To check if user is eligible to migrate rewards.
+         * @param   {Boolea|Object} data.checkSubmitted To check if user already submitted their claim.
+         * @param   {String}        data.identity       Identity that completed the tasks and to distribute $KAPEX.
+         * @param   {Function}      callback            callback function expected arguments:
+         *                                              @err    String: error message if query failed
          */
         this.rewardsClaimKAPEX = (identity, cb) => isFn(cb) && socket.emit('rewards-claim-kapex', identity, cb)
 
