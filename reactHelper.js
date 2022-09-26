@@ -30,7 +30,7 @@ export const iUseReducer = (reducerFn, initialState = {}, onUnmount) => {
             rxSetState,
             {
                 ...initialState,
-                ...rxSetState.value,
+                ...rxSetState && rxSetState.value || {},
             }
         ]
     })
