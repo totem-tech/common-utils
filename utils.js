@@ -585,6 +585,39 @@ export const objReadOnly = (obj, strict = false, silent = false) => new Proxy(ob
 })
 
 /**
+ * @name	objSetProp
+ * @summary assign value to specified property
+ * 
+ * @param	{Object}	obj 
+ * @param	{String}	key 
+ * @param	{*}			value			
+ * @param	{Boolean}	condition	(optional)
+ * @param	{*}			valueAlt 	(optional) value to use if condition is truthy
+ * @returns 
+ */
+export const objSetProp = (obj, key, val, condition, valAlt) => {
+	obj[key] = !condition ? val : valAlt
+	return obj
+}
+
+/**
+ * @name	objSetProp
+ * @summary assign value to specified property only if it is undefined
+ * 
+ * @param	{Object}	obj 
+ * @param	{String}	key 
+ * @param	{*}			value			
+ * @param	{Boolean}	condition	(optional) 
+ * @param	{*}			valueAlt 	(optional) value to use if condition is truthy
+ * 
+ * @returns {Object}
+ */
+export const objSetPropUndefined = (obj, key, v1, condition, v2) => {
+	obj[key] === undefined && objSetProp(obj, key, v1, condition, v2)
+	return obj
+}
+
+/**
  * @name	objToUrlParams
  * @summary	constructs URL param string from an object, excluding any `undefined` values
  * 

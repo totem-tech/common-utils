@@ -15,6 +15,7 @@ const settings = new DataStorage(PREFIX + 'settings', true) // keep cache disabl
 // LocalStorage items that are essential for the applicaiton to run. 
 export const essentialKeys = [
     'totem_chat-history', // chat history
+    'totem_contact-details',
     'totem_history', // user activity history
     'totem_identities',
     'totem_locations',

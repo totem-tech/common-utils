@@ -15,6 +15,7 @@ import {
     isFn,
     isValidDate,
     objWithoutKeys,
+    isDefined,
 } from './utils'
 
 export let messages = {
@@ -79,6 +80,11 @@ export const setMessages = msgObj => {
     messages = { ...messages, ...msgObj }
 }
 
+// if msg is falsy, returns true
+const _msgOrTrue = (msg, value) => !msg || msg === true
+    ? true
+    : `${msg}${isDefined(value) ? ': ' + value : ''}`
+
 /**
  * @name    validate
  * @summary validate single value
@@ -133,46 +139,47 @@ export const validate = (value, config, customMessages = {}) => {
         if (isObj(or) && !!TYPES[or.type]) {
             const configWithoutOr = objWithoutKeys(config, ['or'])
             err = validate(value, configWithoutOr, errorMsgs)
-            // primary validation passed
-            // if () return
+            // primary validation
             if (!err && gotValue || err !== typeErrMsg) return err
+            // secondary (or) validation
             return validate(value, or, errorMsgs)
 
         }
         // if doesn't have any value (undefined/null) and not `required`, assume valid
-        if (!gotValue) return required ? errorMsgs.required : null
+        if (!gotValue) return required ? _msgOrTrue(errorMsgs.required) : null
 
         let valueIsArr = false
         // validate value type
         switch (type) {
             case 'array':
-                if (!isArr(value)) return errorMsgs.array
-                if (unique && arrUnique(value).length < value.length) return errorMsgs.unique
+                if (!isArr(value)) return _msgOrTrue(errorMsgs.array)
+                if (unique && arrUnique(value).length < value.length) return _msgOrTrue(errorMsgs.unique)
                 valueIsArr = true
                 break
             case 'boolean':
-                if (!isBool(value)) return errorMsgs.boolean
+                if (!isBool(value)) return _msgOrTrue(errorMsgs.boolean)
                 break
             case 'date':
                 // validates both  string and Date object
                 const date = new Date(value)
                 // const isValidDate = isDate(date)
-                if (!isValidDate(value)) return errorMsgs.date
+                if (!isValidDate(value)) return _msgOrTrue(errorMsgs.date)
                 // makes sure auto correction didnt occur when using `new Date()`. 
                 // Eg: 2020-02-30 is auto corrected to 2021-03-02)
-                if (isStr(value) && date.toISOString().split('T')[0] !== value.replace(' ', 'T').split('T')[0])
-                    return errorMsgs.date
-                if (max && new Date(max) < date) return `${errorMsgs.dateMax} ${max}`
-                if (min && new Date(min) > date) return `${errorMsgs.dateMin} ${min}`
+                const dateInvalid = isStr(value)
+                    && date.toISOString().split('T')[0] !== value.replace(' ', 'T').split('T')[0]
+                if (dateInvalid) return _msgOrTrue(errorMsgs.date)
+                if (max && new Date(max) < date) return _msgOrTrue(errorMsgs.dateMax, max)
+                if (min && new Date(min) > date) return _msgOrTrue(errorMsgs.dateMin, min)
                 break
             case 'email':
-                if (!isStr(value) || !emailPattern.test(value)) return errorMsgs.email
+                if (!isStr(value) || !emailPattern.test(value)) return _msgOrTrue(errorMsgs.email)
                 break
             case 'hash':
-                if (!isHash(value)) return errorMsgs.hash
+                if (!isHash(value)) return _msgOrTrue(errorMsgs.hash)
                 break
             case 'hex':
-                if (!isHex(value)) return errorMsgs.hex
+                if (!isHex(value)) return _msgOrTrue(errorMsgs.hex)
                 break
             case 'identity':
                 const { chainType, chainId, ignoreChecksum } = config || {}
@@ -182,31 +189,31 @@ export const validate = (value, config, customMessages = {}) => {
                     chainId,
                     ignoreChecksum,
                 )
-                if (!isIdentityValid) return errorMsgs.identity
+                if (!isIdentityValid) return _msgOrTrue(errorMsgs.identity)
                 break
             case 'integer':
-                if (!isInteger(value)) return errorMsgs.integer
+                if (!isInteger(value)) return _msgOrTrue(errorMsgs.integer)
                 break
             case 'number':
-                if (!isValidNumber(value)) return errorMsgs.number
-                if (isValidNumber(min) && value < min) return errorMsgs.numberMin
-                if (isValidNumber(max) && value > max) return errorMsgs.numberMax
+                if (!isValidNumber(value)) return _msgOrTrue(errorMsgs.number)
+                if (isValidNumber(min) && value < min) return _msgOrTrue(errorMsgs.numberMin)
+                if (isValidNumber(max) && value > max) return _msgOrTrue(errorMsgs.numberMax)
                 if (isValidNumber(decimals) && decimals >= 0) {
                     if (decimals === 0) {
-                        if (!isInteger(value)) return errorMsgs.integer
+                        if (!isInteger(value)) return _msgOrTrue(errorMsgs.integer)
                         break
                     }
                     const len = (value.toString().split('.')[1] || '').length
-                    if (len > decimals) return `${errorMsgs.decimals}: ${decimals}`
+                    if (len > decimals) return _msgOrTrue(errorMsgs.decimals, decimals)
                 }
                 break
             case 'object':
-                if (!isObj(value)) return errorMsgs.object
+                if (!isObj(value)) return _msgOrTrue(errorMsgs.object)
                 if (
                     isArr(requiredKeys)
                     && requiredKeys.length > 0
                     && !objHasKeys(value, requiredKeys)
-                ) return errorMsgs.requiredKeys
+                ) return _msgOrTrue(errorMsgs.requiredKeys)
                 // validate child properties of the `value` object
                 err = isObj(childConf)
                     && validateObj(
@@ -219,11 +226,11 @@ export const validate = (value, config, customMessages = {}) => {
                 if (err) return err
                 break
             case 'string':
-                if (!isStr(value)) return errorMsgs.string
+                if (!isStr(value)) return _msgOrTrue(errorMsgs.string)
                 break
             case 'url':
                 try {
-                    if (!isStr(value)) return errorMsgs.url
+                    if (!isStr(value)) return _msgOrTrue(errorMsgs.url)
 
                     const url = new URL(value)
                     // Hack to fix comparison failure due to a trailing slash automatically added by `new URL()`
@@ -231,19 +238,19 @@ export const validate = (value, config, customMessages = {}) => {
 
                     // catch any auto-correction by `new URL()`. 
                     // Eg: spaces in the domain name being replaced by`%20` or missing `//` in protocol being auto added
-                    if (url.href !== value) return errorMsgs.url
+                    if (url.href !== value) return _msgOrTrue(errorMsgs.url)
                 } catch (e) {
-                    return errorMsgs.url
+                    return _msgOrTrue(errorMsgs.url)
                 }
                 break
             default:
                 // validation for unlisted types by checking if the value is an instance of `type`
                 // (eg: ApiPromise, BN)
                 try {
-                    if (!(value instanceof instanceOf)) return errorMsgs.instanceof || errorMsgs.type
+                    if (!(value instanceof instanceOf)) return _msgOrTrue(errorMsgs.instanceof || errorMsgs.type)
                 } catch (_) { }
                 // unsupported type
-                return errorMsgs.type
+                return _msgOrTrue(errorMsgs.type)
         }
 
         // valid only if value `accept` array includes `value` or items in `value` array
@@ -252,23 +259,23 @@ export const validate = (value, config, customMessages = {}) => {
             const valid = !valueIsArr
                 ? accept.includes(value)
                 : value.every(v => accept.includes(v))
-            if (!valid) return errorMsgs.accept
+            if (!valid) return _msgOrTrue(errorMsgs.accept)
         }
         // valid only if value `reject` array does not include the `value` or items in `value` array
         if (isArr(reject) && reject.length) {
             const valid = !valueIsArr
                 ? !reject.includes(value)
                 : value.every(v => !reject.includes(v))
-            if (!valid) return errorMsgs.reject
+            if (!valid) return _msgOrTrue(errorMsgs.reject)
         }
 
         // validate regex expression
-        if (regex instanceof RegExp && !regex.test(value)) return errorMsgs.regex
+        if (regex instanceof RegExp && !regex.test(value)) return _msgOrTrue(errorMsgs.regex)
 
         // validate array/integer/number/string length
         const len = (valueIsArr ? value : `${value}`).length
-        if (isValidNumber(maxLength) && len > maxLength) return `${errorMsgs.lengthMax}: ${maxLength}`
-        if (isValidNumber(minLength) && len < minLength) return `${errorMsgs.lengthMin}: ${minLength}`
+        if (isValidNumber(maxLength) && len > maxLength) return _msgOrTrue(errorMsgs.lengthMax, maxLength)
+        if (isValidNumber(minLength) && len < minLength) return _msgOrTrue(errorMsgs.lengthMin, minLength)
 
         // valid according to the config
         return null
@@ -315,7 +322,7 @@ export const validate = (value, config, customMessages = {}) => {
 export const validateObj = (obj = {}, config = {}, failFast = true, includeLabel = true, customMessages = {}) => {
     try {
         const errorMsgs = { ...messages, ...customMessages }
-        if (!isObj(obj)) return errorMsgs.object
+        if (!isObj(obj)) return _msgOrTrue(errorMsgs.object)
 
         const keys = Object.keys(config)
         let errors = {}
