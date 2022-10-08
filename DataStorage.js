@@ -1,5 +1,5 @@
 import { BehaviorSubject, Subject } from 'rxjs'
-import { isDefined, isStr, mapSearch, isMap, isValidNumber, mapSort, isArr, isFn, isNodeJS } from './utils'
+import { isDefined, isStr, mapSearch, isMap, isValidNumber, mapSort, isArr, isFn, isNodeJS, isArr2D } from './utils'
 /* For NodeJS (non-browser applications) the following node module is required: node-localstorage */
 
 let storage
@@ -94,7 +94,13 @@ export default class DataStorage {
      */
     constructor(name, disableCache = false, initialValue, onChange) {
         let data = (name && read(name)) || initialValue
-        data = !isMap(data) ? new Map() : data
+        data = !isMap(data)
+            ? new Map(
+                isArr2D(data)
+                    ? data
+                    : undefined
+            )
+            : data
         this.name = name
         this.disableCache = name && disableCache
         this.rxData = this.disableCache
