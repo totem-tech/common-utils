@@ -8,9 +8,11 @@ import { downloadFile, generateHash, hasValue, isMap, isObj, isSet, isStr, isVal
 const PREFIX = 'totem_'
 const PREFIX_STATIC = PREFIX + 'static_'
 const CACHE_KEY = PREFIX + 'cache'
+const SETTINGS_KEY = PREFIX + 'settings'
+const MODULE_SETTINGS_KEY = 'module_settings'
 const storage = {}
 const cache = new DataStorage(CACHE_KEY, true)
-const settings = new DataStorage(PREFIX + 'settings', true) // keep cache disabled
+const settings = new DataStorage(SETTINGS_KEY, true) // keep cache disabled
 
 // LocalStorage items that are essential for the applicaiton to run. 
 export const essentialKeys = [
@@ -25,8 +27,11 @@ export const essentialKeys = [
     'totem_settings',
 ]
 
+// Storage items that are to include a timestamp after being backed up
 export const modulesWithTS = [
+    'totem_contacts',
     'totem_identities',
+    'totem_locations',
     'totem_partners',
 ]
 
@@ -93,13 +98,13 @@ export const backup = {
         const timestamp = storage
             .backup
             .filenameToTS(filename)
-        const data = backup.generateData(timestamp)
+        let data = backup.generateData(timestamp)
         data.__fileName = filename
         const content = JSON.stringify(data)
         downloadFile(
             content,
             filename,
-            'application/json'
+            'application/json',
         )
         return {
             data,
@@ -125,20 +130,33 @@ export const backup = {
      * 
      * @returns {Object}
      */
-    generateData: (timestamp) => {
+    generateData: (timestamp = new Date().toISOString()) => {
         const data = objClean(localStorage, essentialKeys)
         Object
             .keys(data)
             .forEach(key => {
                 data[key] = JSON.parse(data[key])
+                if (!timestamp) return
 
-                if (!timestamp || modulesWithTS.includes(key)) return
+                if (key === SETTINGS_KEY) {
+                    const { messaging = {} } = data[SETTINGS_KEY]
+                        .find(([key]) => key === MODULE_SETTINGS_KEY)[1]
+                        || {}
+                    messaging.user = {
+                        ...messaging.user,
+                        fileBackupTS: timestamp,
+                    }
+                }
+                if (!modulesWithTS.includes(key)) return
+
                 // update backup timestamp
-                data[key]
-                    .forEach(([_, entry]) =>
-                        entry.fileBackupTS = timestamp
-                    )
+                data[key].forEach(([_, entry]) =>
+                    entry.fileBackupTS = timestamp
+                )
             })
+
+
+
         return data
     },
 
@@ -161,32 +179,45 @@ export const backup = {
      * @name    backup.updateTS
      * @summary update backup timestamps of module data (eg: identities, partners).
      *          This should only be invoked after backup download has been confirmed.
+     * 
+     * @param   {Object}    data        parsed replica of localStorage with only the keys that are to be backed up
+     * @param   {String}    timestamp   ISO timestamp to be set as the backup datetime
+     * 
+     * @returns {Object}    data
      */
     updateFileBackupTS: (data, timestamp) => {
         if (!isObj(data) || !isValidDate(timestamp)) return console.log('updateFileBackupTS invalid', data, timestamp)
 
+        // set timestamp for individual storage entries
         Object
             .keys(data)
             .forEach(moduleKey => {
                 if (!modulesWithTS.includes(moduleKey)) return
+
                 const moduleStorage = new DataStorage(moduleKey)
-                const keysToUpdated = data[moduleKey]
-                    .map(([key]) => key)
                 const updated = moduleStorage
-                    .map(([key, value]) => [
-                        key,
-                        {
-                            ...value,
-                            fileBackupTS: keysToUpdated.includes(key)
-                                ? timestamp
-                                : value.fileBackupTS,
-                        },
-                    ])
+                    .map(([key, value]) => ([key, {
+                        ...value,
+                        fileBackupTS: timestamp,
+                    }]))
                 moduleStorage.setAll(new Map(updated))
             })
 
+
+        // set timestamp on user credentials
+        const user = {
+            ...storage
+                .settings
+                .module('messaging')
+                .user
+            || {},
+            fileBackupTS: timestamp,
+        }
+        user.id && storage.settings.module('messaging', { user })
+
         // update modules
         rxForeUpdateCache.next(modulesWithTS)
+        return data
     }
 }
 
@@ -212,7 +243,7 @@ storage.settings = {
      * 
      * @returns {*} returns the saved value
      */
-    module: (moduleKey, value, override = false) => rw(settings, 'module_settings', moduleKey, value, override)
+    module: (moduleKey, value, override = false) => rw(settings, MODULE_SETTINGS_KEY, moduleKey, value, override)
 }
 
 /**
@@ -249,15 +280,14 @@ storage.clearNonEssentialData = () => {
         '_static_',
         '_cache_',
     ]
-    const shouldRemove = key => !essentialKeys.includes(key)
+    const shouldRemove = key => !essentialKeys.includes(key) && (
         // makes sure essential keys are not removed
-        && (
-            keys.includes(key)
-            || partialKeys.reduce((remove, pKey) =>
-                remove || key.includes(pKey),
-                false,
-            )
+        keys.includes(key)
+        || partialKeys.reduce((remove, pKey) =>
+            remove || key.includes(pKey),
+            false,
         )
+    )
 
     Object
         .keys(localStorage)
