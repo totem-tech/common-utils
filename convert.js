@@ -70,6 +70,14 @@ export const hexToBytes = (hex, bitLength) => {
     ])
 }
 
+/**
+ * @name    bytesToHex
+ * @summary convert bytes array or string to hex
+ * 
+ * @param   {String|Uint8Array} bytes 
+ * 
+ * @returns {String}
+ */
 export const bytesToHex = bytes => {
     // no need to convert
     if (isHex(bytes)) return bytes
@@ -77,10 +85,20 @@ export const bytesToHex = bytes => {
     const { u8aToHex } = require('@polkadot/util')
     return fallbackIfFails(u8aToHex, [bytes])
 }
+
+/**
+ * @name    u8aToStr
+ * @summary convert bytes array to string
+ * 
+ * @param   {Uint8Array} value 
+ * 
+ * @returns {String}
+ */
 export const u8aToStr = value => {
     const { u8aToString } = require('@polkadot/util')
     return u8aToString(value)
 }
+
 /**
  * @name    strToU8a
  * @summary converts any input Uint8Array
@@ -100,6 +118,7 @@ export const strToU8a = value => {
             : `${value}`
     return stringToU8a(str)
 }
+
 export const decodeUTF8 = strToU8a // ToDo: deprecate
 export const encodeUTF8 = u8aToStr // ToDo: deprecate
 
@@ -117,8 +136,6 @@ export const addressToStr = (address, ignoreChecksum, ss58Format) => fallbackIfF
     // if fails check if address is a valid string
     fallbackIfFails(ss58Decode, [address, ignoreChecksum, ss58Format]) && address || '',
 )
-
-
 
 /**
  * @name    csvToArrr

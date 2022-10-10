@@ -1,8 +1,9 @@
 /*
  * Storage Helper: helper funtions to handle all interactions with browser's localStorage including backup and restore.
  */
+import { isHex } from 'web3-utils'
 import DataStorage, { rxForeUpdateCache } from './DataStorage'
-import { downloadFile, generateHash, hasValue, isMap, isObj, isSet, isStr, isValidDate, objClean } from './utils'
+import { downloadFile, generateHash, hasValue, isFn, isMap, isObj, isSet, isStr, isValidDate, objClean } from './utils'
 
 // Local Storage item key prefix for all items
 const PREFIX = 'totem_'
@@ -86,21 +87,30 @@ export const backup = {
      * @name    backup.download
      * @summary download backup of application data
      * 
-     * @param   {String}    filename (optional)
+     * @param   {String}    filename        (optional) Default: generated name with domain and timestamp
+     * @param   {Function}  dataModifier    function to modify/encrypt downloadable data/object
+     *                                      Args: Object
+     *                                      Expected return: String/Object
      * 
-     * @returns {Array} [
-     *                      content     string: st
-     *                      timestamp   string:
-     *                      fileName    string:
-     *                  ]
+     * @returns {Array} 
+     * [
+     *     content     String:
+     *     timestamp   String:
+     *     fileName    String:
+     * ]
      */
-    download: (filename = backup.generateFilename()) => {
-        const timestamp = storage
-            .backup
-            .filenameToTS(filename)
+    download: (filename, dataModifier = null) => {
+        filename = filename || backup.generateFilename()
+        const timestamp = backup.filenameToTS(filename)
         let data = backup.generateData(timestamp)
-        data.__fileName = filename
-        const content = JSON.stringify(data)
+        // add filename hash to the backup to force user to upload the exact same file
+        data._file = generateHash(filename, 'blake2', 32).slice(2)
+        data = isFn(dataModifier)
+            ? dataModifier(data)
+            : data
+        const content = isStr(data)
+            ? data
+            : JSON.stringify(data)
         downloadFile(
             content,
             filename,
@@ -108,7 +118,7 @@ export const backup = {
         )
         return {
             data,
-            hash: generateHash(content),
+            hash: generateHash(content, 'blake2', 256),
             timestamp,
             filename,
         }
@@ -125,8 +135,10 @@ export const backup = {
         .split('.json')[0],
 
     /**
-     * @name    backup.generate
+     * @name    backup.generateData
      * @summary generates an object for backup only using essential data from localStorage
+     * 
+     * @params  {String}    timestamp
      * 
      * @returns {Object}
      */
@@ -154,8 +166,6 @@ export const backup = {
                     entry.fileBackupTS = timestamp
                 )
             })
-
-
 
         return data
     },
@@ -186,7 +196,8 @@ export const backup = {
      * @returns {Object}    data
      */
     updateFileBackupTS: (data, timestamp) => {
-        if (!isObj(data) || !isValidDate(timestamp)) return console.log('updateFileBackupTS invalid', data, timestamp)
+        if (!isHex(data)) throw new Error('Invalid file contents')
+        if (!isValidDate(timestamp)) throw new Error('invalid timestamp')
 
         // set timestamp for individual storage entries
         Object
@@ -203,7 +214,6 @@ export const backup = {
                 moduleStorage.setAll(new Map(updated))
             })
 
-
         // set timestamp on user credentials
         const user = {
             ...storage
@@ -218,7 +228,7 @@ export const backup = {
         // update modules
         rxForeUpdateCache.next(modulesWithTS)
         return data
-    }
+    },
 }
 
 storage.backup = backup

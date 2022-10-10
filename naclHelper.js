@@ -15,14 +15,14 @@ import {
     naclVerify,
     randomAsU8a,
 } from '@polkadot/util-crypto'
-import { isArr, isHex, isObj, isUint8Arr, objCopy } from "./utils"
+import { generateHash, isArr, isHex, isObj, isUint8Arr, objCopy } from './utils'
 import {
     bytesToHex,
     hexToBytes,
     ss58Encode,
     u8aToStr,
     strToU8a,
-} from "./convert"
+} from './convert'
 
 /**
  * @name    decrypt
@@ -172,9 +172,9 @@ export const encrypt = (message, senderSecretKey, recipientPublicKey, nonce, asH
  * // object to encrypt
  * const obj = {
  *     first: 'some text',
- *     second: 1, // will be converted to string: "1"
+ *     second: 1, // will be converted to string: '1'
  *     third: 'ignored property',
- *     fifth: null, // will be converted to string: "null"
+ *     fifth: null, // will be converted to string: 'null'
  * }
  * 
  * // secondary object for recursive encryption
@@ -443,10 +443,12 @@ export const randomBytes = (length, asHex = true) => {
  * @name    naclDecrypt
  * @summary decrypt an message that was encrytped using TweetNaclJS SecretBox (AKA secret key) encryption
  * 
- * @param   {*} encrypted 
- * @param   {*} nonce 
- * @param   {*} secret 
- * @param   {*} asString
+ * @param   {Sting|Uint8Array}  encrypted   encrypted message (hex string or Uint8Array)
+ * @param   {Sting|Uint8Array}  nonce       random nonce to decrypt the message (hex string or Uint8Array)
+ * @param   {Sting|Uint8Array}  secret      encryption secret (hex string or Uint8Array)
+ * @param   {Boolean}           asString    (optional) whether to return decrypted message as string or Uint8Array
+ * 
+ * @returns {String|Uint8Array} decrypted message, null if decryption failed
  */
 export const secretBoxDecrypt = (encrypted, nonce, secret, asString = true) => {
     const decrypted = naclDecrypt1(
@@ -454,7 +456,7 @@ export const secretBoxDecrypt = (encrypted, nonce, secret, asString = true) => {
         hexToBytes(nonce),
         hexToBytes(secret),
     )
-    return !asString
+    return !decrypted || !asString
         ? decrypted
         : u8aToStr(decrypted)
 }
@@ -470,7 +472,7 @@ export const secretBoxDecrypt = (encrypted, nonce, secret, asString = true) => {
  * @param   {Boolean}           asHex   (optional) whether to return encrypted message as bytes or hex string
  *                                      Default: true
  * 
- * @returns {Object}    `{ encrypted, nonce }`
+ * @returns {Object}    `{ encrypted, nonce }` | null if encryption fails
  */
 export const secretBoxEncrypt = (message, secret, nonce, asHex = true) => {
     nonce = nonce || newNonce(false) // generate new nonce
@@ -480,11 +482,26 @@ export const secretBoxEncrypt = (message, secret, nonce, asHex = true) => {
         hexToBytes(nonce),
     )
     if (!asHex || !result.encrypted) return result
+
     return {
         encrypted: bytesToHex(result.encrypted),
         nonce: bytesToHex(result.nonce),
     }
 }
+
+/**
+ * @name    secretBoxKeyFromPW
+ * @summary generates a TweetNacl SecretBox compatible secret key (hex string) from supplied seed/password
+ * 
+ * @param   {String}    password
+ * 
+ * @returns {String}    hex string
+ */
+export const secretBoxKeyFromPW = password => generateHash(
+    password,
+    'blake2',
+    256, // DO NOT CHANGE
+)
 
 /**
  * @name    signingKeyPair

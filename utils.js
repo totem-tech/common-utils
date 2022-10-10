@@ -54,7 +54,7 @@ export const copyToClipboard = str => {
 }
 
 export const downloadFile = (content, fileName, contentType) => {
-	const a = document.createElement("a")
+	const a = document.createElement('a')
 	const file = new Blob([content], { type: contentType })
 	a.href = URL.createObjectURL(file)
 	a.download = fileName
@@ -70,11 +70,11 @@ export const escapeStringRegexp = (str) => {
  * @name	generateHash
  * @summary generate hash using supplied data
  * 
- * @param	{String}	seed data to generate hash of
- * @param	{String}	algo supported algorithms: blake2 (default), keccak
- * @param	{Number}	bitLength 
+ * @param	{String}	seed		data to generate hash of
+ * @param	{String}	algo		Supported algorithms: blake2 (default), keccak
+ * @param	{Number}	bitLength 	Default: 256
  */
-export const generateHash = (seed, algo, bitLength = 256) => {
+export const generateHash = (seed, algo = 'blake2', bitLength = 256) => {
 	const { blake2AsHex, keccakAsHex } = require('@polkadot/util-crypto')
 	seed = isUint8Arr(seed)
 		? seed
@@ -128,7 +128,7 @@ export const isArr = x => Array.isArray(x)
 export const isArr2D = x => isArr(x) && x.every(isArr)
 // checks if convertible to an array by using `Array.from(x)`
 export const isArrLike = x => isSet(x) || isMap(x) || isArr(x)
-export const isAsyncFn = x => x instanceof (async () => { }).constructor && x[Symbol.toStringTag] === "AsyncFunction"
+export const isAsyncFn = x => x instanceof (async () => { }).constructor && x[Symbol.toStringTag] === 'AsyncFunction'
 export const isBool = x => typeof x === 'boolean'
 export const isBond = x => {
 	try {
@@ -138,7 +138,7 @@ export const isBond = x => {
 	}
 }
 // Check if x is a valid Date instance
-// Date object can sometimes be "Invalid Date" without any timestamp.
+// Date object can sometimes be 'Invalid Date' without any timestamp.
 // Date.getTime() is used to make sure it's a valid Date
 export const isDate = x => x instanceof Date && isValidNumber(x.getTime())
 // checks if dateOrStr is a valid date
@@ -827,7 +827,7 @@ export const search = (data, query, keys = []) => {
 /**
  * @name			searchRanked
  * @summary 		enhanced search for Dropdown
- * @description		Semantic UI Dropdown search defaults to only "text" option property.
+ * @description		Semantic UI Dropdown search defaults to only 'text' option property.
  * 					See FormInput for usage.
  * @param {Array}	searchKeys	Object properties (keys) to search for.
  * 								Default: ['text'] (for Dropdown and similar input fields)
