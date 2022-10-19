@@ -143,6 +143,7 @@ export const backup = {
      * @returns {Object}
      */
     generateData: (timestamp = new Date().toISOString()) => {
+        // data to be backed up
         const data = objClean(localStorage, essentialKeys)
         Object
             .keys(data)
@@ -195,24 +196,19 @@ export const backup = {
      * 
      * @returns {Object}    data
      */
-    updateFileBackupTS: (data, timestamp) => {
-        if (!isHex(data)) throw new Error('Invalid file contents')
+    updateFileBackupTS: (timestamp) => {
         if (!isValidDate(timestamp)) throw new Error('invalid timestamp')
 
         // set timestamp for individual storage entries
-        Object
-            .keys(data)
-            .forEach(moduleKey => {
-                if (!modulesWithTS.includes(moduleKey)) return
-
-                const moduleStorage = new DataStorage(moduleKey)
-                const updated = moduleStorage
-                    .map(([key, value]) => ([key, {
-                        ...value,
-                        fileBackupTS: timestamp,
-                    }]))
-                moduleStorage.setAll(new Map(updated))
-            })
+        modulesWithTS.forEach(moduleKey => {
+            const moduleStorage = new DataStorage(moduleKey)
+            const updated = moduleStorage
+                .map(([key, value]) => ([key, {
+                    ...value,
+                    fileBackupTS: timestamp,
+                }]))
+            moduleStorage.setAll(new Map(updated))
+        })
 
         // set timestamp on user credentials
         const user = {
@@ -223,11 +219,10 @@ export const backup = {
             || {},
             fileBackupTS: timestamp,
         }
-        user.id && storage.settings.module('messaging', { user })
+        !!user.id && storage.settings.module('messaging', { user })
 
         // update modules
         rxForeUpdateCache.next(modulesWithTS)
-        return data
     },
 }
 
