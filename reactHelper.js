@@ -198,7 +198,7 @@ export const usePromise = (promise, resultModifier, errorModifier) => {
  * @name    useRxSubject
  * @summary custom React hook for use with RxJS subjects
  * 
- * @param   {BehaviorSubject|Subject}   subject RxJS subject or subject like Object (with subscribe function)
+ * @param   {BehaviorSubject|Subject}   _subject RxJS subject or subject like Object (with subscribe function)
  *              If not object or doesn't have subcribe function will assume subject to be a static value.
  * @param   {Boolean}   ignoreFirst whether to ignore first change. 
  *              Setting `true`, will prevent an additional state update after first load.
@@ -220,8 +220,8 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowSubjectU
     )
 
     const [{ firstValue, value }, setState] = iUseReducer(reducer, () => {
-        let value = subject instanceof BehaviorSubject
-            ? subject.value
+        let value = _subject instanceof BehaviorSubject
+            ? _subject.value
             : initialValue
         value = !isFn(valueModifier)
             ? value
@@ -230,8 +230,8 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowSubjectU
     })
 
     useEffect(() => {
-        let ignoreFirst = !(subject instanceof BehaviorSubject)
-        const subscribed = subject.subscribe((newValue) => {
+        let ignoreFirst = !(_subject instanceof BehaviorSubject)
+        const subscribed = _subject.subscribe((newValue) => {
             if (!ignoreFirst) {
                 ignoreFirst = true
                 if (firstValue === newValue) return
@@ -254,7 +254,7 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowSubjectU
 
         !allowSubjectUpdate
             ? setState({ value: _value })
-            : subject.next(_value)
+            : _subject.next(_value)
     }
     return [value, setValue]
 }
