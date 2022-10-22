@@ -3,7 +3,7 @@
  */
 import { BehaviorSubject, Subject } from 'rxjs'
 import PromisE from './PromisE'
-import { hasValue, isDefined, isFn, isSubjectLike, isValidNumber } from './utils'
+import { hasValue, isArr, isDefined, isFn, isObj, isSubjectLike, isValidNumber } from './utils'
 
 const useEffect = (...args) => require('react').useEffect(...args)
 const useReducer = (...args) => require('react').useReducer(...args)
@@ -213,7 +213,11 @@ export const usePromise = (promise, resultModifier, errorModifier) => {
  * @returns {Array}     [value, setvalue]
  */
 export const useRxSubject = (subject, valueModifier, initialValue, allowSubjectUpdate = false) => {
-    if (!isSubjectLike(subject)) return subject
+    const [_subject] = useState(() =>
+        isSubjectLike(subject)
+            ? subject
+            : new BehaviorSubject({})
+    )
 
     const [{ firstValue, value }, setState] = iUseReducer(reducer, () => {
         let value = subject instanceof BehaviorSubject
@@ -234,19 +238,24 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowSubjectU
             }
             if (!isFn(valueModifier)) return setState({ value: newValue })
 
-            PromisE(valueModifier(newValue)).then(newValue => {
-                if (newValue === useRxSubject.IGNORE_UPDATE) return
-                setState({ value: newValue })
-            })
+            PromisE(valueModifier(newValue))
+                .then(newValue => {
+                    if (newValue === useRxSubject.IGNORE_UPDATE) return
+                    setState({ value: newValue })
+                })
         })
         return () => subscribed.unsubscribe()
     }, [])
 
-    const setValue = newValue => !allowSubjectUpdate
-        ? setState({
-            value: { ...value, ...newValue },
-        })
-        : subject.next(newValue)
+    const setValue = newValue => {
+        const _value = isObj(newValue)
+            ? { ...value, ...newValue }
+            : newValue
+
+        !allowSubjectUpdate
+            ? setState({ value: _value })
+            : subject.next(_value)
+    }
     return [value, setValue]
 }
 // To prevent an update return this in valueModifier
