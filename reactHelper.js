@@ -8,6 +8,39 @@ import { hasValue, isArr, isDefined, isFn, isObj, isSubjectLike, isValidNumber }
 const useEffect = (...args) => require('react').useEffect(...args)
 const useReducer = (...args) => require('react').useReducer(...args)
 const useState = (...args) => require('react').useState(...args)
+
+/**
+ * @name    copyRxSubject
+ * @summary creates a new subject that automatically copies the value of the source subject.
+ * 
+ * @description The the changes are applied unidirectionally from the source subject to the destination subject.
+ * Changes on the destination subject is NOT applied back into the source subject.
+ * 
+ * @param   {Object}    rxSource   RxJS source subject
+ * @param   {Object}    rxCopy     (optional) RxJS copy/destination subject
+ *                                 Default: `new BehaviorSubject()`
+ * 
+ * @returns {Object}    subjectCopy
+ */
+export const copyRxSubject = (rxSource, rxCopy) => {
+    if (!isSubjectLike(rxCopy)) rxCopy = new BehaviorSubject()
+    if (!isSubjectLike(rxSource)) return rxCopy
+
+    rxCopy.next(rxSource.value)
+    const subscribe = rxCopy.subscribe
+    rxCopy.subscribe = (...args) => {
+        const sourceSub = rxSource.subscribe(value => rxCopy.next(value))
+        const localSub = subscribe.apply(rxCopy, args)
+        const { unsubscribe } = localSub
+        localSub.unsubscribe = (...args) => {
+            unsubscribe.apply(localSub, ...args)
+            sourceSub.unsubscribe()
+        }
+        return localSub
+    }
+    return rxCopy
+}
+
 /**
  * @name    iUseReducer
  * @summary A sugar for React `userReducer` with added benefit of tracking of component mounted status.
@@ -198,13 +231,15 @@ export const usePromise = (promise, resultModifier, errorModifier) => {
  * @name    useRxSubject
  * @summary custom React hook for use with RxJS subjects
  * 
- * @param   {BehaviorSubject|Subject}   _subject RxJS subject or subject like Object (with subscribe function)
+ * @param   {BehaviorSubject|Subject}   subject RxJS subject or subject like Object (with subscribe function)
  *              If not object or doesn't have subcribe function will assume subject to be a static value.
  * @param   {Boolean}   ignoreFirst whether to ignore first change. 
  *              Setting `true`, will prevent an additional state update after first load.
  * @param   {Function}  valueModifier (optional) value modifier. 
  *              If an async function is supplied, `ignoreFirst` will be assumed `false`.
+ *              Args: [value, rxSubject]
  * @param   {*}         initialValue (optional) initial value where appropriate
+ * @
  * @param   {Boolean}   allowSubjectUpdate whether to allow update of the subject or only state.
  *              CAUTION: if true and @subject is sourced from a DataStorage instance,
  *              it may override values in the LocalStorage values.
@@ -212,10 +247,12 @@ export const usePromise = (promise, resultModifier, errorModifier) => {
  * 
  * @returns {Array}     [value, setvalue]
  */
-export const useRxSubject = (subject, valueModifier, initialValue, allowSubjectUpdate = false) => {
+export const useRxSubject = (subject, valueModifier, initialValue, allowMerge = false, allowSubjectUpdate = false) => {
     const [_subject] = useState(() =>
         isSubjectLike(subject)
-            ? subject
+            ? allowSubjectUpdate
+                ? subject
+                : copyRxSubject(subject)
             : new BehaviorSubject({})
     )
 
@@ -225,7 +262,7 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowSubjectU
             : initialValue
         value = !isFn(valueModifier)
             ? value
-            : valueModifier(value)
+            : valueModifier(value, _subject)
         return { firstValue: value, value }
     })
 
@@ -248,7 +285,7 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowSubjectU
     }, [])
 
     const setValue = newValue => {
-        const _value = isObj(newValue)
+        const _value = allowMerge && isObj(newValue)
             ? { ...value, ...newValue }
             : newValue
 
