@@ -3,7 +3,7 @@
  */
 import { BehaviorSubject, Subject } from 'rxjs'
 import PromisE from './PromisE'
-import { hasValue, isArr, isDefined, isFn, isObj, isSubjectLike, isValidNumber } from './utils'
+import { isDefined, isFn, isObj, isSubjectLike, isValidNumber } from './utils'
 
 const useEffect = (...args) => require('react').useEffect(...args)
 const useReducer = (...args) => require('react').useReducer(...args)
@@ -23,10 +23,13 @@ const useState = (...args) => require('react').useState(...args)
  * @returns {Object}    subjectCopy
  */
 export const copyRxSubject = (rxSource, rxCopy) => {
-    if (!isSubjectLike(rxCopy)) rxCopy = new BehaviorSubject()
-    if (!isSubjectLike(rxSource)) return rxCopy
+    if (!isSubjectLike(rxSource)) return new Subject()
+    if (!isSubjectLike(rxCopy)) {
+        rxCopy = rxSource instanceof BehaviorSubject
+            ? new BehaviorSubject(rxSource.value)
+            : new Subject()
+    }
 
-    rxCopy.next(rxSource.value)
     const subscribe = rxCopy.subscribe
     rxCopy.subscribe = (...args) => {
         const sourceSub = rxSource.subscribe(value => rxCopy.next(value))
