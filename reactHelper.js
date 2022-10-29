@@ -256,7 +256,7 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowMerge = 
             ? allowSubjectUpdate
                 ? subject
                 : copyRxSubject(subject)
-            : new BehaviorSubject({})
+            : new BehaviorSubject(initialValue)
     )
 
     const [{ firstValue, value }, setState] = iUseReducer(reducer, () => {

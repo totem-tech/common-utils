@@ -15,7 +15,7 @@ import {
     naclVerify,
     randomAsU8a,
 } from '@polkadot/util-crypto'
-import { generateHash, isArr, isHex, isObj, isUint8Arr, objCopy } from './utils'
+import { generateHash, isArr, isHex, isMap, isObj, isUint8Arr, objCopy } from './utils'
 import {
     bytesToHex,
     hexToBytes,
@@ -146,6 +146,36 @@ export const encrypt = (message, senderSecretKey, recipientPublicKey, nonce, asH
         nonce: bytesToHex(result.nonce)
     }
 }
+
+export const mapDecrypt = (map, senderPublicKey, recipientSecretKey, keys) => isMap(map)
+    && new Map(
+        Array
+            .from(map)
+            .map(([key, value]) => {
+                value = !isObj(value)
+                    ? value
+                    : decryptObj(value, senderPublicKey, recipientSecretKey, keys)
+                return [key, value]
+            })
+    )
+
+export const mapEncrypt = (map, secretKey, recipientPublicKey, keys, asHex = true) => isMap(map)
+    && new Map(
+        Array
+            .from(map)
+            .map(([key, value]) => {
+                value = !isObj(value)
+                    ? value
+                    : encryptObj(
+                        value,
+                        secretKey,
+                        recipientPublicKey,
+                        keys,
+                        asHex
+                    )[0]
+                return [key, value]
+            })
+    )
 
 /**
  * @name    encryptObj
