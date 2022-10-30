@@ -276,27 +276,27 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowMerge = 
                 ignoreFirst = true
                 if (firstValue === newValue) return
             }
-            if (!isFn(valueModifier)) return setState({ value: newValue })
 
-            PromisE(valueModifier(newValue))
-                .then(newValue => {
-                    if (newValue === useRxSubject.IGNORE_UPDATE) return
-                    setState({ value: newValue })
+            const promise = PromisE(
+                !isFn(valueModifier)
+                    ? newValue
+                    : valueModifier(newValue)
+            )
+            promise.then(newValue => {
+                if (newValue === useRxSubject.IGNORE_UPDATE) return
+                setState({
+                    value: allowMerge
+                        ? { ...value, ...newValue }
+                        : newValue
                 })
+            })
+            promise.catch(err => console.log('useRxSubject => unexpected error:', err))
         })
         return () => subscribed.unsubscribe()
     }, [])
 
-    const setValue = newValue => {
-        const _value = allowMerge && isObj(newValue)
-            ? { ...value, ...newValue }
-            : newValue
-
-        !allowSubjectUpdate
-            ? setState({ value: _value })
-            : _subject.next(_value)
-    }
-    return [value, setValue]
+    const setValue = newValue => _subject.next(newValue)
+    return [value, setValue, _subject]
 }
 // To prevent an update return this in valueModifier
 useRxSubject.IGNORE_UPDATE = Symbol('ignore-rx-subject-update')
