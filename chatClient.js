@@ -619,7 +619,7 @@ export class ChatClient {
         referredBy,
         err => {
             if (!err) {
-                setUser({ id, secret })
+                setUser({ address, id, secret })
                 rxIsLoggedIn.next(true)
                 rxIsRegistered.next(true)
             }
