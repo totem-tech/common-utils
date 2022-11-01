@@ -103,13 +103,18 @@ export const setSelected = async (selected, client) => {
 }
 
 // save translated list of texts retrieved from server
-export const setTexts = (langCode, texts, enTexts) => translations.setAll(new Map(
-    // remove all language cache if selected is English
-    langCode === EN ? [] : [
-        [EN, enTexts || translations.get(EN)],
-        [langCode, texts || translations.get(langCode)],
-    ].filter(Boolean)
-))
+export const setTexts = (langCode, texts, enTexts) => translations.setAll(
+    new Map(
+        // remove all language cache if selected is English
+        langCode === EN
+            ? []
+            : [
+                [EN, enTexts || translations.get(EN)],
+                [langCode, texts || translations.get(langCode)],
+            ].filter(Boolean)
+    ),
+    true,
+)
 
 export const translated = (texts = {}, capitalized = false) => {
     const langCode = getSelected()

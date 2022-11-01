@@ -106,9 +106,16 @@ export default class DataStorage {
         this.rxData = this.disableCache
             ? new Subject()
             : new BehaviorSubject(data)
-        this.size = data.size
+        // `this.save` can be used to skip write operations temporarily by setting it to false
         this.save = true
+        this.size = data.size
+        let ignoredFirst = this.disableCache
         this.rxData.subscribe(data => {
+            if (!ignoredFirst) {
+                // prevent save operation on startup when BehaviorSubject is used
+                ignoredFirst = true
+                return
+            }
             this.name && this.save && write(this.name, data)
             this.save = true
             this.size = data.size

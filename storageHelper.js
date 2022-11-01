@@ -207,7 +207,7 @@ export const backup = {
                     ...value,
                     fileBackupTS: timestamp,
                 }]))
-            moduleStorage.setAll(new Map(updated))
+            moduleStorage.setAll(new Map(updated), true)
         })
 
         // set timestamp on user credentials
