@@ -65,6 +65,14 @@ export const escapeStringRegexp = (str) => {
 	const fn = require('escape-string-regexp')
 	return fn(str)
 }
+// returns @fallbackValue if function call throws error
+export const fallbackIfFails = (func, args = [], fallbackValue = null) => {
+	try {
+		return func(...isFn(args) ? args() : args)
+	} catch (e) {
+		return fallbackValue
+	}
+}
 
 /**
  * @name	generateHash
@@ -128,7 +136,8 @@ export const isArr = x => Array.isArray(x)
 export const isArr2D = x => isArr(x) && x.every(isArr)
 // checks if convertible to an array by using `Array.from(x)`
 export const isArrLike = x => isSet(x) || isMap(x) || isArr(x)
-export const isAsyncFn = x => x instanceof (async () => { }).constructor && x[Symbol.toStringTag] === 'AsyncFunction'
+export const isAsyncFn = x => x instanceof (async () => { }).constructor
+	&& x[Symbol.toStringTag] === 'AsyncFunction'
 export const isBool = x => typeof x === 'boolean'
 export const isBond = x => {
 	try {
@@ -162,17 +171,11 @@ export const isETHAddress = (address, chainId) => {
 	return isAddress(address, chainId)
 }
 export const isFn = x => typeof x === 'function'
-export const isHash = x => HASH_REGEX.test(`${x}`)
-export const isHex = x => HEX_REGEX.test(`${x}`)
+export const isHash = x => fallbackIfFails(HASH_REGEX.test, () => [`${x}`], false)
+export const isHex = x => fallbackIfFails(HEX_REGEX.test, () => [`${x}`], false)
 export const isInteger = x => Number.isInteger(x)
 export const isMap = x => x instanceof Map
-export const isNodeJS = () => {
-	try {
-		eval(window) && eval(localStorage)
-	} catch (_) {
-		return true
-	}
-}
+export const isNodeJS = () => fallbackIfFails(() => !(window && localStorage), [], true)
 export const isObj = x => !!x && typeof x === 'object' && !isArr(x) && !isMap(x) && !isSet(x)
 // Checks if argument is an Array of Objects. Each element type must be object, otherwise will return false.
 export const isObjArr = x => isArr(x) && x.every(isObj)
@@ -182,6 +185,7 @@ export const isPromise = x => x instanceof Promise
 export const isSet = x => x instanceof Set
 export const isStr = x => typeof x === 'string'
 export const isSubjectLike = x => isObj(x) && isFn(x.subscribe) && isFn(x.next)
+export const isTouchable = () => fallbackIfFails(() => 'ontouchstart' in document.documentElement, [], false)
 export const isUint8Arr = arr => arr instanceof Uint8Array
 export const isValidNumber = x => typeof x == 'number' && !isNaN(x) && isFinite(x)
 export const hasValue = x => {

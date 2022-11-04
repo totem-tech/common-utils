@@ -1,4 +1,4 @@
-import { isArr, isArrLike, isHex, isObj, isStr, isUint8Arr } from './utils'
+import { fallbackIfFails, isArr, isArrLike, isHex, isObj, isStr, isUint8Arr } from './utils'
 /*
  * List of optional node-modules and the functions used by them:
  * Module Name          : Function Name
@@ -6,15 +6,6 @@ import { isArr, isArrLike, isHex, isObj, isStr, isUint8Arr } from './utils'
  * @polkadot/util       : bytesToHex, hexToBytes, strToU8a, u8aToStr
  * @polkadot/util-crypto: ss58Decode, ss58Encode
 */
-
-// returns @fallbackValue if function call throws error
-const fallbackIfFails = (func, args = [], fallbackValue = null) => {
-    try {
-        return func.apply(null, args)
-    } catch (e) {
-        return fallbackValue
-    }
-}
 
 /**
  * @name    ss58Encode
