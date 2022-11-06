@@ -337,12 +337,22 @@ export const arrSearch = (arr, keyValues, matchExact, matchAll, ignoreCase, asAr
 }
 
 // Returns new array sorted by key. If sortOriginal is 'truty', existing array will be sorted and returned.
-export const arrSort = (arr, key, reverse = false, sortOriginal = false) => {
+export const arrSort = (arr, key, reverse = false, sortOriginal = false, caseInsensitive = true) => {
 	if (!isObjArr(arr)) return []
-	const sortedArr = (sortOriginal ? arr : [...arr])
-		.sort((a, b) => a[key] > b[key] ? 1 : -1)
+	let sortedArr = (sortOriginal ? arr : [...arr])
 
-	return reverse ? arrReverse(sortedArr, true) : sortedArr
+	const toLC = x => `${x}`.toLowerCase()
+	sortedArr = !caseInsensitive
+		? sortedArr.sort((a, b) =>
+			a[key] > b[key] ? 1 : -1
+		)
+		: sortedArr.sort((a, b) =>
+			toLC(a[key]) > toLC(b[key]) ? 1 : -1
+		)
+
+	return reverse
+		? arrReverse(sortedArr, true)
+		: sortedArr
 }
 
 /**
