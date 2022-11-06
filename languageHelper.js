@@ -1,6 +1,13 @@
 import DataStorage from './DataStorage'
-import storage from './storageHelper'
-import { clearClutter, downloadFile, generateHash, getUrlParam, isNodeJS, textCapitalize } from './utils'
+import storage from '../utils/storageHelper'
+import {
+    clearClutter,
+    downloadFile,
+    generateHash,
+    getUrlParam,
+    isNodeJS,
+    textCapitalize,
+} from './utils'
 
 const translations = new DataStorage('totem_static_translations')
 export const EN = 'EN'

@@ -1,9 +1,9 @@
 import { BehaviorSubject } from 'rxjs'
 import ioClient from 'socket.io-client'
-import { translated } from './languageHelper'
-import storage from './storageHelper'
-import { subjectAsPromise } from './reactHelper'
+import storage from '../utils/storageHelper'
 import { isFn, isObj, isStr, objWithoutKeys } from './utils'
+import { translated } from './languageHelper'
+import { subjectAsPromise } from './reactHelper'
 
 const textsCap = translated({
     invalidRequest: 'invalid request',

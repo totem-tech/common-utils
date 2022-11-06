@@ -45,6 +45,15 @@ export const copyRxSubject = (rxSource, rxCopy) => {
 }
 
 /**
+ * @name    isMemo
+ * @summary checks if x is an `Reat.memo` element type
+ * @param   {*} x
+ *  
+ * @returns {Boolean}
+ */
+export const isMemo = x => x['$$typeof'] === require('react').memo('div')['$$typeof']
+
+/**
  * @name    iUseReducer
  * @summary A sugar for React `userReducer` with added benefit of tracking of component mounted status.
  *          Prevents state update if component is not mounted.

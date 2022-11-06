@@ -13,7 +13,7 @@ const SETTINGS_KEY = PREFIX + 'settings'
 const MODULE_SETTINGS_KEY = 'module_settings'
 const storage = {}
 const cache = new DataStorage(CACHE_KEY, true)
-const settings = new DataStorage(SETTINGS_KEY, true) // keep cache disabled
+const settings = new DataStorage(SETTINGS_KEY) //, true // keep cache disabled???
 
 // LocalStorage items that are essential for the applicaiton to run. 
 export const essentialKeys = [

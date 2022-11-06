@@ -1,8 +1,7 @@
 /*
  * Date formatting etc.
  */
-
-import { isDate, isStr, strFill } from "./utils";
+import { isDate, isStr, strFill } from './utils'
 
 // prepends '0' if number is less than 10
 const fill = n => strFill(n, 2, '0')
@@ -17,7 +16,7 @@ const fill = n => strFill(n, 2, '0')
  * 
  * @returns {String} formatted string
  */
-export const format = (date, seconds = false, ms = false) => {
+export const format = (date, seconds = false, ms = false, amPm = false) => {
     if (isDate(date)) {
         date = date.toISOString()
     }
@@ -31,14 +30,16 @@ export const format = (date, seconds = false, ms = false) => {
         .map(fill)
         .join('-')
 
+    const hours = xDate.getHours()
     formatted += ' ' + [
-        xDate.getHours(),
+        hours,
         xDate.getMinutes(),
         seconds && xDate.getSeconds(),
     ]
         .filter(x => x !== false)
         .map(fill)
         .join(':')
+    if (amPm) formatted += ` ${hours >= 12 ? 'PM' : 'AM'}`
 
     return !seconds || !ms
         ? formatted
