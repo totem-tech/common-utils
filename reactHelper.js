@@ -268,7 +268,7 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowMerge = 
             : new BehaviorSubject(initialValue)
     )
 
-    const [{ firstValue, value }, setState] = iUseReducer(reducer, () => {
+    const [{ firstValue, value }, _setState] = iUseReducer(reducer, () => {
         let value = _subject instanceof BehaviorSubject
             ? _subject.value
             : initialValue
@@ -289,11 +289,11 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowMerge = 
             const promise = PromisE(
                 !isFn(valueModifier)
                     ? newValue
-                    : valueModifier(newValue)
+                    : valueModifier(newValue, _subject, value)
             )
             promise.then(newValue => {
                 if (newValue === useRxSubject.IGNORE_UPDATE) return
-                setState({
+                _setState({
                     value: allowMerge
                         ? { ...value, ...newValue }
                         : newValue
