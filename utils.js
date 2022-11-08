@@ -171,8 +171,8 @@ export const isETHAddress = (address, chainId) => {
 	return isAddress(address, chainId)
 }
 export const isFn = x => typeof x === 'function'
-export const isHash = x => fallbackIfFails(HASH_REGEX.test, () => [`${x}`], false)
-export const isHex = x => fallbackIfFails(HEX_REGEX.test, () => [`${x}`], false)
+export const isHash = x => fallbackIfFails(() => HASH_REGEX.test(x), [], false)
+export const isHex = x => fallbackIfFails(() => HEX_REGEX.test(x), [], false)
 export const isInteger = x => Number.isInteger(x)
 export const isMap = x => x instanceof Map
 export const isNodeJS = () => fallbackIfFails(() => !(window && localStorage), [], true)
