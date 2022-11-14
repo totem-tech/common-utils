@@ -1,7 +1,7 @@
 import { BehaviorSubject } from 'rxjs'
 import ioClient from 'socket.io-client'
 import storage from '../utils/storageHelper'
-import { isFn, isObj, isStr, objWithoutKeys } from './utils'
+import { isArr, isFn, isObj, isStr, objWithoutKeys } from './utils'
 import { translated } from './languageHelper'
 import { subjectAsPromise } from './reactHelper'
 
@@ -226,7 +226,14 @@ export class ChatClient {
         this.companySearch = (query, searchParentIdentity, cb) => isFn(cb) && socket.emit('company-search',
             query,
             searchParentIdentity,
-            (err, result) => cb(err, new Map(result)),
+            (err, result) => cb(
+                err,
+                new Map(
+                    isArr(result)
+                        ? result
+                        : []
+                ),
+            ),
         )
 
         // Get list of all countries
