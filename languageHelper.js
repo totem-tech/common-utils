@@ -42,13 +42,35 @@ export const languages = Object.freeze({
 // that can be used to translate by opening the file in Google Drive
 // NB: this function should not be used when BUILD_MODE is false (URL param 'build-mode' not 'true')
 export const downloadTextListCSV = !BUILD_MODE ? null : () => {
-    const langCodes = [EN, ...Object.keys(languages).filter(x => x != EN)]
+    const seperator = ','
+    const langCodes = [
+        EN,
+        ...Object
+            .keys(languages)
+            .filter(x => x != EN),
+    ]
     const rest = langCodes.slice(1)
-    const cols = textCapitalize('abcdefghijklmnopqrstuvwxyz').split('')
-    const str = langCodes.join(',') + '\n' + (window.enList || []).map((x, i) => {
-        const rowNo = i + 2
-        const functions = rest.map((_, c) => `"=GOOGLETRANSLATE($A${rowNo}, $A$1, ${cols[c + 1]}$1)"`).join(',')
-        return `"${clearClutter(x)}", ` + functions
+    const cols = 'abcdefghijklmnopqrstuvwxyz'
+        .repeat(5)
+        .toUpperCase()
+        .split('')
+    const maxRows = window.enList.length + 1
+    // use batch functions so that translation request is only executed once.
+    // only the first data cell in each column needs this function.
+    const getRowTranslateFunction = colName =>
+        `=BYROW(A2:INDEX(A:A, ${maxRows}), LAMBDA(x, GOOGLETRANSLATE(x, A1, ${colName}1)))`
+    //
+    // `=BYROW(A2:INDEX(A:A, MAX((A:A<>"")*ROW(A:A))), LAMBDA(x, GOOGLETRANSLATE(x, A1, ${colName}1)))`
+
+    const str = langCodes.join(seperator) + '\n' + (window.enList || []).map((x, i) => {
+        // const rowNo = i + 2
+        // const functions = rest.map((_, c) => `"=GOOGLETRANSLATE($A${rowNo}, $A$1, ${cols[c + 1]}$1)"`).join(',')
+        const functions = i >= 1
+            ? langCodes.map(_ => '') // empty cells
+            : rest.map((_, j) =>
+                `"${getRowTranslateFunction(cols[j + 1])}"`
+            )
+        return `"${clearClutter(x)}"${seperator}${functions.join(seperator)}`
     }).join(',\n')
     downloadFile(str, `English-texts-${new Date().toISOString()}.csv`, 'text/csv')
 }
