@@ -26,7 +26,7 @@ export const languages = Object.freeze({
     ES: 'Spanish - Español',
     FR: 'French - Français',
     HI: 'Hindi - हिन्दी',
-    ID: 'Indonesian - Bahasa Indonesia',
+    // ID: 'Indonesian - Bahasa Indonesia',
     IT: 'Italian - Italiano',
     JA: 'Japanese - 日本',
     KO: 'Korean - 한국인',
@@ -36,7 +36,7 @@ export const languages = Object.freeze({
     RU: 'Russian - Русский',
     TR: 'Turkish - Türkçe',
     UK: 'Ukrainian - українська',
-    VI: 'Vietnamese - Tiếng Việt',
+    // VI: 'Vietnamese - Tiếng Việt',
     ZH: 'Chinese - 中国人',
 })
 

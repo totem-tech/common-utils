@@ -798,10 +798,16 @@ export const mapSort = (map, key, reverse = false) => {
 	if (!isMap(map)) return map
 	const arr2d = Array.from(map)
 	if (!arr2d[0] || !isObj(arr2d[0][1])) return map
-	return new Map(arrReverse(
-		arr2d.sort((a, b) => a[1][key] > b[1][key] ? 1 : -1),
-		reverse
-	))
+	return new Map(
+		arrReverse(
+			arr2d.sort((a, b) => {
+				const valueA = a[1] ? a[1][key] : undefined
+				const valueB = b[1] ? b[1][key] : undefined
+				return valueA > valueB ? 1 : -1
+			}),
+			reverse
+		)
+	)
 }
 
 /**
