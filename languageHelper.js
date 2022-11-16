@@ -26,7 +26,7 @@ export const languages = Object.freeze({
     ES: 'Spanish - Español',
     FR: 'French - Français',
     HI: 'Hindi - हिन्दी',
-    // ID: 'Indonesian - Bahasa Indonesia',
+    ID: 'Indonesian - Bahasa Indonesia',
     IT: 'Italian - Italiano',
     JA: 'Japanese - 日本',
     KO: 'Korean - 한국인',
@@ -36,7 +36,7 @@ export const languages = Object.freeze({
     RU: 'Russian - Русский',
     TR: 'Turkish - Türkçe',
     UK: 'Ukrainian - українська',
-    // VI: 'Vietnamese - Tiếng Việt',
+    VI: 'Vietnamese - Tiếng Việt',
     ZH: 'Chinese - 中国人',
 })
 
@@ -59,8 +59,9 @@ export const downloadTextListCSV = !BUILD_MODE ? null : () => {
     const maxRows = window.enList.length + 1
     // use batch functions so that translation request is only executed once.
     // only the first data cell in each column needs this function.
+    // To avoid being rate limited, manuall set "=" when opening in Google Sheets
     const getRowTranslateFunction = colName =>
-        `=BYROW(A2:INDEX(A:A, ${maxRows}), LAMBDA(x, GOOGLETRANSLATE(x, A1, ${colName}1)))`
+        `BYROW(A2:INDEX(A:A, ${maxRows}), LAMBDA(x, GOOGLETRANSLATE(x, A1, ${colName}1)))`
     //
     // `=BYROW(A2:INDEX(A:A, MAX((A:A<>"")*ROW(A:A))), LAMBDA(x, GOOGLETRANSLATE(x, A1, ${colName}1)))`
 
