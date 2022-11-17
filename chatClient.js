@@ -23,6 +23,7 @@ export const rxIsConnected = new BehaviorSubject(false)
 export const rxIsLoggedIn = new BehaviorSubject(null)
 export const rxIsRegistered = new BehaviorSubject(!!(rw().user || {}).id)
 export const rxIsInMaintenanceMode = new BehaviorSubject(false)
+export const rxUserIdentity = new BehaviorSubject()
 const eventMaintenanceMode = 'maintenance-mode'
 
 //- migrate existing user data
@@ -629,6 +630,7 @@ export class ChatClient {
                 setUser({ address, id, secret })
                 rxIsLoggedIn.next(true)
                 rxIsRegistered.next(true)
+                rxUserIdentity.next(address)
             }
             cb(err)
         },
@@ -638,9 +640,11 @@ export class ChatClient {
         id,
         secret,
         async (err, data) => {
+            const { address } = data || {}
             const isLoggedIn = !err
             // store user roles etc data sent from server
             isLoggedIn && setUser({ ...getUser(), ...data })
+            rxUserIdentity.next(address)
 
             // wait until maintenance mode is turned off
             rxIsInMaintenanceMode.value && await subjectAsPromise(rxIsInMaintenanceMode, false)
