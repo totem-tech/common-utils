@@ -337,18 +337,21 @@ export const arrSearch = (arr, keyValues, matchExact, matchAll, ignoreCase, asAr
 }
 
 // Returns new array sorted by key. If sortOriginal is 'truty', existing array will be sorted and returned.
-export const arrSort = (arr, key, reverse = false, sortOriginal = false, caseInsensitive = true) => {
+export const arrSort = (arr, key, reverse = false, caseInsensitive = true, sortOriginal = false) => {
 	if (!isObjArr(arr)) return []
 	let sortedArr = (sortOriginal ? arr : [...arr])
 
-	const toLC = x => `${x}`.toLowerCase()
-	sortedArr = !caseInsensitive
-		? sortedArr.sort((a, b) =>
-			a[key] > b[key] ? 1 : -1
-		)
-		: sortedArr.sort((a, b) =>
-			toLC(a[key]) > toLC(b[key]) ? 1 : -1
-		)
+	const getValue = (obj, key) => {
+		const value = fallbackIfFails(() => `${obj[key] || ''}`, [], '')
+		return caseInsensitive
+			? value.toLowerCase()
+			: value
+	}
+	sortedArr = sortedArr.sort((a, b) =>
+		getValue(a, key) > getValue(b, key)
+			? 1
+			: -1
+	)
 
 	return reverse
 		? arrReverse(sortedArr, true)
@@ -794,17 +797,24 @@ export const mapSearch = (map, keyValues, matchExact, matchAll, ignoreCase) => {
  * @returns {Map}
  */
 // 
-export const mapSort = (map, key, reverse = false) => {
+export const mapSort = (map, key, reverse = false, caseInsensitive = true) => {
 	if (!isMap(map)) return map
 	const arr2d = Array.from(map)
 	if (!arr2d[0] || !isObj(arr2d[0][1])) return map
+
+	const getValue = (obj, key1, key2) => {
+		const value = fallbackIfFails(() => `${obj[key1][key2] || ''}`, [], '')
+		return caseInsensitive
+			? value.toLowerCase()
+			: value
+	}
 	return new Map(
 		arrReverse(
-			arr2d.sort((a, b) => {
-				const valueA = a[1] ? a[1][key] : undefined
-				const valueB = b[1] ? b[1][key] : undefined
-				return valueA > valueB ? 1 : -1
-			}),
+			arr2d.sort((a, b) =>
+				getValue(a, 1, key) > getValue(b, 1, key)
+					? 1
+					: -1
+			),
 			reverse
 		)
 	)
@@ -899,19 +909,22 @@ export const searchRanked = (searchKeys = ['text'], maxResults = 100) => (option
  * @param {Array|Map} data 
  * @param {String}	  key		   (optional) property to sort by
  * @param {Boolean}   reverse	   (optional)
- * @param {Boolean}	  sortOriginal (optional)
+ * @param {Boolean}	  caseInsensitive (optional) Default: true
+ * @param {Boolean}	  sortOriginal (optional) for Array only. 
  * 
  * @returns {Array|Map}
  */
-export const sort = (data, key, reverse, sortOriginal) => {
+export const sort = (data, key, reverse, caseInsensitive, sortOriginal) => {
 	const sortFunc = isArr(data)
 		? arrSort
-		: isMap(data) && mapSort
-	if (!sortFunc) return []
+		: isMap(data)
+			? mapSort
+			: () => data // return as is
 	return sortFunc(
 		data,
 		key,
 		reverse,
+		caseInsensitive,
 		sortOriginal,
 	)
 }
