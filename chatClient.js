@@ -23,7 +23,7 @@ export const rxIsConnected = new BehaviorSubject(false)
 export const rxIsLoggedIn = new BehaviorSubject(null)
 export const rxIsRegistered = new BehaviorSubject(!!(rw().user || {}).id)
 export const rxIsInMaintenanceMode = new BehaviorSubject(false)
-export const rxUserIdentity = new BehaviorSubject()
+export const rxUserIdentity = new BehaviorSubject(getUser().address)
 const eventMaintenanceMode = 'maintenance-mode'
 
 //- migrate existing user data
@@ -40,7 +40,7 @@ if (rw().history) rw({ history: null })
 //- migrate end
 
 // retrieves user credentails from local storage
-export const getUser = () => rw().user
+export function getUser() { return rw().user }
 export const setUser = (user = {}) => rw({ user })
 /**
  * @name    referralCode
@@ -176,12 +176,36 @@ export const translateError = err => {
     }
 
     // translate if there is any error message
-    const separator = ' => '
-    if (!err.includes(separator)) return translated({ err })[0].err
+    const inputNameSeperator = ' => '
+    const infoSeperator = ': '
+    let inputName = ''
+    let message = err
+    let suffix = ''
+    let arr = err.split(inputNameSeperator)
+    if (arr.length > 1) {
+        inputName = arr[0]
+        message = arr[1]
+    }
+    arr = message.split(infoSeperator)
+    if (arr.length > 1) {
+        message = arr[0]
+        suffix = arr[1]
+    }
+    const texts = translated({
+        inputName,
+        message,
+        suffix,
+    }, true)[1]
 
-    const [prefix, msg] = err.split(separator)
-    const [texts] = translated({ prefix, msg })
-    return `${texts.prefix}${separator}${texts.msg}`
+    return [
+        texts.inputName,
+        texts.inputName && inputNameSeperator,
+        texts.message,
+        texts.suffix && infoSeperator,
+        texts.suffix
+    ]
+        .filter(Boolean)
+        .join('')
 }
 
 // Make sure to always keep the callback as the last argument

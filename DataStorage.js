@@ -1,5 +1,17 @@
 import { BehaviorSubject, Subject } from 'rxjs'
-import { isDefined, isStr, mapSearch, isMap, isValidNumber, mapSort, isArr, isFn, isNodeJS, isArr2D } from './utils'
+import {
+    isDefined,
+    isStr,
+    mapSearch,
+    isMap,
+    isValidNumber,
+    mapSort,
+    isArr,
+    isFn,
+    isNodeJS,
+    isArr2D,
+    deferred,
+} from './utils'
 /* For NodeJS (non-browser applications) the following node module is required: node-localstorage */
 
 let storage
@@ -110,16 +122,19 @@ export default class DataStorage {
         this.save = true
         this.size = data.size
         let ignoredFirst = this.disableCache
+        const deferredSave = deferred(data => {
+            this.name && this.save && write(this.name, data)
+            this.save = true
+            this.size = data.size
+            isFn(onChange) && onChange(data)
+        })
         this.rxData.subscribe(data => {
             if (!ignoredFirst) {
                 // prevent save operation on startup when BehaviorSubject is used
                 ignoredFirst = true
                 return
             }
-            this.name && this.save && write(this.name, data)
-            this.save = true
-            this.size = data.size
-            isFn(onChange) && onChange(data)
+            deferredSave(data)
         })
         if (this.disableCache) return
 
@@ -133,6 +148,8 @@ export default class DataStorage {
             if (!doRefresh) return
             const data = read(this.name)
             this.size = data.size
+            // prevent (unnecessary) writing to storage
+            this.save = false
             this.rxData.next(data)
         })
     }
@@ -204,6 +221,13 @@ export default class DataStorage {
         this.size = data.size
         return data
     }
+
+    /**
+     * @name    keys
+     * 
+     * @returns {Array}
+     */
+    keys() { return [...this.getAll().keys()] }
 
     /**
      * @name map
@@ -338,4 +362,11 @@ export default class DataStorage {
             spacing,
         )
     }
+
+    /**
+     * @name    values
+     * 
+     * @returns {Array}
+     */
+    values() { return [...this.getAll().values()] }
 }

@@ -249,7 +249,7 @@ export const usePromise = (promise, resultModifier, errorModifier) => {
  *              Setting `true`, will prevent an additional state update after first load.
  * @param   {Function}  valueModifier (optional) value modifier. 
  *              If an async function is supplied, `ignoreFirst` will be assumed `false`.
- *              Args: [value, rxSubject]
+ *              Args: [newValue, oldValue, rxSubject]
  * @param   {*}         initialValue (optional) initial value where appropriate
  * @
  * @param   {Boolean}   allowSubjectUpdate whether to allow update of the subject or only state.
@@ -274,7 +274,14 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowMerge = 
             : initialValue
         value = !isFn(valueModifier)
             ? value
-            : valueModifier(value, _subject)
+            : valueModifier(
+                value,
+                undefined,
+                _subject,
+            )
+        if (value === useRxSubject.IGNORE_UPDATE) {
+            value = undefined
+        }
         return { firstValue: value, value }
     })
 
@@ -289,7 +296,11 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowMerge = 
             const promise = PromisE(
                 !isFn(valueModifier)
                     ? newValue
-                    : valueModifier(newValue, _subject, value)
+                    : valueModifier(
+                        newValue,
+                        value,
+                        _subject,
+                    )
             )
             promise.then(newValue => {
                 if (newValue === useRxSubject.IGNORE_UPDATE) return
