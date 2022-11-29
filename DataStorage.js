@@ -122,19 +122,16 @@ export default class DataStorage {
         this.save = true
         this.size = data.size
         let ignoredFirst = this.disableCache
-        const deferredSave = deferred(data => {
-            this.name && this.save && write(this.name, data)
-            this.save = true
-            this.size = data.size
-            isFn(onChange) && onChange(data)
-        })
         this.rxData.subscribe(data => {
             if (!ignoredFirst) {
                 // prevent save operation on startup when BehaviorSubject is used
                 ignoredFirst = true
                 return
             }
-            deferredSave(data)
+            this.name && this.save && write(this.name, data)
+            this.save = true
+            this.size = data.size
+            isFn(onChange) && onChange(data)
         })
         if (this.disableCache) return
 

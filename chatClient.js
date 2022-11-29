@@ -63,8 +63,13 @@ export const referralCode = code => {
         .referralCode
 }
 
-// Returns a singleton instance of the websocket client
-// Instantiates the client if not already done
+/**
+ * @name    getClient
+ * @summary Returns a singleton instance of the websocket client.
+ * Instantiates the client if not already done.
+ * 
+ * @returns {ChatClient}
+ */
 export const getClient = () => {
     if (instance) return instance
 
@@ -545,6 +550,21 @@ export class ChatClient {
         this.taskGetById = (ids, cb) => isFn(cb) && socket.emit(
             'task-get-by-id',
             ids,
+            (err, result) => cb(err, new Map(result)),
+        )
+
+        /**
+         * @name    taskGetById
+         * @summary retrieve a list of tasks details by Task IDs
+         * 
+         * @param   {Object}    filter  single or array of Task IDs
+         * @param   {Function}  cb      Callback function expected arguments:
+         *                              @err    String: error message if query failed
+         *                              @result Map: list of tasks with details
+         */
+        this.taskSearch = (filter = {}, cb) => isFn(cb) && socket.emit(
+            'task-search',
+            filter,
             (err, result) => cb(err, new Map(result)),
         )
 
