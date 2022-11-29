@@ -1,7 +1,7 @@
 import nano from 'nano'
 import uuid from 'uuid'
 import PromisE from './PromisE'
-import { isObj, isStr, isArr, arrUnique, isMap, isValidNumber } from './utils'
+import { isObj, isStr, isArr, arrUnique, isMap, isValidNumber, mapJoin } from './utils'
 
 // globab connection for use with multiple databases
 let connection
@@ -340,6 +340,23 @@ export default class CouchDBStorage {
             db.find(query),
             timeout,
         )
+    }
+
+    /**
+     * @name    searchMulti
+     * @param   {Object}    selectors 
+     * @param   {Boolean}   all         if falsy, will return as soon as any of the selectors retuns one or more results
+     * 
+     * @returns {Map}
+     */
+    async searchMulti(selectors = [], limit, all = true) {
+        let result = new Map()
+        for (let i = 0; i < selectors.length; i++) {
+            if (result.size > 0 && !all) return result
+            const selector = selectors[i]
+            result = mapJoin(result, await this.search(selector, limit))
+        }
+        return result
     }
 
     /**
