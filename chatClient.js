@@ -554,6 +554,22 @@ export class ChatClient {
         )
 
         /**
+         * @name    taskMarketApply
+         * @summary apply for an open marketplace task
+         * 
+         * @param   {Object}    filter  single or array of Task IDs
+         * @param   {Function}  cb      Callback function expected arguments:
+         *                              @err    String: error message if query failed
+         *                              @result Map: list of tasks with details
+         */
+        this.taskMarketApply = (taskId, workerAddress, cb) => isFn(cb) && socket.emit(
+            'task-market-search',
+            taskId,
+            workerAddress,
+            (err, result) => cb(err, new Map(result)),
+        )
+
+        /**
          * @name    taskGetById
          * @summary retrieve a list of tasks details by Task IDs
          * 
@@ -562,8 +578,8 @@ export class ChatClient {
          *                              @err    String: error message if query failed
          *                              @result Map: list of tasks with details
          */
-        this.taskSearch = (filter = {}, cb) => isFn(cb) && socket.emit(
-            'task-search',
+        this.taskMarketSearch = (filter = {}, cb) => isFn(cb) && socket.emit(
+            'task-market-search',
             filter,
             (err, result) => cb(err, new Map(result)),
         )
