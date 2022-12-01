@@ -557,15 +557,17 @@ export class ChatClient {
          * @name    taskMarketApply
          * @summary apply for an open marketplace task
          * 
-         * @param   {Object}    filter  single or array of Task IDs
-         * @param   {Function}  cb      Callback function expected arguments:
-         *                              @err    String: error message if query failed
-         *                              @result Map: list of tasks with details
+         * @param   {Object}    application
+         * @param   {Array}     application.links
+         * @param   {String}    application.proposal
+         * @param   {String}    application.taskId
+         * @param   {String}    application.workerAddress
+         * @param   {Function}  cb  Callback function expected arguments:
+         *                          @err    String: error message if request failed
          */
-        this.taskMarketApply = (taskId, workerAddress, cb) => isFn(cb) && socket.emit(
-            'task-market-search',
-            taskId,
-            workerAddress,
+        this.taskMarketApply = (application, cb) => isFn(cb) && socket.emit(
+            'task-market-apply',
+            application,
             (err, result) => cb(err, new Map(result)),
         )
 
