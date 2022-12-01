@@ -208,7 +208,7 @@ export const query = async (
         // only add interceptor to process result
         args[args.length - 1] = result => {
             const sanitised = sanitise(result)
-            print && console.log(func, sanitised)
+            print && console.log(func, { args, result: JSON.stringify(sanitised, null, 4) })
             cb(sanitised, result)
         }
     }
@@ -239,7 +239,7 @@ export const query = async (
         }
     }
     const result = isFn(fn) ? await fn.apply(null, args) : fn
-    !isSubscribe && print && console.log(JSON.stringify(result, null, 4))
+    !isSubscribe && print && console.log(func, { args, result: JSON.stringify(result, null, 4) })
     return isSubscribe ? result : sanitise(result)
 }
 

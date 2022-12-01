@@ -2,8 +2,14 @@
  * a set of reusable React and state related utility functions
  */
 import { BehaviorSubject, Subject } from 'rxjs'
+import { query } from './polkadotHelper'
 import PromisE from './PromisE'
-import { isDefined, isFn, isObj, isSubjectLike, isValidNumber } from './utils'
+import {
+    isDefined,
+    isFn,
+    isSubjectLike,
+    isValidNumber,
+} from './utils'
 
 const useEffect = (...args) => require('react').useEffect(...args)
 const useReducer = (...args) => require('react').useReducer(...args)
@@ -147,6 +153,17 @@ export const RecursiveShapeType = (propsTypes = {}, recursiveKey = 'children') =
 }
 
 /**
+ * @name    reducer
+ * @summary simple reducer to mimic Class component setState behavior
+ * 
+ * @param   {Object}    state 
+ * @param   {Object}    newValue 
+ * 
+ * @returns {Object}
+ */
+export const reducer = (state = {}, newValue = {}) => ({ ...state, ...newValue })
+
+/**
  * @name    subjectAsPromise
  * @summary sugar for RxJS subject as promise and, optionally, wait until an expected value is received
  * 
@@ -187,15 +204,22 @@ export const subjectAsPromise = (subject, expectedValue, timeout) => {
 }
 
 /**
- * @name    reducer
- * @summary simple reducer to mimic Class component setState behavior
- * 
- * @param   {Object}    state 
- * @param   {Object}    newValue 
- * 
- * @returns {Object}
+ * @name    unsubscribe
+ * @summary unsubscribe to multiple RxJS subscriptions
+ * @param   {Object|Array} subscriptions 
  */
-export const reducer = (state = {}, newValue = {}) => ({ ...state, ...newValue })
+export const unsubscribe = (subscriptions = {}) => Object.values(subscriptions)
+    .forEach(x => {
+        try {
+            if (!x) return
+            const fn = isFn(x)
+                ? x
+                : isFn(x.unsubscribe)
+                    ? x.unsubscribe
+                    : null
+            fn && fn()
+        } catch (e) { } // ignore
+    })
 
 /**
  * @name        usePromise
@@ -223,7 +247,7 @@ export const usePromise = (promise, resultModifier, errorModifier) => {
     useState(() => {
         let mounted = true
         const handler = (key, modifier, setState) => value => {
-            if (!mounted) return console.log({ mounted })
+            if (!mounted) return
             const newState = {}
             newState[key] = isFn(modifier)
                 ? modifier(value)
@@ -237,6 +261,93 @@ export const usePromise = (promise, resultModifier, errorModifier) => {
     }, [setState, promise])
 
     return [state.result, state.error]
+}
+
+/**
+ * @name    useQueryBlockchain
+ * @summary a React Hook to query (and optionally subscribe) blockchain storage
+ * 
+ * @param   {Object|Promise}    connection
+ * @param   {Object}            connection.api  ApiPromise 
+ * @param   {String|Function}   func
+ * @param   {Array|*}           args    (optional)
+ * @param   {Boolean}           multi   (optional)
+ * @param   {Function}          resultModifier (optional)
+ * @param   {Boolean}           subscribe (optional)
+ * @param   {Boolean}           print   (optional)
+ * 
+ * @returns {Object} { message, result, unsubscribe }
+ */
+export const useQueryBlockchain = (connection, func, args = [], multi, resultModifier, subscribe = true, print) => {
+    const [data, setData] = useState({
+        message: {
+            content: 'Loading...',
+            icon: true,
+            status: 'loading',
+        }
+    })
+
+    useEffect(() => {
+        let mounted = true
+        let unsubscribed = false
+        let unsubscribe
+        const callback = args.slice(-1)
+        const handleConnection = async ({ api }) => {
+            unsubscribed = false
+            const result = await query(
+                api,
+                func,
+                args,
+                multi,
+                print,
+            )
+            // once-off query
+            if (!isFn(result)) return handleResult(result)
+
+            // subscription
+            unsubscribe = result
+        }
+        const handleError = err => setData({
+            message: err && {
+                content: `${err}`,
+                icon: true,
+                status: 'error',
+            }
+        })
+        const handleResult = (resultSanitised, resultOriginal) => {
+            setData({
+                message: null,
+                result: isFn(resultModifier)
+                    ? resultModifier(resultSanitised)
+                    : resultSanitised,
+                unsubscribe: handleUnsubscribe,
+            })
+            isFn(callback) && callback(resultSanitised, resultOriginal)
+        }
+        const handleUnsubscribe = () => {
+            if (!isFn(unsubscribe)) return // || unsubscribed
+
+            unsubscribed = true
+            unsubscribe()
+        }
+
+        if (!isFn(callback)) {
+            subscribe && args.push(handleResult)
+        } else {
+            // args[args.indexOf(callback)] = handleResult
+        }
+        func && PromisE(connection)
+            .then(handleConnection)
+            .catch(handleError)
+
+        return () => {
+            mounted = false
+            handleUnsubscribe()
+        }
+    }, [func, args, multi])
+
+    const { message, result, unsubscribe } = data || {}
+    return { message, result, unsubscribe }
 }
 
 /**
@@ -320,21 +431,3 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowMerge = 
 }
 // To prevent an update return this in valueModifier
 useRxSubject.IGNORE_UPDATE = Symbol('ignore-rx-subject-update')
-
-/**
- * @name    unsubscribe
- * @summary unsubscribe to multiple RxJS subscriptions
- * @param   {Object|Array} subscriptions 
- */
-export const unsubscribe = (subscriptions = {}) => Object.values(subscriptions)
-    .forEach(x => {
-        try {
-            if (!x) return
-            const fn = isFn(x)
-                ? x
-                : isFn(x.unsubscribe)
-                    ? x.unsubscribe
-                    : null
-            fn && fn()
-        } catch (e) { } // ignore
-    })

@@ -1012,3 +1012,20 @@ export const textEllipsis = (text, maxLen, numDots, split = true) => {
 		).join('')
 	return left + dots + right
 }
+
+/**
+ * @name	toArray
+ * @summary convert string or other itearables to Array
+ * 
+ * @param	{String|Array|Map|Set}	value 
+ * @param	{String}				seperator (optional) only used when value is a string
+ * 
+ * @returns {Array}
+ */
+export const toArray = (value, seperator = ',') => isStr(value)
+	? value
+		.split(seperator)
+		.filter(Boolean)
+	: isFn((value || []).values)
+		? [...value.values()]
+		: []
