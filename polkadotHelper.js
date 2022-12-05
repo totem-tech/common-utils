@@ -203,12 +203,16 @@ export const query = async (
     multi = isFn(fn) && !!multi
     const cb = args[args.length - 1]
     const isSubscribe = isFn(cb) && isFn(fn)
+    const printResult = (result) => print && console.log(
+        func,
+        '\nargs:', args,
+        '\nresult:', JSON.stringify(result, null, 4))
 
     if (isSubscribe) {
         // only add interceptor to process result
         args[args.length - 1] = result => {
             const sanitised = sanitise(result)
-            print && console.log(func, { args, result: JSON.stringify(sanitised, null, 4) })
+            printResult(sanitised)
             cb(sanitised, result)
         }
     }
@@ -238,9 +242,14 @@ export const query = async (
             throw `${config.errorMsgs.invalidMutliArgsMsg} ${err}`
         }
     }
-    const result = isFn(fn) ? await fn.apply(null, args) : fn
-    !isSubscribe && print && console.log(func, { args, result: JSON.stringify(result, null, 4) })
-    return isSubscribe ? result : sanitise(result)
+    let result = isFn(fn)
+        ? await fn.apply(null, args)
+        : fn
+    result = isSubscribe
+        ? result
+        : sanitise(result)
+    !isSubscribe && printResult(result)
+    return result
 }
 
 export const sanitise = x => JSON.parse(JSON.stringify(x)) // get rid of jargon

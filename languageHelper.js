@@ -6,6 +6,7 @@ import {
     generateHash,
     getUrlParam,
     isNodeJS,
+    isStr,
     textCapitalize,
 } from './utils'
 
@@ -20,6 +21,7 @@ export const BUILD_MODE = isNodeJS()
         .toLowerCase() == 'true'
     && window.location.hostname !== 'totem.live'
 export const languages = Object.freeze({
+    // AR: 'Arabic - عربي',
     BN: 'Bengali - বাংলা',
     DE: 'German - Deutsch',
     EN: 'English',
@@ -39,6 +41,22 @@ export const languages = Object.freeze({
     VI: 'Vietnamese - Tiếng Việt',
     ZH: 'Chinese - 中国人',
 })
+
+const digits = {
+    // AR: ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'],
+    // BN: ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'],
+    // HI: ['०', '१', '२', '३', '४', '५', '६', '७', '८', '९'],
+    // ZH: ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'],
+}
+
+export const digitsTranslated = (texts = {}, langCode = getSelected()) => !digits[langCode]
+    ? texts
+    : new Proxy(texts, {
+        get: (self, key) => `${self[key]}`.replace(
+            /[0-9]/g,
+            n => digits[langCode][n],
+        ),
+    })
 
 // downloadTextListCSV generates a CSV file with all the unique application texts
 // that can be used to translate by opening the file in Google Drive
@@ -148,7 +166,9 @@ export const setTexts = (langCode, texts, enTexts) => translations.setAll(
     true,
 )
 
-export const translated = (texts = {}, capitalized = false) => {
+export const translated = (texts = {}, capitalized = false, fullSentence, forceLowercase) => {
+    if (isStr(texts)) return translated({ texts }, capitalized)[capitalized ? 1 : 0].texts
+
     const langCode = getSelected()
     // translation not required
     if (langCode === EN && !BUILD_MODE) return [texts, capitalized && textCapitalize(texts)]
@@ -179,10 +199,20 @@ export const translated = (texts = {}, capitalized = false) => {
         if (!translatedText) return
         texts[key] = translatedText
     })
-    return [texts, capitalized && textCapitalize(texts)]
+    texts = digitsTranslated(texts, langCode)
+    capitalized = capitalized && digitsTranslated(
+        textCapitalize(
+            texts,
+            fullSentence,
+            forceLowercase,
+        ),
+        langCode,
+    )
+    return [texts, capitalized]
 }
 
 export default {
+    digitsTranslated,
     translations,
     translated,
     setTexts,

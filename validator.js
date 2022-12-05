@@ -1,21 +1,20 @@
 import {
     arrUnique,
+    EMAIL_REGEX,
+    hasValue,
     isAddress,
     isArr,
     isBool,
-    isDate,
+    isDefined,
     isHash,
     isHex,
     isInteger,
     isObj,
     isStr,
-    isValidNumber,
-    hasValue,
-    objHasKeys,
-    isFn,
     isValidDate,
+    isValidNumber,
+    objHasKeys,
     objWithoutKeys,
-    isDefined,
 } from './utils'
 
 export let messages = {
@@ -50,8 +49,6 @@ export let messages = {
     // non-TYPE specific
     unexpectedError: 'unexpected validation error occured',
 }
-
-const emailPattern = new RegExp(/^(("[\w-\s]+")|([\w-]+(?:\.[\w-]+)*)|("[\w-\s]+")([\w-]+(?:\.[\w-]+)*))(@((?:[\w-]+\.)*\w[\w-]{0,66})\.([a-z]{2,9}(?:\.[a-z]{2})?)$)|(@\[?((25[0-5]\.|2[0-4][0-9]\.|1[0-9]{2}\.|[0-9]{1,2}\.))((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]{1,2})\.){2}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]{1,2})\]?$)/i)
 // Accepted validation types.
 // Any type not listed here will be ignored.
 export const TYPES = Object.freeze({
@@ -173,7 +170,7 @@ export const validate = (value, config, customMessages = {}) => {
                 if (min && new Date(min) > date) return _msgOrTrue(errorMsgs.dateMin, min)
                 break
             case 'email':
-                if (!isStr(value) || !emailPattern.test(value)) return _msgOrTrue(errorMsgs.email)
+                if (!isStr(value) || !EMAIL_REGEX.test(value)) return _msgOrTrue(errorMsgs.email)
                 break
             case 'hash':
                 if (!isHash(value)) return _msgOrTrue(errorMsgs.hash)
