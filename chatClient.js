@@ -23,7 +23,7 @@ export const rxIsConnected = new BehaviorSubject(false)
 export const rxIsLoggedIn = new BehaviorSubject(null)
 export const rxIsRegistered = new BehaviorSubject(!!(rw().user || {}).id)
 export const rxIsInMaintenanceMode = new BehaviorSubject(false)
-export const rxUserIdentity = new BehaviorSubject(getUser().address)
+export const rxUserIdentity = new BehaviorSubject((getUser() || {}).address)
 const eventMaintenanceMode = 'maintenance-mode'
 
 //- migrate existing user data
