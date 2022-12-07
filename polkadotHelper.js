@@ -203,11 +203,10 @@ export const query = async (
     multi = isFn(fn) && !!multi
     const cb = args[args.length - 1]
     const isSubscribe = isFn(cb) && isFn(fn)
-    const printResult = (result) => print && console.log({
-        func: isStr(func) && func || '',
-        args,
-        result: JSON.stringify(result, null, 4),
-    })
+    const printResult = (result) => print && console.log(
+        result,
+        isStr(func) && func || undefined,
+    )
 
     if (isSubscribe) {
         // only add interceptor to process result
