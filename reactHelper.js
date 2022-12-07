@@ -168,7 +168,8 @@ export const reducer = (state = {}, newValue = {}) => ({ ...state, ...newValue }
  * @summary sugar for RxJS subject as promise and, optionally, wait until an expected value is received
  * 
  * @param   {Subject}           subject         RxJS subject or similar subscribable
- * @param   {*|Function}        expectedValue   (optional) if undefined, will resolve as soon as any value is received
+ * @param   {*|Function}        expectedValue   (optional) if undefined, will resolve as soon as any value is received.
+ *                      If function, it should return true or false to indicate whether the value should be resolved.
  * @param   {Number|Function}   timeout         (optional) will reject if no value received within given time
  * 
  * @returns {[Promise, Function]}   will reject with: 
@@ -186,8 +187,8 @@ export const subjectAsPromise = (subject, expectedValue, timeout) => {
     const promise = new PromisE((resolve, reject) => {
         subscription = subject.subscribe(value => {
             const isExpectedValue = isFn(expectedValue)
-                ? expectedValue(value) === value
-                : isDefined(expectedValue)
+                ? !!expectedValue(value)
+                : expectedValue !== undefined
                     ? value === expectedValue
                     : true
             if (!isExpectedValue) return
