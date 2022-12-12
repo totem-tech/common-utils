@@ -197,7 +197,7 @@ export const subjectAsPromise = (subject, expectedValue, timeout) => {
         })
         timeoutId = isValidNumber(timeout) && setTimeout(() => {
             unsubscribe()
-            reject(null)
+            reject('Request timed out')
         }, timeout)
 
     })
