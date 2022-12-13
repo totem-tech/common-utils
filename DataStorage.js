@@ -1,4 +1,4 @@
-import { BehaviorSubject, Subject } from 'rxjs'
+import { BehaviorSubject, map, Subject } from 'rxjs'
 import {
     isArr,
     isArr2D,
@@ -62,11 +62,12 @@ export function getStorage(storagePath, quota = 500 * 1024 * 1024) {
         if (isNodeJS() && err.message.toLowerCase().includes('no such file or directory')) throw err
     }
 
+    console.warn('DataStorage: storage not supported. Writing data will not work. Using workaround to avoid error.')
     // Hack for IFrame or if "node-localstorage" module is not available.
     // Caution: All data will be lost as soon as application is closed.
-    const storage = new DataStorage(null)
-    storage.getItem = storage.get
-    storage.setItem = storage.set
+    const storage = new DataStorage()
+    storage.getItem = (...args) => storage.get(...args)
+    storage.setItem = (...args) => storage.set(...args)
     return storage
 }
 
@@ -79,14 +80,14 @@ export function getStorage(storagePath, quota = 500 * 1024 * 1024) {
  * @returns {Map}        retieved data
  */
 export const read = (key, asMap = true, storage = _storage) => {
-    let data
+    let data = undefined
     try {
         data = JSON.parse(storage.getItem(key))
     } catch (_) { }
 
-    return asMap
-        ? new Map(data || [])
-        : data
+    return !asMap
+        ? data
+        : new Map(data || [])
 }
 
 /**
@@ -96,15 +97,17 @@ export const read = (key, asMap = true, storage = _storage) => {
  * @param   {String}    key     file name (NodeJS) or property key (LocalStorage)
  * @param   {String|*}  value   will be converted to JSON string
  */
-export const write = (key, value, storage = _storage) => {
+export const write = (key, value, asMap = true, storage = _storage) => {
     // invalid key: ignore request
     if (!isStr(key)) return
     try {
         if (!isStr(value)) {
             value = JSON.stringify(
-                isArrLike(value)
-                    ? [...value.values()]
-                    : value
+                asMap
+                    ? Array.from(value)
+                    : isArrLike(value)
+                        ? [...value.values()]
+                        : value
             )
         }
         storage.setItem(key, value)
@@ -146,15 +149,17 @@ export default class DataStorage {
         // `this.save` can be used to skip write operations temporarily by setting it to false
         this.save = true
         this.storage = storage
+        let ignoredFirst = this.disableCache
         this.rxData.subscribe(data => {
-            if (!this.rxData.__ignoredFirst) {
+            if (!ignoredFirst) {
                 // prevent save operation on startup when BehaviorSubject is used
-                this.rxData.__ignoredFirst = true
+                ignoredFirst = true
                 return
             }
             this.name && this.save && write(
                 this.name,
                 data,
+                true,
                 this.storage,
             )
             this.save = true
@@ -164,7 +169,6 @@ export default class DataStorage {
 
         // update cached data from localStorage throughout the application only when triggered
         rxForceUpdateCache.subscribe(refresh => {
-            console.log('rxForceUpdateCache')
             const doRefresh = !this.name
                 ? false
                 : isArr(refresh) || isStr(refresh)

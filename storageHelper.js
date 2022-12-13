@@ -2,7 +2,18 @@
  * Storage Helper: helper funtions to handle all interactions with browser's localStorage including backup and restore.
  */
 import DataStorage, { rxForceUpdateCache } from './DataStorage'
-import { downloadFile, generateHash, hasValue, isFn, isMap, isObj, isSet, isStr, isValidDate, objClean } from './utils'
+import {
+    downloadFile,
+    generateHash,
+    hasValue,
+    isFn,
+    isMap,
+    isObj,
+    isSet,
+    isStr,
+    isValidDate,
+    objClean,
+} from './utils'
 
 // Local Storage item key prefix for all items
 const PREFIX = 'totem_'
@@ -11,8 +22,8 @@ const CACHE_KEY = PREFIX + 'cache'
 const SETTINGS_KEY = PREFIX + 'settings'
 const MODULE_SETTINGS_KEY = 'module_settings'
 const storage = {}
-const cache = new DataStorage(CACHE_KEY, true)
-const settings = new DataStorage(SETTINGS_KEY) //, true // keep cache disabled???
+const cache = new DataStorage(CACHE_KEY, true) // directly read and write from storage
+const settings = new DataStorage(SETTINGS_KEY)
 
 // LocalStorage items that are essential for the applicaiton to run. 
 export const essentialKeys = [
