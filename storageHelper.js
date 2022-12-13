@@ -1,8 +1,7 @@
 /*
  * Storage Helper: helper funtions to handle all interactions with browser's localStorage including backup and restore.
  */
-import { isHex } from 'web3-utils'
-import DataStorage, { rxForeUpdateCache } from './DataStorage'
+import DataStorage, { rxForceUpdateCache } from './DataStorage'
 import { downloadFile, generateHash, hasValue, isFn, isMap, isObj, isSet, isStr, isValidDate, objClean } from './utils'
 
 // Local Storage item key prefix for all items
@@ -222,7 +221,7 @@ export const backup = {
         !!user.id && storage.settings.module('messaging', { user })
 
         // update modules
-        rxForeUpdateCache.next(modulesWithTS)
+        rxForceUpdateCache.next(modulesWithTS)
     },
 }
 
