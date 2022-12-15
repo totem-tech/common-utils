@@ -570,6 +570,25 @@ export class ChatClient {
             application,
             (err, result) => cb(err, new Map(result)),
         )
+        /**
+         * @name    handleTaskMarketApplication
+         * @summary task owner/publisher accept/rejects application(s)
+         * 
+         * @param   {Object}    data 
+         * @param   {Boolean}   data.rejectOthers   (optional) if true all applications excluding accepted ones will be rejected
+         * @param   {Boolean}   data.status         set accepted/rejected status for a specific applicant
+         * @param   {String}    data.taskId
+         * @param   {String}    data.workerAddress
+         * @param   {Function}  callback            Args: [error String, updateCount Number]
+         */
+        this.taskMarketApplication = (data, cb) => isFn(cb) && socket.emit(
+            'task-market-application',
+            data,
+            err => {
+                console.log({ err })
+                cb(err)
+            },
+        )
 
         /**
          * @name    taskGetById
