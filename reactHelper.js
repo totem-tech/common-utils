@@ -64,7 +64,7 @@ export const isMemo = x => x['$$typeof'] === require('react').memo('div')['$$typ
  * @summary A sugar for React `userReducer` with added benefit of tracking of component mounted status.
  *          Prevents state update if component is not mounted.
  * 
- * @param   {Function}          reducerFn       if falsy, will use `reducer` function
+ * @param   {Function}          reducerFn      
  * @param   {Object|Function}   initialState    if function, a RxJS Subject will be supplied as argument 
  *                                              as an alternative to setState
  * 
@@ -108,6 +108,33 @@ export const iUseReducer = (reducerFn, initialState = {}, onUnmount) => {
     }, [setStateOrg, rxSetState])
 
     return [state, setState]
+}
+
+export const iUseState = (initialState = {}, onUnmount) => {
+    const [[rxState, iniState]] = useState(() => {
+        const rxState = new BehaviorSubject({})
+        initialState = !isFn(initialState)
+            ? initialState
+            : initialState(rxState)
+        rxState.next(initialState)
+        return [
+            rxState,
+            initialState
+        ]
+    })
+    const [state, setState] = useRxSubject(
+        rxState,
+        null,
+        iniState,
+        true,
+        true,
+    )
+
+    useEffect(() => {
+        return () => isFn(onUnmount) && onUnmount(state)
+    }, [])
+
+    return [state, setState, rxState]
 }
 
 /**
@@ -363,8 +390,8 @@ export const useQueryBlockchain = (connection, func, args = [], multi, resultMod
  *              If an async function is supplied, `ignoreFirst` will be assumed `false`.
  *              Args: [newValue, oldValue, rxSubject]
  * @param   {*}         initialValue (optional) initial value where appropriate
- * @
- * @param   {Boolean}   allowSubjectUpdate whether to allow update of the subject or only state.
+ * @param   {Boolean}   allowMerge (optional) only applicable if value is an object
+ * @param   {Boolean}   allowSubjectUpdate (optional) whether to allow update of the subject or only state.
  *              CAUTION: if true and @subject is sourced from a DataStorage instance,
  *              it may override values in the LocalStorage values.
  *              Default: false
