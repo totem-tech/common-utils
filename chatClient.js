@@ -571,7 +571,7 @@ export class ChatClient {
             (err, result) => cb(err, new Map(result)),
         )
         /**
-         * @name    handleTaskMarketApplication
+         * @name    taskMarketApplyResponse
          * @summary task owner/publisher accept/rejects application(s)
          * 
          * @param   {Object}    data 
@@ -581,13 +581,10 @@ export class ChatClient {
          * @param   {String}    data.workerAddress
          * @param   {Function}  callback            Args: [error String, updateCount Number]
          */
-        this.taskMarketApplication = (data, cb) => isFn(cb) && socket.emit(
-            'task-market-application',
+        this.taskMarketApplyResponse = (data, cb) => isFn(cb) && socket.emit(
+            'task-market-apply-response',
             data,
-            err => {
-                console.log({ err })
-                cb(err)
-            },
+            cb,
         )
 
         /**

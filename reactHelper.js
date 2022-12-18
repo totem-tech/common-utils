@@ -7,8 +7,10 @@ import PromisE from './PromisE'
 import {
     isDefined,
     isFn,
+    isObj,
     isSubjectLike,
     isValidNumber,
+    objCopy,
 } from './utils'
 
 const useEffect = (...args) => require('react').useEffect(...args)
@@ -407,8 +409,9 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowMerge = 
             : new BehaviorSubject(initialValue)
     )
 
-    const [{ firstValue, value }, _setState] = iUseReducer(reducer, () => {
-        let value = _subject instanceof BehaviorSubject
+    let [{ firstValue, isBSub, value }, _setState] = useState(() => {
+        const isBSub = _subject instanceof BehaviorSubject
+        let value = isBSub
             ? _subject.value
             : initialValue
         value = !isFn(valueModifier)
@@ -421,11 +424,16 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowMerge = 
         if (value === useRxSubject.IGNORE_UPDATE) {
             value = undefined
         }
-        return { firstValue: value, value }
+        return {
+            firstValue: value,
+            isBSub,
+            value,
+        }
     })
 
     useEffect(() => {
-        let ignoreFirst = !(_subject instanceof BehaviorSubject)
+        let mounted = true
+        let ignoreFirst = !isBSub
         const subscribed = _subject.subscribe((newValue) => {
             if (!ignoreFirst) {
                 ignoreFirst = true
@@ -443,19 +451,34 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowMerge = 
             )
             promise.then(newValue => {
                 if (newValue === useRxSubject.IGNORE_UPDATE) return
-                _setState({
-                    value: allowMerge
-                        ? { ...value, ...newValue }
-                        : newValue
-                })
+                value = allowMerge
+                    ? { ...value, ...newValue }
+                    : newValue
+
+                if (allowMerge && isBSub && isObj(_subject.value)) Object
+                    .keys(value)
+                    .forEach(key => {
+                        try {
+                            _subject.value[key] = value[key]
+                        } catch (err) {
+                            console.warn(err)
+                        }
+                    })
+                mounted && _setState({ isBSub, value })
             })
             promise.catch(err => console.log('useRxSubject => unexpected error:', err))
         })
-        return () => subscribed.unsubscribe()
+        return () => {
+            mounted = false
+            subscribed.unsubscribe()
+        }
     }, [])
 
-    const setValue = newValue => _subject.next(newValue)
-    return [value, setValue, _subject]
+    return [
+        value,
+        newValue => _subject.next(newValue),
+        _subject,
+    ]
 }
 // To prevent an update return this in valueModifier
 useRxSubject.IGNORE_UPDATE = Symbol('ignore-rx-subject-update')
