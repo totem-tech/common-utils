@@ -527,14 +527,17 @@ export class ChatClient {
         this.rewardsGetData = cb => isFn(cb) && socket.emit('rewards-get-data', cb)
 
         /**
-         * @name task
-         * @summary add/update task details to messaging service
+         * @name    task
+         * @summary saves off-chain task details to the database.
+         * Requires pre-authentication using BONSAI with the blockchain identity that owns the task.
+         * Login is required simply for the purpose of logging the User ID who saved the data.
          * 
-         * @param {String}      id ID of the task
-         * @param {Object}      task 
-         * @param {String}      ownerAddress
-         * @param {Function}    cb callback function expected arguments:
-         *                      @err    String: error message if query failed
+         * @description 'task-market-created' event will be broadcasted whenever a new marketplace task is created.
+         * @param {String}   taskId          task ID
+         * @param {Object}   task
+         * @param {String}   ownerAddress    task owner identity
+         * @param {Function} callback        callback args:
+         *                                      @err    string: error message, if unsuccessful
          */
         this.task = (id, task, ownerAddress, cb) => isFn(cb) && socket.emit('task', id, task, ownerAddress, cb)
 
@@ -554,6 +557,21 @@ export class ChatClient {
         )
 
         /**
+         * @name    taskGetByParentId
+         * @summary search for tasks by parent ID
+         * 
+         * @param   {String}    parentId 
+         * @param   {Function}  callback Callback function expected arguments:
+         *                               @err    String: error message if query failed
+         *                               @result Map: list of tasks with details
+         */
+        this.taskGetByParentId = (parentId, cb) => isFn(cb) && socket.emit(
+            'task-get-by-parent-id',
+            parentId,
+            (err, result) => cb(err, new Map(result))
+        )
+
+        /**
          * @name    taskMarketApply
          * @summary apply for an open marketplace task
          * 
@@ -570,12 +588,22 @@ export class ChatClient {
             application,
             (err, result) => cb(err, new Map(result)),
         )
+
+        /**
+         * @name    onTaskMarketCreated
+         * @summary subscribe to new marketplace task creation event
+         * 
+         * @param   {Function} cb   args: @taskId string
+         */
+        this.onTaskMarketCreated = cb => isFn(cb) && socket.on('task-market-created', cb)
+
         /**
          * @name    taskMarketApplyResponse
          * @summary task owner/publisher accept/rejects application(s)
          * 
          * @param   {Object}    data 
-         * @param   {Boolean}   data.rejectOthers   (optional) if true all applications excluding accepted ones will be rejected
+         * @param   {Boolean}   data.rejectOthers   (optional) if true applications other than accepted will be rejected
+         * @param   {Boolean}   data.silent         (optional) whether to skip notification for rejected applications
          * @param   {Boolean}   data.status         set accepted/rejected status for a specific applicant
          * @param   {String}    data.taskId
          * @param   {String}    data.workerAddress

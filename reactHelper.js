@@ -337,7 +337,7 @@ export const useQueryBlockchain = (connection, func, args = [], multi, resultMod
             // subscription
             unsubscribe = result
         }
-        const handleError = err => setData({
+        const handleError = err => mounted && setData({
             message: err && {
                 content: `${err}`,
                 icon: true,
@@ -345,10 +345,10 @@ export const useQueryBlockchain = (connection, func, args = [], multi, resultMod
             }
         })
         const handleResult = (resultSanitised, resultOriginal) => {
-            setData({
+            mounted && setData({
                 message: null,
                 result: isFn(resultModifier)
-                    ? resultModifier(resultSanitised)
+                    ? resultModifier(resultSanitised, resultOriginal)
                     : resultSanitised,
                 unsubscribe: handleUnsubscribe,
             })
