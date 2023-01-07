@@ -180,9 +180,12 @@ export default class BlockchainHelper {
             if (isArr(result)) return result.map(handleResult)
 
             const { data } = result
-            data.free = isStr(data.free)
-                ? eval(data.free)
-                : data.free
+            // data.free = isStr(data.free)
+            //     ? eval(data.free)
+            //     : data.free
+            data.free = Number(data.free)
+            data.feeFrozen = Number(data.feeFrozen)
+            data.miscFrozen = Number(data.miscFrozen)
             doSubscribe && callback(data)
             return data
         }
