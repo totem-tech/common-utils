@@ -236,7 +236,7 @@ export const validate = (value, config, customMessages = {}) => {
 
                     // catch any auto-correction by `new URL()`. 
                     // Eg: spaces in the domain name being replaced by`%20` or missing `//` in protocol being auto added
-                    if (strict && url.href !== value.toLowerCase()) return _msgOrTrue(errorMsgs.url)
+                    if (strict && url.href.toLowerCase() !== value.toLowerCase()) return _msgOrTrue(errorMsgs.url)
                 } catch (e) {
                     return _msgOrTrue(errorMsgs.url)
                 }
