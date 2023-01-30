@@ -192,28 +192,28 @@ export class IdentityHelper {
 		await cryptoWaitReady()
 		if (retries < 0) return
 		if (!this.getAll().length) {
-			// generate a new seed
-			const seed = this.generateUri()
-			if (!seed) {
-				setTimeout(() => this.init(retries - 1), 1000)
-				return
-			}
+			try {
+				// generate a new seed
+				const seed = this.generateUri()
+				if (!seed) throw 1
 
-			const uri = `${seed}/totem/0/0`
-			const { address } = this.addFromUri(uri, this.type) || {}
-			// in case `wasm-crypto` hasn't been initiated yet, try again after a second
-			if (!address) {
-				setTimeout(() => this.init(retries - 1), 1000)
-				return
-			}
+				const uri = `${seed}/totem/0/0`
+				const { address } = this.addFromUri(uri, this.type) || {}
+				// in case `wasm-crypto` hasn't been initiated yet, try again after a second
+				if (!address) throw 1
 
-			const identity = {
-				address,
-				name: 'Default',
-				usageType: USAGE_TYPES.PERSONAL,
-				uri,
+				const identity = {
+					address,
+					name: 'Default',
+					usageType: USAGE_TYPES.PERSONAL,
+					uri,
+				}
+				this.set(address, identity)
+			} catch (err) {
+				return err !== 1
+					? Promise.reject(err)
+					: setTimeout(() => this.init(retries - 1), 1000)
 			}
-			this.set(address, identity)
 		}
 
 		const { address: selected } = this.getSelected() || {}
