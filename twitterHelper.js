@@ -56,6 +56,33 @@ class TwitterHelper {
         }
     }
 
+    async getAllFollowerIds(userHandle = '') {
+        await this.getClient()
+        const limit = 5000
+        const params = {
+            count: limit,
+            screen_name: userHandle,
+            stringify_ids: true,
+        }
+        const followers = []
+        let result = {}
+        try {
+            do {
+                result = await this.client
+                    .get('followers/ids', params)
+
+                params.cursor = result.next_cursor
+                followers.push(...result.ids)
+            } while (result.ids.length === limit)
+        } catch (err) {
+            throw new Error(!err.errors
+                ? err
+                : this.joinTwitterErrors(err)
+            )
+        }
+        return followers
+    }
+
     async getFollowersList(userHanlde, count = 200, cursor = -1, skipStatus = true, include_user_entities = false) {
         await this.getClient()
         const params = {
