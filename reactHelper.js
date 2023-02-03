@@ -308,14 +308,17 @@ export const usePromise = (promise, resultModifier, errorModifier) => {
  * 
  * @returns {Object} { message, result, unsubscribe }
  */
-export const useQueryBlockchain = (connection, func, args = [], multi, resultModifier, subscribe = true, print) => {
-    const [data, setData] = useState({
-        message: {
-            content: 'Loading...',
-            icon: true,
-            status: 'loading',
-        }
-    })
+export const useQueryBlockchain = (
+    connection,
+    func,
+    args = [],
+    multi,
+    resultModifier,
+    subscribe = true,
+    loadingText = 'Loading ...',
+    print,
+) => {
+    const [data, setData] = useState({})
 
     useEffect(() => {
         let mounted = true
@@ -337,7 +340,7 @@ export const useQueryBlockchain = (connection, func, args = [], multi, resultMod
             // subscription
             unsubscribe = result
         }
-        const handleError = err => setData({
+        const handleError = err => mounted && setData({
             message: err && {
                 content: `${err}`,
                 icon: true,
@@ -345,10 +348,10 @@ export const useQueryBlockchain = (connection, func, args = [], multi, resultMod
             }
         })
         const handleResult = (resultSanitised, resultOriginal) => {
-            setData({
+            mounted && setData({
                 message: null,
                 result: isFn(resultModifier)
-                    ? resultModifier(resultSanitised)
+                    ? resultModifier(resultSanitised, resultOriginal)
                     : resultSanitised,
                 unsubscribe: handleUnsubscribe,
             })
@@ -366,9 +369,18 @@ export const useQueryBlockchain = (connection, func, args = [], multi, resultMod
         } else {
             // args[args.indexOf(callback)] = handleResult
         }
-        func && PromisE(connection)
-            .then(handleConnection)
-            .catch(handleError)
+        if (func) {
+            setData({
+                message: {
+                    content: loadingText,
+                    icon: true,
+                    status: 'loading',
+                }
+            })
+            PromisE(connection)
+                .then(handleConnection)
+                .catch(handleError)
+        }
 
         return () => {
             mounted = false

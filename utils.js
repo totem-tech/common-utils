@@ -1,3 +1,4 @@
+import uuid from 'uuid'
 // import { blake2AsHex, keccakAsHex } from '@polkadot/util-crypto'
 import { ss58Decode } from './convert'
 /*
@@ -85,7 +86,7 @@ export const fallbackIfFails = (func, args = [], fallbackValue = null) => {
  * @param	{String}	algo		Supported algorithms: blake2 (default), keccak
  * @param	{Number}	bitLength 	Default: 256
  */
-export const generateHash = (seed, algo = 'blake2', bitLength = 256) => {
+export const generateHash = (seed = uuid.v1(), algo = 'blake2', bitLength = 256) => {
 	const { blake2AsHex, keccakAsHex } = require('@polkadot/util-crypto')
 	seed = isUint8Arr(seed)
 		? seed
