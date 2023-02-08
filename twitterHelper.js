@@ -30,19 +30,19 @@ class TwitterHelper {
     }
 
     /**
-     * @name    checkFollower
+     * @name    getFollower
      * @summary get Twitter follower information
      * 
-     * @param   {String} sourceHandle 
-     * @param   {String} targetHandle 
+     * @param   {String} userHandle     user handle
+     * @param   {String} followerHandle follower handle
      * 
      * @returns {Boolean}
      */
-    async getFollower(sourceHandle, targetHandle) {
+    async getFollower(userHandle, followerHandle) {
         await this.getClient()
         const params = {
-            source_screen_name: sourceHandle,
-            target_screen_name: targetHandle,
+            source_screen_name: userHandle,
+            target_screen_name: followerHandle,
         }
         try {
             const { relationship = {} } = await this.client
@@ -55,7 +55,14 @@ class TwitterHelper {
             )
         }
     }
-
+    /**
+     * @name    getAllFollowerIds
+     * @summary get Twitter list of user IDs (not Twitter handles) of followers
+     * 
+     * @param   {String} userHandle 
+     * 
+     * @returns {Boolean}
+     */
     async getAllFollowerIds(userHandle = '') {
         await this.getClient()
         const limit = 5000
