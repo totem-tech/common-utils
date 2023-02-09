@@ -339,7 +339,7 @@ export default class DataStorage {
      * 
      * @returns {DataStorage}      reference to the DataStorage instance
      */
-    setAll(data, override = true) {
+    setAll(data, override = true, forceWrite = false) {
         if (!isMap(data)) return this
         if (!override) {
             // merge data
@@ -351,6 +351,15 @@ export default class DataStorage {
             data = existing // merged value
         }
 
+        if (forceWrite) {
+            this.save = false
+            this.name && write(
+                this.name,
+                data,
+                true,
+                this.storage,
+            )
+        }
         this.rxData.next(data)
         return this
     }
