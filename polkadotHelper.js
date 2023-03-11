@@ -51,11 +51,17 @@ export const connect = (
     const timeoutMsg = config.errorMsgs.connectionTimeout
     const failedMsg = config.errorMsgs.connectionFailed
     const provider = new WsProvider(nodeUrl, autoConnect)
+
     if (!autoConnect) provider.connect()
     // auto reject if doesn't connect within specified duration
     const tId = setTimeout(() => !provider.isConnected() && reject(timeoutMsg), timeout)
     // reject if connection fails
-    provider.websocket.addEventListener('error', () => reject(failedMsg) | clearTimeout(tId))
+    provider.websocket.onerror = err => {
+        console.log(failedMsg, err)
+        clearTimeout(tId)
+        provider.disconnect()
+        reject(failedMsg)
+    }
     // instantiate the Polkadot API using the provider and supplied types
     ApiPromise.create({ provider, types }).then(api =>
         resolve({ api, keyring, provider }) | clearTimeout(tId),
@@ -196,12 +202,16 @@ export const query = async (
     multi = isFn(fn) && !!multi
     const cb = args[args.length - 1]
     const isSubscribe = isFn(cb) && isFn(fn)
+    const printResult = (result) => print && console.log(
+        result,
+        isStr(func) && func || undefined,
+    )
 
     if (isSubscribe) {
         // only add interceptor to process result
         args[args.length - 1] = result => {
             const sanitised = sanitise(result)
-            print && console.log(func, sanitised)
+            printResult(sanitised)
             cb(sanitised, result)
         }
     }
@@ -231,9 +241,14 @@ export const query = async (
             throw `${config.errorMsgs.invalidMutliArgsMsg} ${err}`
         }
     }
-    const result = isFn(fn) ? await fn.apply(null, args) : fn
-    !isSubscribe && print && console.log(JSON.stringify(result, null, 4))
-    return isSubscribe ? result : sanitise(result)
+    let result = isFn(fn)
+        ? await fn.apply(null, args)
+        : fn
+    result = isSubscribe
+        ? result
+        : sanitise(result)
+    !isSubscribe && printResult(result)
+    return result
 }
 
 export const sanitise = x => JSON.parse(JSON.stringify(x)) // get rid of jargon
@@ -250,14 +265,16 @@ export const sanitise = x => JSON.parse(JSON.stringify(x)) // get rid of jargon
  * 
  * @returns {Array}   [blockHash, eventsArr]
  */
-export const signAndSend = async (api, address, tx, nonce, rxStatus) => {
+export const signAndSend = async (api, address, tx, nonce, rxStatus, tag) => {
     const account = _keyring.getPair(address)
-    nonce = nonce || await query(api, api.query.system.accountNonce, address)
-    if (nonces[address] && nonces[address] >= nonce) {
-        nonce = nonces[address] + 1
+    if (!nonce) {
+        nonce = await query(api, api.query.system.accountNonce, address)
+        if (nonces[address] && nonces[address] >= nonce) {
+            nonce = nonces[address] + 1
+        }
+        nonces[address] = nonce
     }
-    nonces[address] = nonce
-    console.log('Totem Blockchain: initiating transation', { nonce })
+    console.log('Totem Blockchain: initiating transation', tag, { nonce })
     return await new Promise(async (resolve, reject) => {
         try {
             const signed = await tx.sign(account, { nonce })
@@ -265,7 +282,7 @@ export const signAndSend = async (api, address, tx, nonce, rxStatus) => {
                 const { events, status } = result
                 const isFuture = status.type !== 'Future'
                 let hash = ''
-                console.log('Totem Blockchain: Transaction status', status.type)
+                console.log('Totem Blockchain: Transaction status', tag, status.type)
 
                 // notify
                 rxStatus && rxStatus.next(result)
@@ -286,7 +303,7 @@ export const signAndSend = async (api, address, tx, nonce, rxStatus) => {
                 }).filter(Boolean)
 
                 if (eventErrors.length > 0) {
-                    console.log('Totem Blockchain: Transaction failed!', { blockHash: hash, eventErrors })
+                    console.log('Totem Blockchain: Transaction failed!', tag, { blockHash: hash, eventErrors })
                     return reject(eventErrors.join(' | '))
                 }
 
@@ -297,7 +314,7 @@ export const signAndSend = async (api, address, tx, nonce, rxStatus) => {
                 }))
                     // exclude empty event data
                     .filter(event => event.data && event.data.length) || {}
-                console.log(`Totem Blockchain: Completed at block hash: ${hash}`, isNode ? '' : { eventsArr })
+                console.log(`Totem Blockchain: Completed at block hash: ${hash}`, tag, isNode ? '' : { eventsArr })
                 rxStatus && rxStatus.complete()
                 resolve([hash, eventsArr])
             })

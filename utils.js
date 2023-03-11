@@ -1,3 +1,4 @@
+import { v1 as uuidV1 } from 'uuid'
 // import { blake2AsHex, keccakAsHex } from '@polkadot/util-crypto'
 import { ss58Decode } from './convert'
 /*
@@ -10,8 +11,11 @@ import { ss58Decode } from './convert'
  * web3-utils  			: isAddress, isETHAddress
 */
 
+export const EMAIL_REGEX = new RegExp(/^(("[\w-\s]+")|([\w-]+(?:\.[\w-]+)*)|("[\w-\s]+")([\w-]+(?:\.[\w-]+)*))(@((?:[\w-]+\.)*\w[\w-]{0,66})\.([a-z]{2,9}(?:\.[a-z]{2})?)$)|(@\[?((25[0-5]\.|2[0-4][0-9]\.|1[0-9]{2}\.|[0-9]{1,2}\.))((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]{1,2})\.){2}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]{1,2})\]?$)/i)
 export const HEX_REGEX = /^0x[0-9a-f]+$/i
 export const HASH_REGEX = /^0x[0-9a-f]{64}$/i
+// doesn't work well on URLs with ports!!! Matches emails too!
+export const URL_REGEX = /((([A-Za-z]{3,9}:(?:\/\/)?)(?:[\-;:&=\+\$,\w]+@)?[A-Za-z0-9\.\-]+|(?:www\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+)((?:\/[\+~%\/\.\w\-_]*)?\??(?:[\-\+=&;%@\.\w_]*)#?(?:[\.\!\/\\\w]*))?)/g
 // default icons used in Message component
 export const icons = {
 	basic: '',
@@ -58,7 +62,7 @@ export const copyToClipboard = str => {
 }
 
 export const downloadFile = (content, fileName, contentType) => {
-	const a = document.createElement("a")
+	const a = document.createElement('a')
 	const file = new Blob([content], { type: contentType })
 	a.href = URL.createObjectURL(file)
 	a.download = fileName
@@ -69,16 +73,30 @@ export const escapeStringRegexp = (str) => {
 	const fn = require('escape-string-regexp')
 	return fn(str)
 }
+// returns @fallbackValue if function call throws error
+export const fallbackIfFails = (func, args = [], fallbackValue = null) => {
+	try {
+		return func(
+			...isFn(args)
+				? args()
+				: args
+		)
+	} catch (e) {
+		return isFn(fallbackValue)
+			? fallbackValue()
+			: fallbackValue
+	}
+}
 
 /**
  * @name	generateHash
  * @summary generate hash using supplied data
  * 
- * @param	{String}	seed data to generate hash of
- * @param	{String}	algo supported algorithms: blake2 (default), keccak
- * @param	{Number}	bitLength 
+ * @param	{String}	seed		data to generate hash of
+ * @param	{String}	algo		Supported algorithms: blake2 (default), keccak
+ * @param	{Number}	bitLength 	Default: 256
  */
-export const generateHash = (seed, algo, bitLength = 256) => {
+export const generateHash = (seed = uuidV1(), algo = 'blake2', bitLength = 256) => {
 	const { blake2AsHex, keccakAsHex } = require('@polkadot/util-crypto')
 	seed = isUint8Arr(seed)
 		? seed
@@ -132,9 +150,8 @@ export const isArr = x => Array.isArray(x)
 export const isArr2D = x => isArr(x) && x.every(isArr)
 // checks if convertible to an array by using `Array.from(x)`
 export const isArrLike = x => isSet(x) || isMap(x) || isArr(x)
-export const isAsyncFn = x => x instanceof (async () => { }).constructor && x[Symbol.toStringTag] === "AsyncFunction"
-//x instanceof (async () => { }).constructor && x[Symbol.toStringTag] === "AsyncFunction"
-//Object.prototype.toString.call(x) == '[object AsyncFunction]'
+export const isAsyncFn = x => x instanceof (async () => { }).constructor
+	&& x[Symbol.toStringTag] === 'AsyncFunction'
 export const isBool = x => typeof x === 'boolean'
 export const isBond = x => {
 	try {
@@ -144,7 +161,7 @@ export const isBond = x => {
 	}
 }
 // Check if x is a valid Date instance
-// Date object can sometimes be "Invalid Date" without any timestamp.
+// Date object can sometimes be 'Invalid Date' without any timestamp.
 // Date.getTime() is used to make sure it's a valid Date
 export const isDate = x => x instanceof Date && isValidNumber(x.getTime())
 // checks if dateOrStr is a valid date
@@ -168,19 +185,12 @@ export const isETHAddress = (address, chainId) => {
 	return isAddress(address, chainId)
 }
 export const isFn = x => typeof x === 'function'
-export const isHash = x => HASH_REGEX.test(`${x}`)
-export const isHex = x => HEX_REGEX.test(`${x}`)
+export const isHash = x => fallbackIfFails(() => HASH_REGEX.test(x), [], false)
+export const isHex = x => fallbackIfFails(() => HEX_REGEX.test(x), [], false)
 export const isInteger = x => Number.isInteger(x)
 export const isMap = x => x instanceof Map
-export const isNodeJS = () => {
-	try {
-		eval(window) && eval(localStorage)
-	} catch (_) {
-		return true
-	}
-}
-export const isObj = x => Object.prototype.toString.call(x) === '[object Object]'
-//!!x && typeof x === 'object' && !isArr(x) && !isMap(x) && !isSet(x)
+export const isNodeJS = () => fallbackIfFails(() => !(window && localStorage), [], true)
+export const isObj = x => !!x && typeof x === 'object' && !isArr(x) && !isMap(x) && !isSet(x)
 // Checks if argument is an Array of Objects. Each element type must be object, otherwise will return false.
 export const isObjArr = x => isArr(x) && x.every(isObj)
 // Checks if argument is a Map of Objects. Each element type must be object, otherwise will return false.
@@ -190,6 +200,7 @@ export const isPromise = x => x instanceof Promise
 export const isSet = x => x instanceof Set
 export const isStr = x => typeof x === 'string'
 export const isSubjectLike = x => isObj(x) && isFn(x.subscribe) && isFn(x.next)
+export const isTouchable = () => fallbackIfFails(() => 'ontouchstart' in document.documentElement, [], false)
 export const isUint8Arr = arr => arr instanceof Uint8Array
 export const isURL = x => x instanceof URL
 export const isValidURL = (x, strict = true) => {
@@ -360,12 +371,25 @@ export const arrSearch = (arr, keyValues, matchExact, matchAll, ignoreCase, asAr
 }
 
 // Returns new array sorted by key. If sortOriginal is 'truty', existing array will be sorted and returned.
-export const arrSort = (arr, key, reverse = false, sortOriginal = false) => {
+export const arrSort = (arr, key, reverse = false, caseInsensitive = true, sortOriginal = false) => {
 	if (!isObjArr(arr)) return []
-	const sortedArr = (sortOriginal ? arr : [...arr])
-		.sort((a, b) => a[key] > b[key] ? 1 : -1)
+	let sortedArr = (sortOriginal ? arr : [...arr])
 
-	return reverse ? arrReverse(sortedArr, true) : sortedArr
+	const getValue = (obj, key) => {
+		const value = fallbackIfFails(() => `${obj[key] || ''}`, [], '')
+		return caseInsensitive
+			? value.toLowerCase()
+			: value
+	}
+	sortedArr = sortedArr.sort((a, b) =>
+		getValue(a, key) > getValue(b, key)
+			? 1
+			: -1
+	)
+
+	return reverse
+		? arrReverse(sortedArr, true)
+		: sortedArr
 }
 
 /**
@@ -628,6 +652,39 @@ export const objReadOnly = (obj, strict = false, silent = false) => new Proxy(ob
 })
 
 /**
+ * @name	objSetProp
+ * @summary assign value to specified property
+ * 
+ * @param	{Object}	obj 
+ * @param	{String}	key 
+ * @param	{*}			value			
+ * @param	{Boolean}	condition	(optional)
+ * @param	{*}			valueAlt 	(optional) value to use if condition is truthy
+ * @returns 
+ */
+export const objSetProp = (obj, key, val, condition, valAlt) => {
+	obj[key] = !condition ? val : valAlt
+	return obj
+}
+
+/**
+ * @name	objSetProp
+ * @summary assign value to specified property only if it is undefined
+ * 
+ * @param	{Object}	obj 
+ * @param	{String}	key 
+ * @param	{*}			value			
+ * @param	{Boolean}	condition	(optional) 
+ * @param	{*}			valueAlt 	(optional) value to use if condition is truthy
+ * 
+ * @returns {Object}
+ */
+export const objSetPropUndefined = (obj, key, v1, condition, v2) => {
+	obj[key] === undefined && objSetProp(obj, key, v1, condition, v2)
+	return obj
+}
+
+/**
  * @name	objToUrlParams
  * @summary	constructs URL param string from an object, excluding any `undefined` values
  * 
@@ -783,14 +840,27 @@ export const mapSearch = (map, keyValues, matchExact, matchAll, ignoreCase) => {
  * @returns {Map}
  */
 // 
-export const mapSort = (map, key, reverse = false) => {
+export const mapSort = (map, key, reverse = false, caseInsensitive = true) => {
 	if (!isMap(map)) return map
 	const arr2d = Array.from(map)
 	if (!arr2d[0] || !isObj(arr2d[0][1])) return map
-	return new Map(arrReverse(
-		arr2d.sort((a, b) => a[1][key] > b[1][key] ? 1 : -1),
-		reverse
-	))
+
+	const getValue = (obj, key1, key2) => {
+		const value = fallbackIfFails(() => `${obj[key1][key2] || ''}`, [], '')
+		return caseInsensitive
+			? value.toLowerCase()
+			: value
+	}
+	return new Map(
+		arrReverse(
+			arr2d.sort((a, b) =>
+				getValue(a, 1, key) > getValue(b, 1, key)
+					? 1
+					: -1
+			),
+			reverse
+		)
+	)
 }
 
 /**
@@ -830,7 +900,7 @@ export const search = (data, query, keys = []) => {
 /**
  * @name			searchRanked
  * @summary 		enhanced search for Dropdown
- * @description		Semantic UI Dropdown search defaults to only "text" option property.
+ * @description		Semantic UI Dropdown search defaults to only 'text' option property.
  * 					See FormInput for usage.
  * @param {Array}	searchKeys	Object properties (keys) to search for.
  * 								Default: ['text'] (for Dropdown and similar input fields)
@@ -882,19 +952,22 @@ export const searchRanked = (searchKeys = ['text'], maxResults = 100) => (option
  * @param {Array|Map} data 
  * @param {String}	  key		   (optional) property to sort by
  * @param {Boolean}   reverse	   (optional)
- * @param {Boolean}	  sortOriginal (optional)
+ * @param {Boolean}	  caseInsensitive (optional) Default: true
+ * @param {Boolean}	  sortOriginal (optional) for Array only. 
  * 
  * @returns {Array|Map}
  */
-export const sort = (data, key, reverse, sortOriginal) => {
+export const sort = (data, key, reverse, caseInsensitive, sortOriginal) => {
 	const sortFunc = isArr(data)
 		? arrSort
-		: isMap(data) && mapSort
-	if (!sortFunc) return []
+		: isMap(data)
+			? mapSort
+			: () => data // return as is
 	return sortFunc(
 		data,
 		key,
 		reverse,
+		caseInsensitive,
 		sortOriginal,
 	)
 }
@@ -982,3 +1055,20 @@ export const textEllipsis = (text, maxLen, numDots, split = true) => {
 		).join('')
 	return left + dots + right
 }
+
+/**
+ * @name	toArray
+ * @summary convert string or other itearables to Array
+ * 
+ * @param	{String|Array|Map|Set}	value 
+ * @param	{String}				seperator (optional) only used when value is a string
+ * 
+ * @returns {Array}
+ */
+export const toArray = (value, seperator = ',') => isStr(value)
+	? value
+		.split(seperator)
+		.filter(Boolean)
+	: isFn((value || []).values)
+		? [...value.values()]
+		: []

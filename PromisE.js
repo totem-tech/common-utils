@@ -190,9 +190,11 @@ PromisE.getSocketEmitter = (socket, timeoutGlobal, errorArgIndex = 0, callbackIn
         const timeout = isPositiveInteger(timeoutLocal)
             ? timeoutLocal
             : timeoutGlobal
-        const getError = err => isFn(errorModifier)
+        const getError = err => new Error(
+            isFn(errorModifier)
             && errorModifier(err)
             || err
+        )
         const promise = new Promise((resolve, reject) => {
             try {
                 const interceptor = async (...result) => {

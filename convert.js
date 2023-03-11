@@ -1,4 +1,4 @@
-import { isArr, isArrLike, isHex, isObj, isStr, isUint8Arr } from './utils'
+import { fallbackIfFails, isArr, isArrLike, isHex, isObj, isStr, isUint8Arr } from './utils'
 /*
  * List of optional node-modules and the functions used by them:
  * Module Name          : Function Name
@@ -6,15 +6,6 @@ import { isArr, isArrLike, isHex, isObj, isStr, isUint8Arr } from './utils'
  * @polkadot/util       : bytesToHex, hexToBytes, strToU8a, u8aToStr
  * @polkadot/util-crypto: ss58Decode, ss58Encode
 */
-
-// returns @fallbackValue if function call throws error
-const fallbackIfFails = (func, args = [], fallbackValue = null) => {
-    try {
-        return func.apply(null, args)
-    } catch (e) {
-        return fallbackValue
-    }
-}
 
 export const decodeUTF8 = strToU8a // ToDo: deprecate
 export const encodeUTF8 = u8aToStr // ToDo: deprecate
@@ -28,10 +19,9 @@ export const encodeUTF8 = u8aToStr // ToDo: deprecate
  * @returns {String}    If invalid address returns empty string.
  */
 export const addressToStr = (address, ignoreChecksum, ss58Format) => fallbackIfFails(
-    ss58Encode, // first attempt to convert bytes to string
+    ss58Encode,
     [address, ss58Format],
-    // if fails check if address is a valid string
-    fallbackIfFails(ss58Decode, [address, ignoreChecksum, ss58Format]) && address || '',
+    '',
 )
 
 /**
@@ -136,7 +126,7 @@ export const hexToBytes = (hex, bitLength) => {
         isStr(hex) && !hex.startsWith('0x')
             ? '0x' + hex
             : hex,
-        bitLength
+        bitLength,
     ])
 }
 

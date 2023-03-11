@@ -4,7 +4,14 @@ import { translated } from './languageHelper'
 import PromisE from './PromisE'
 import { subjectAsPromise } from './reactHelper'
 import storage from './storageHelper'
-import { deferred, isAsyncFn, isFn, isObj, isStr, objWithoutKeys } from './utils'
+import {
+    deferred,
+    isAsyncFn,
+    isFn,
+    isObj,
+    isStr,
+    objWithoutKeys,
+} from './utils'
 
 let instance, socket, hostname
 let port = 3001
@@ -25,12 +32,15 @@ try {
 const defaultServerURL = `${hostname}:${port}`
 const MODULE_KEY = 'messaging'
 const PREFIX = 'totem_'
+// include any ChatClient property that is not a function or event that does not have a callback
+const nonCbs = ['isConnected', 'disconnect']
 // read or write to messaging settings storage
 const rw = value => storage.settings.module(MODULE_KEY, value) || {}
 export const rxIsConnected = new BehaviorSubject(false)
 export const rxIsLoggedIn = new BehaviorSubject(null)
 export const rxIsRegistered = new BehaviorSubject(!!(rw().user || {}).id)
 export const rxIsInMaintenanceMode = new BehaviorSubject(false)
+export const rxUserIdentity = new BehaviorSubject((getUser() || {}).address)
 const eventMaintenanceMode = 'maintenance-mode'
 
 //- migrate existing user data
@@ -47,49 +57,23 @@ if (rw().history) rw({ history: null })
 //- migrate end
 
 const log = (...args) => console.log(new Date().toLocaleTimeString(), 'Totem Messaging Service:', ...args)
-// Returns a singleton instance of the websocket client
-// Instantiates the client if not already done
-export const getClient = (...args) => {
-    if (instance) return instance
 
-    // create a new instance
-    instance = new ChatClient(...args)
-    log('Connecting to', instance.url)
-
-    // on successful conenction login using user credentials and check if messaging server is in maintenance mode
-    instance.onConnect(async () => {
-        log('Connected')
-        const active = await instance.maintenanceMode()
-            .catch(err => {
-                log('Failed to retrieve maintenance mode status', err)
-                return true
-            })
-        rxIsInMaintenanceMode.next(active)
-        rxIsConnected.next(true)
-        if (!rxIsRegistered.value) return
-
-        // auto login on connect to messaging service
-        const { id, secret } = getUser() || {}
-        instance.login(id, secret)
-            .then(() => log('Login success'))
-            // warn user if login fails. should not occur unless
-            // 1. user has wrong credentials stored in the localStorage
-            // 2. user has been deleted from the backend database (eg: deleted test account)
-            // 3. database error occured while logging in (connection failure, timeout etc)
-            // 4. there is a bug in the backend code
-            .catch(err => alert(`Totem Messaging Service: login failed! ${err}`))
-    })
-    instance.onConnectError(() => {
-        rxIsConnected.next(false)
-        rxIsRegistered.value && rxIsLoggedIn.next(false)
-    })
-    instance.onMaintenanceMode(active => {
-        console.log('MaintenanceMode', active)
-        rxIsInMaintenanceMode.next(active)
-    })
-    return instance
-}
-
+// retrieves user credentails from local storage
+/** @name    setUser
+ * @summary retrieves user credentails from local storage
+ * 
+ * @returns {Object} user
+ */
+export function getUser() { return rw().user }
+/**
+ * @name    setUser
+ * @summary saves user credentails from local storage
+ * 
+ * @param   {Object}    user
+ * 
+ * @returns {Object} user
+ */
+export const setUser = (user = {}) => rw({ user })
 /**
  * @name    referralCode
  * @summary get/set referral code to LocalStorage
@@ -112,21 +96,48 @@ export const referralCode = code => {
 }
 
 /**
- * @name    setUser
- * @summary retrieves user credentails from local storage
- * 
- * @returns {Object} user
+ * @name    getClient
+ * @summary Returns a singleton instance of the websocket client.
+ * Instantiates the client if not already done.
+ *
+ * @returns {ChatClient}
  */
-export const getUser = () => rw().user
-/**
- * @name    setUser
- * @summary saves user credentails from local storage
- * 
- * @param   {Object}    user
- * 
- * @returns {Object} user
- */
-export const setUser = (user = {}) => rw({ user })
+export const getClient = (url) => {
+    if (instance) return instance
+
+    instance = new ChatClient(url)
+
+    instance.onConnect(async () => {
+        const active = await instance.maintenanceMode.promise(null, null)
+        rxIsInMaintenanceMode.next(active)
+        rxIsConnected.next(true)
+        if (!rxIsRegistered.value) return
+
+        // auto login on connect to messaging service
+        const { id, secret } = getUser() || {}
+        instance
+            .login(id, secret)
+            .then(() => console.log(new Date().toISOString(), 'Logged into messaging service'))
+            .catch(console.error)
+    })
+    instance.onConnectError(error => {
+        log('connectError', error)
+        rxIsConnected.next(false)
+        rxIsLoggedIn.next(false)
+    })
+    instance.socket.on('disconnect', () => {
+        log('disconnected')
+        rxIsConnected.next(false)
+        rxIsLoggedIn.next(false)
+    })
+    instance.onMaintenanceMode(active => {
+        console.log('Maintenance mode', active ? 'active' : 'inactive')
+        rxIsInMaintenanceMode.next(active)
+    })
+
+    instance.connect()
+    return instance
+}
 
 /**
  * @name    translateInterceptor
@@ -145,13 +156,37 @@ export const translateError = err => {
         return keys.forEach(key => err[key] = translateError(err[key]))
     }
 
-    // translate if there is any labeled error message
-    const separator = ' => '
-    if (!err.includes(separator)) return translated({ err })[0].err
+    // translate if there is any error message
+    const inputNameSeperator = ' => '
+    const infoSeperator = ': '
+    let inputName = ''
+    let message = err
+    let suffix = ''
+    let arr = err.split(inputNameSeperator)
+    if (arr.length > 1) {
+        inputName = arr[0]
+        message = arr[1]
+    }
+    arr = message.split(infoSeperator)
+    if (arr.length > 1) {
+        message = arr[0]
+        suffix = arr[1]
+    }
+    const texts = translated({
+        inputName,
+        message,
+        suffix,
+    }, true)[1]
 
-    const [prefix, msg] = err.split(separator)
-    const [texts] = translated({ prefix, msg })
-    return `${texts.prefix}${separator}${texts.msg}`
+    return [
+        texts.inputName,
+        texts.inputName && inputNameSeperator,
+        texts.message,
+        texts.suffix && infoSeperator,
+        texts.suffix
+    ]
+        .filter(Boolean)
+        .join('')
 }
 
 // Make sure to always keep the callback as the last argument
@@ -164,131 +199,70 @@ export class ChatClient {
             // rejectUnauthorized: false,
         })
         this.socket = socket
-
-        this.connect = () => socket.connect()
-        this.disconnect = () => socket.disconnect()
-        this.disconnectDeferred = deferred(() => {
-            log('Disconnecting due to inactivity')
-            this.disconnect()
-            rxIsLoggedIn.next(false)
-        }, DISCONNECT_DELAY_MS)
-        this.isConnected = () => socket.connected
-        this.onConnect = cb => socket.on('connect', cb)
-        // this.onConnectTimeout = cb => socket.on('connect_timeout', cb);
-        this.onConnectError = cb => socket.on('connect_error', cb);
-        this.onError = cb => socket.on('error', cb)
-        this.onReconnect = cb => socket.on('reconnect', cb)
-
-        // Request funds : deprecated
-        // this.faucetRequest = (address, cb) => isFn(cb) && socket.emit('faucet-request', address, cb)
-
-        // /**
-        //  * @name    crowdsaleCheckDeposits
-        //  * @summary check and retrieve user's crowdsale deposits
-        //  *
-        //  * @param {Function}    cb  callback function arguments:
-        //  *                          @err        string: if request failed
-        //  *                          @result     object:
-        //  *                              @result.deposits    object: deposit amounts for each allocated addresses
-        //  *                              @result.lastChecked string: timestamp of last checked
-        //  *
-        //  */
-        // this.crowdsaleCheckDeposits = (cached = true, cb) => isFn(cb) && socket.emit(
-        //     'crowdsale-check-deposits',
-        //     cached,
-        //     cb,
-        // )
-
-        // /**
-        //  * @name    crowdsaleConstants
-        //  * @summary retrieve crowdsale related constants for use with calcuation of allocation and multiplier levels
-        //  *
-        //  * @param {Function}    cb  callback function arguments:
-        //  *                          @err        string: if request failed
-        //  *                          @result     object:
-        //  *                              @result.Level_NEGOTIATE_Entry_USD   Number: amount in USD for negotiation
-        //  *                              @result.LEVEL_MULTIPLIERS   Array: multipliers for each level
-        //  *                              @result.LEVEL_ENTRY_USD     Array: minimum deposit amount in USD for each level
-        //  */
-        // this.crowdsaleConstants = cb => isFn(cb) && socket.emit(
-        //     'crowdsale-constants',
-        //     cb,
-        // )
-        // /**
-        //  * @name    crowdsaleDAA
-        //  * @summary request new or retrieve exisitng deposit address
-        //  *
-        //  * @param   {String}    blockchain  ticker of the Blockchain to request/retrieve address of
-        //  * @param   {String}    ethAddress  use `0x0` to retrieve existing address.
-        //  *                                  If the @blockchain is `ETH`, user's Ethereum address for whitelisting.
-        //  *                                  Otherwise, leave an empty string.
-        //  * @param   {Function}  cb          callback function arguments:
-        //  *                                  @err     string: if request failed
-        //  *                                  @address string: deposit address
-        //  */
-        // this.crowdsaleDAA = (blockchain, ethAddress, cb) => isFn(cb) && socket.emit(
-        //     'crowdsale-daa',
-        //     blockchain,
-        //     ethAddress,
-        //     cb,
-        // )
-
-        // /**
-        //  * @name    crowdsaleKYC
-        //  * @summary register for crowdsale or check if already registered
-        //  *
-        //  * @param   {Object|Boolean}    kycData use `true` to check if user already registered.
-        //  *                                      Required object properties:
-        //  *                                      @email      string
-        //  *                                      @familyName string
-        //  *                                      @givenName  string
-        //  *                                      @identity   string
-        //  *                                      @location   object
-        //  * @param   {Function}          cb      arguments:
-        //  *                                      @err        string
-        //  *                                      @publicKey  string
-        //  */
-        // this.crowdsaleKYC = (kycData, cb) => isFn(cb) && socket.emit(
-        //     'crowdsale-kyc',
-        //     kycData,
-        //     cb,
-        // )
-
-        // /**
-        //  * @name    crowdsaleKYCPublicKey
-        //  * @summary get Totem Live Association's encryption public key
-        //  *
-        //  * @param   {Function}          cb      arguments:
-        //  *                                      @err        string
-        //  *                                      @publicKey  string
-        //  */
-        // this.crowdsaleKYCPublicKey = cb => isFn(cb) && socket.emit(
-        //     'crowdsale-kyc-publicKey',
-        //     cb,
-        // )
-
         // add support for legacy `.promise`
         Object
             .keys(this)
             .forEach(key => {
                 const func = this[key]
+                if (key.startsWith('on') || !isFn(func)) return
 
-                if (!isAsyncFn(func)) return
+                func.promise = async (...args) => await func(...args)
             })
 
-        // converts callback based emits to promise. With 30 seconds timeout
-        const _emit = PromisE.getSocketEmitter(socket, 30000, 0, null)
-        // add an interceptor to translate all error messages from the server to the selected language (if any)
+        this.connect = () => this.socket.connect()
+        this.disconnect = () => this.socket.disconnect()
+        this.disconnectDeferred = deferred(() => {
+            log('Disconnecting due to inactivity')
+            this.disconnect()
+            rxIsLoggedIn.next(false)
+        }, DISCONNECT_DELAY_MS)
+        this.isConnected = () => this.socket.connected
+        this.onConnect = cb => this.socket.on('connect', cb)
+        // this.onConnectTimeout = cb => this.socket.on('connect_timeout', cb);
+        this.onConnectError = cb => this.socket.on('connect_error', cb);
+        this.onError = cb => this.socket.on('error', cb)
+        this.onReconnect = cb => this.socket.on('reconnect', cb)
+        this.rxIsConnected = rxIsConnected
+        this.rxIsInMaintenanceMode = rxIsInMaintenanceMode
+        this.rxIsLoggedIn = rxIsLoggedIn
+        this.rxIsRegistered = rxIsRegistered
+
+
+        // converts callback based emission to promise. With 30 seconds timeout.
+        const _emitter = PromisE.getSocketEmitter(socket, 30000, 0, null)
+        /**
+         * @name    emit
+         * 
+         * @param   {String}    event           name of the Websocket message event
+         * @param   {Array}     args            (optional) arguments/data to supplied during event emission
+         * @param   {Function}  resultModifier  (optional) modify result before being resolved
+         * @param   {Function}  onError         (optional)
+         * @param   {Number}    timeoutLocal    (optional) timeout in milliseconds
+         * 
+         * @returns {Promise}
+         */
         this.emit = (event, args = [], resultModifier, onError, timeoutLocal) => {
-            let loginPromise
+            let delayPromise
+            // functions allowed during maintenace mode
+            const maintenanceModeKeys = [
+                eventMaintenanceMode,
+                'login',
+                'rewards-get-kapex-payouts',
+            ]
             if (!this.isConnected()) {
                 this.connect()
                 // if user is registered, on reconnect wait until login before making a new request
-                loginPromise = rxIsRegistered.value
-                    && event !== eventMaintenanceMode
+                delayPromise = rxIsRegistered.value
+                    && maintenanceModeKeys.includes(event)
                     && subjectAsPromise(rxIsLoggedIn, true, timeoutLocal)[0]
             }
-            const promise = _emit(
+            const doWait = rxIsInMaintenanceMode.value && !maintenanceModeKeys.includes(event)
+            if (doWait) {
+                console.info('Waiting for maintenance mode to be deactivated...')
+                const maintenanceModePromise = subjectAsPromise(rxIsInMaintenanceMode, false)[0]
+                delayPromise = maintenanceModePromise.then(() => maintenanceModePromise)
+            }
+            const promise = _emitter(
                 event,
                 args,
                 resultModifier,
@@ -298,7 +272,7 @@ export class ChatClient {
                     return translatedErr
                 },
                 timeoutLocal,
-                loginPromise,
+                delayPromise, // makes sure user is logged in
             )
             // auto disconnect after pre-configured period of inactivity
             promise.promise.finally(() => this.disconnectDeferred())
@@ -330,7 +304,7 @@ export class ChatClient {
      *  
      * @returns {Map}
      */
-    companySearch = (query, searchParentIdentity) => this.emit(
+    companySearch = async (query, searchParentIdentity) => await this.emit(
         'company-search',
         [query, searchParentIdentity],
         // convert 2D array back to Map
@@ -346,7 +320,7 @@ export class ChatClient {
      * 
      * @returns {Map}
      */
-    countries = hash => this.emit(
+    countries = async (hash) => await this.emit(
         'countries',
         [hash],
         countries => new Map(countries),
@@ -375,18 +349,7 @@ export class ChatClient {
      * 
      * @param   {Function} cb   Args: plegedTotal (number)
      */
-    // crowdloanPledgeTotal = async () => await this.emit(
-    //     'crowdloan-pledged-total',
-    //     [],
-    // )
-
-    /**
-     * @name    onCrowdloanPledgeTotal
-     * @summary listen for changes on total pledged amount
-     * 
-     * @param   {Function} cb   Args: plegedTotal (number)
-     */
-    onCrowdloanPledgeTotal = cb => isFn(cb) && socket.on('crowdloan-pledged-total', cb)
+    onCrowdloanPledgeTotal = cb => isFn(cb) && this.socket.on('crowdloan-pledged-total', cb)
 
     /**
      * @name    currencyConvert
@@ -457,8 +420,10 @@ export class ChatClient {
 
     /**
      * @name    languageErrorMessages
-     * @summary Retrieve a list of error messages used in the messaging service. FOR BUILD MODE ONLY.
-     * @returns 
+     * @summary Retrieve a list of error messages used in the messaging service. 
+     * FOR BUILD MODE ONLY.
+     * 
+     * @returns {Array}
      */
     languageErrorMessages = async () => await this.emit('language-error-messages', [])
 
@@ -486,17 +451,21 @@ export class ChatClient {
      *  
      * @returns {Object} data. Eg: roles etc.
      */
-    login = (id, secret) => this.emit(
+    login = async (id, secret) => await this.emit(
         'login',
         [id, secret],
         async (data) => {
+            const { address } = data || {}
+            rxUserIdentity.next(address)
             // store user roles etc data sent from server
             setUser({ ...getUser(), ...data })
-            // wait until maintenance mode is turned off
-            rxIsInMaintenanceMode.value && await subjectAsPromise(rxIsInMaintenanceMode, false)
             rxIsLoggedIn.next(true)
+            return data
         },
-        err => console.log('Login failed', err)
+        err => {
+            rxIsLoggedIn.next(false)
+            console.log('Login failed', err)
+        }
     )
 
     /**
@@ -514,22 +483,22 @@ export class ChatClient {
      * 
      * @param   {Function} cb args: @active Boolean
      */
-    onMaintenanceMode = cb => isFn(cb) && socket.on(eventMaintenanceMode, cb)
+    onMaintenanceMode = cb => isFn(cb) && this.socket.on(eventMaintenanceMode, cb)
 
     /**
      * @name   message
-     * @summary Send chat messages
+     * @summary send a chat message to one or more users.
      *
-     * @param  {Array}     userIds    User IDs without '@' sign
-     * @param  {String}    message    encrypted or plain text message
-     * @param  {Bool}      encrypted  determines whether `message` requires decryption. 
-     *                                (Encryption to be implemented)
+     * @param  {Array}     toUserIds    Recipient user IDs (without '@' sign)
+     * @param  {String}    message      encrypted or plain text message
+     * @param  {Bool}      encrypted    determines whether `message` requires decryption. 
+     *                                  (Encryption to be implemented)
      * 
      * @returns {*}
      */
-    message = async (receiverIds, msg, encrypted) => await this.emit(
+    message = async (toUserIds, msg, encrypted) => await this.emit(
         'message',
-        [receiverIds, msg, encrypted],
+        [toUserIds, msg, encrypted],
     )
 
     /**
@@ -542,7 +511,7 @@ export class ChatClient {
      *                          message     {String}  : encrypted or plain text message
      *                          encrypted   {Bool}    : determines whether @message requires decryption
      */
-    onMessage = cb => isFn(cb) && socket.on('message', cb)
+    onMessage = cb => isFn(cb) && this.socket.on('message', cb)
 
     /**
      * @name    messageGetRecent
@@ -561,22 +530,25 @@ export class ChatClient {
      * @name    messageGroupName
      * @summary set name of a group chat
      * 
-     * @param   {Array}     receiverIds list of all user IDs belonging to the group
-     * @param   {String}    name        new group name
+     * @param   {Array}     userIds list of all user IDs belonging to the group
+     * @param   {String}    name    new group name
      * 
      * @returns {*}
      */
-    messageGroupName = async (receiverIds, name) => await this.emit(
+    messageGroupName = async (userIds, name) => await this.emit(
         'message-group-name',
-        [receiverIds, name],
+        [userIds, name],
     )
 
     /**
      * @name    newsletterSignup
      * @summary sign up to newsletter and updates
      * 
-     * @param   {Object}    values required fields: name and email
-     * @param   {Function}  cb
+     * @param   {Object}    values
+     * @param   {String}    values.email
+     * @param   {String}    values.name     subscriber's full name
+     * 
+     * @returns {*}
      */
     newsletterSignup = async (values) => await this.emit('newsletter-signup', [values])
 
@@ -584,7 +556,7 @@ export class ChatClient {
      * @name    notify
      * @summary Send notification
      * 
-     * @param   {Array}   toUserIds   receiver User ID(s)
+     * @param   {Array}   toUserIds   recipient user ID(s)
      * @param   {String}  type        parent notification type. Eg: timeKeeping
      * @param   {String}  childType   child notification type. Eg: invitation
      * @param   {String}  message     message to be displayed
@@ -616,7 +588,7 @@ export class ChatClient {
      *                          - tsCreated  date       : notification creation timestamp
      *                          - cbConfirm  function   : a function to confirm receipt
      */
-    onNotify = cb => isFn(cb) && socket.on('notification', cb)
+    onNotify = cb => isFn(cb) && this.socket.on('notification', cb)
 
     /**
      * @name    notificationGetRecent
@@ -626,9 +598,9 @@ export class ChatClient {
      * 
      * @returns {Map}
      */
-    notificationGetRecent = async (ts) => await this.emit(
+    notificationGetRecent = async (tsLast) => await this.emit(
         'notification-get-recent',
-        [ts],
+        [tsLast],
         result => new Map(result),
     )
 
@@ -647,13 +619,11 @@ export class ChatClient {
 
     /**
      * @name    project
-     * @summary add/get/update project
-     *
+     * @summary add/get/update project (Activity)
      * 
      * @param {String}   projectId   Project ID
      * @param {Object}   project
      * @param {Boolean}  create      whether to create or update project
-     * @param {Function} cb          
      */
     project = async (projectId, project, create) => await this.emit(
         'project',
@@ -671,7 +641,7 @@ export class ChatClient {
     projectsByHashes = async (projectIds) => await this.emit(
         'projects-by-hashes',
         [projectIds],
-        ([projects, notFoundIds]) => [new Map(projects), notFoundIds],
+        ([projects, notFoundIds = []]) => [new Map(projects), notFoundIds],
     )
 
     /**
@@ -682,9 +652,8 @@ export class ChatClient {
      * @param   {String}    secret
      * @param   {String}    address     Blockchain identity
      * @param   {String}    referredBy  (optional) referrer user ID
-     * @param   {Function}  cb 
      */
-    register = (id, secret, address, referredBy) => this.emit(
+    register = async (id, secret, address, referredBy) => await this.emit(
         'register',
         [
             id,
@@ -696,6 +665,7 @@ export class ChatClient {
             setUser({ id, secret })
             rxIsLoggedIn.next(true)
             rxIsRegistered.next(true)
+            rxUserIdentity.next(address)
         },
     )
 
@@ -706,14 +676,27 @@ export class ChatClient {
      * @param   {String}    platform    social media platform name. Eg: twitter
      * @param   {String}    handle      user's social media handle/username
      * @param   {String}    postId      social media post ID
-     * @param   {Function}  cb          Callback function expected arguments:
-     *                                  @err    String: error message if query failed
-     *                                  @code   String: hex string
+     * 
+     * @returns {String}
      */
     rewardsClaim = async (platform, handle, postId) => await this.emit(
         'rewards-claim',
         [platform, handle, postId],
     )
+
+    /**
+     * @name    handleClaimKapex
+     * @summary Handle claim requests to migrate Meccano testnet reward tokens to Kapex chain.
+     * This is to simply mark that the user has completed the required tasks.
+     * At the end of the claim period, all requests will be validated and checked for fradulent claims.
+     * 
+     * @param   {Boolea|Object} data.checkEligible  To check if user is eligible to migrate rewards.
+     * @param   {Boolea|Object} data.checkSubmitted To check if user already submitted their claim.
+     * @param   {String}        data.identity       Identity that completed the tasks and to distribute $KAPEX.
+     * @param   {Function}      callback            callback function expected arguments:
+     *                                              @err    String: error message if query failed
+     */
+    rewardsClaimKAPEX = async (identity) => await this.emit('rewards-claim-kapex', [identity])
 
     /**
      * @name    rewardsGetData
@@ -724,12 +707,15 @@ export class ChatClient {
     rewardsGetData = async () => await this.emit('rewards-get-data')
 
     /**
-     * @name task
-     * @summary add/update task details to messaging service
+     * @name    task
+     * @summary saves off-chain task details to the database.
+     * Requires pre-authentication using BONSAI with the blockchain identity that owns the task.
+     * Login is required simply for the purpose of logging the User ID who saved the data.
+     * @description 'task-market-created' event will be broadcasted whenever a new marketplace task is created.
      * 
-     * @param {String}      id              ID of the task
-     * @param {Object}      task            
-     * @param {String}      ownerAddress    identity that created the task
+     * @param {String}   taskId          task ID
+     * @param {Object}   task
+     * @param {String}   ownerAddress    task owner identity
      */
     task = async (id, task, ownerAddress) => await this.emit(
         'task',
@@ -741,16 +727,68 @@ export class ChatClient {
      * @summary retrieve a list of tasks details' (off-chain data) by Task IDs
      * 
      * @param   {String|Array}  ids single or array of Task IDs
-     * @param   {Function}      cb Callback function expected arguments:
-     *                      @err    String: error message if query failed
-     *                      @result Map: list of tasks with details
      * 
-     * @returns {Map} list of task details'
+     * @returns {Map} list of objects with task details
      */
     taskGetById = async (ids) => await this.emit(
         'task-get-by-id',
         [ids],
         result => new Map(result),
+    )
+
+    /**
+     * @name    taskGetByParentId
+     * @summary search for tasks by parent ID
+     *
+     * @param   {String}    parentId
+     * 
+     * @returns {Map}   list of tasks with details
+     */
+    taskGetByParentId = async (parentId) => await this.emit(
+        'task-get-by-parent-id',
+        [parentId],
+        result => new Map(result)
+    )
+
+    /**
+     * @name    taskMarketApply
+     * @summary apply for an open marketplace task
+     *
+     * @param   {Object}    application
+     * @param   {Array}     application.links    (optional) only used if published task requires proposal
+     * @param   {String}    application.proposal (optional) required only if published task requires proposal
+     * @param   {String}    application.taskId
+     * @param   {String}    application.workerAddress
+     */
+    taskMarketApply = async (application) => await this.emit(
+        'task-market-apply',
+        [application],
+        result => new Map(result),
+    )
+
+    /**
+     * @name    onTaskMarketCreated
+     * @summary subscribe to new marketplace task creation event
+     *
+     * @param   {Function} cb   args: @taskId string
+     */
+    onTaskMarketCreated = cb => isFn(cb) && this.socket.on('task-market-created', cb)
+
+    /**
+     * @name    taskMarketApplyResponse
+     * @summary task owner/publisher accept/rejects application(s)
+     *
+     * @param   {Object}    data
+     * @param   {Boolean}   data.rejectOthers   (optional) if true applications other than accepted will be rejected
+     * @param   {Boolean}   data.silent         (optional) whether to skip notification for rejected applications
+     * @param   {Boolean}   data.status         set accepted/rejected status for a specific applicant
+     * @param   {String}    data.taskId
+     * @param   {String}    data.workerAddress
+     * @param   {Function}  callback            Args: [error String, updateCount Number]
+     */
+    taskMarketApplyResponse = async (data) => await this.emit(
+        'task-market-apply-response',
+        [data],
     )
 }
 // export default {} //getClient()

@@ -1,10 +1,14 @@
+import nano from 'nano'
 import uuid from 'uuid'
 import PromisE from './PromisE'
-import nano from 'nano'
-import { isObj, isStr, isArr, arrUnique, isMap, isValidNumber } from './utils'
+import { isObj, isStr, isArr, arrUnique, isMap, isValidNumber, mapJoin } from './utils'
 
 // globab connection for use with multiple databases
 let connection
+// all individual connections
+const connections = {}
+const debugTag = '[CouchDBStorage]'
+
 /**
  * @name    getConnection
  * @summary getConnection returns existing connection, if available.
@@ -18,8 +22,10 @@ let connection
 export const getConnection = async (url, global = true) => {
     if (global && connection) return connection
 
-    const con = await nano(url)
+    const con = connections[url] || await nano(url)
+    // set as global connection
     if (global) connection = con
+    connections[url] = con
     return con
 }
 
@@ -31,7 +37,9 @@ export const getConnection = async (url, global = true) => {
  * 
  * @returns {Boolean} 
  */
-export const isCouchDBStorage = (...args) => args.flat()
+export const isCouchDBStorage = (...args) => args
+    .flat()
+    .flat()
     .every(instance => instance instanceof CouchDBStorage)
 
 /**
@@ -44,9 +52,6 @@ export const isCouchDBStorage = (...args) => args.flat()
  * @returns {Object}    doc
  */
 const setTs = (doc, existingDoc) => {
-    if (!doc) {
-        console.log({ doc, existingDoc })
-    }
     // add/update creation and update time
     doc.tsCreated = (existingDoc || doc).tsCreated || new Date()
     if (!!existingDoc || doc.tsUpdated) {
@@ -77,8 +82,27 @@ export default class CouchDBStorage {
      * @returns {CouchDBStorage}
      */
     constructor(connectionOrUrl, dbName, fields = []) {
-        this.connectionOrUrl = connectionOrUrl || process.env[`CouchDB_URL_${dbName}`]
-        // whethe to use the global connection or database specific
+        // Global DB name prefix and suffix applied to all databases excluding 
+        const prefix = process.env.CouchDB_DBName_Prefix || ''
+        const suffix = process.env.CouchDB_DBName_Suffix || ''
+        dbName = process.env[`CouchDB_DBName_Override_${dbName}`]
+            || `${prefix}${dbName}${suffix}`
+
+        // Connection/URL/DBName override for individual databases
+        let url = (process.env[`CouchDB_URL_${dbName}`] || '').trim()
+        if (!!url && isStr(url)) {
+            url = new URL(url)
+            if (url.pathname !== '/') {
+                // URL includes a DBName override 
+                dbName = url.pathname.replace('/', '')
+            }
+            const { host, password, protocol, username } = url
+            url = `${protocol}//${username}:${password}@${host}`
+            // re-use existing connection to the same URL if available
+            url = connections[url] || url
+        }
+        this.connectionOrUrl = url || connectionOrUrl
+        // whether to use the global connection or database specific
         this.useGlobalCon = !this.connectionOrUrl
         this.db = null
         this.dbName = dbName
@@ -239,21 +263,25 @@ export default class CouchDBStorage {
         // database already initialized
         if (!isObj(con)) throw new Error('CouchDB: invalid connection')
 
-        this.dbPromise = new PromisE((resolve, reject) => (async () => {
-
+        this.dbPromise = this.dbPromise || new PromisE((resolve, reject) => (async () => {
             try {
                 // retrieve a list of all database names
                 const dbNames = await con.db.list()
                 // database already exists, use it
                 if (!dbNames.includes(dbName)) {
                     // database doesn't exist, create it
-                    console.log('CouchDB: new database created. Name:', dbName)
-                    await con.db.create(dbName)
+                    console.log(`${debugTag} new database created: ${dbName}`)
+                    await con.db
+                        .create(dbName)
+                        .catch(err =>
+                            `${err}`.includes('already exists')
+                                ? null
+                                : Promise.reject(err)
+                        )
                 }
-                this.dbPromise = null
-
-                this.db = con.use(dbName)
+                this.db = await con.use(dbName)
                 resolve(this.db)
+                this.dbPromise = null
             } catch (err) {
                 reject(err)
             }
@@ -276,7 +304,7 @@ export default class CouchDBStorage {
      *                               Default: true
      * @param   {Object}  extraProps (optional) extra properties to be supplied to to the mango query
      * @param   {Number}    timeout     query timeout duration in milliseconds.
-     *                                  Default: `15000`
+     *                                  Default: `30000`
      * 
      * @returns {Map|Array}
      */
@@ -297,11 +325,11 @@ export default class CouchDBStorage {
      * @param   {Number}    skip 
      * @param   {Object}    extraProps
      * @param   {Number}    timeout     query timeout duration in milliseconds.
-     *                                  Default: `15000`
+     *                                  Default: `30000`
      * 
      * @returns {Array}
      */
-    async searchRaw(selector = {}, limit = 0, skip = 0, extraProps = {}, timeout = 15000) {
+    async searchRaw(selector = {}, limit = 0, skip = 0, extraProps = {}, timeout = 30000) {
         const db = await this.getDB()
         const query = {
             fields: this.fields,
@@ -314,6 +342,23 @@ export default class CouchDBStorage {
             db.find(query),
             timeout,
         )
+    }
+
+    /**
+     * @name    searchMulti
+     * @param   {Object}    selectors 
+     * @param   {Boolean}   all         if falsy, will return as soon as any of the selectors retuns one or more results
+     * 
+     * @returns {Map}
+     */
+    async searchMulti(selectors = [], limit, all = true) {
+        let result = new Map()
+        for (let i = 0; i < selectors.length; i++) {
+            if (result.size > 0 && !all) return result
+            const selector = selectors[i]
+            result = mapJoin(result, await this.search(selector, limit))
+        }
+        return result
     }
 
     /**
@@ -336,7 +381,7 @@ export default class CouchDBStorage {
      *
      * @returns {Object}
      */
-    async set(id, value, update = true, merge = true, timeout = 3000, updateTS = true) {
+    async set(id, value, update = true, merge = true, timeout = 10000, updateTS = true) {
         id = isStr(id)
             ? id
             : uuid.v1()
@@ -408,22 +453,62 @@ export default class CouchDBStorage {
      * 
      * @param   {String} designName 
      * @param   {String} viewName 
-     * @param   {Object} params     (optional)
+     * @param   {Object} params         (optional)
+     * @param   {Object} includeDocs    (optional) use `false` for map-reduce functions.
+     *                                  Default: `true`
      * 
      * @returns {Array}
      */
-    async view(designName, viewName, params) {
+    async view(designName, viewName, params, includeDocs = true) {
         const db = await this.getDB()
         const { rows = [] } = await db.view(
             designName,
             viewName,
             {
-                include_docs: true,
+                include_docs: includeDocs,
                 ...params,
-
             },
         )
 
-        return rows.map(x => x.doc)
+        return includeDocs
+            ? rows.map(x => x.doc)
+            : rows
+    }
+
+    /**
+     * @name    viewCreateMap
+     * @summary create/update a design document with a map function. Ignores if exact same function already exists.
+     * 
+     * @param   {String} designName 
+     * @param   {String} viewName 
+     * @param   {String} mapFunc    The map function as a string
+     * @param   {String} reduceFunc (optional) redunce function as string. 
+     *                              Built-in reduce functions: '_approx_count_distinct', '_count', '_stats' and '_sum'
+     * 
+     * @returns {Object}
+     */
+    async viewCreateMap(designName, viewName, mapFunc, reduceFunc) {
+        // create design document to enable case-insensitive search of twitter handles
+        if (!designName.startsWith('_design/')) designName = `_design/${designName}`
+        const designDoc = await this.getDoc(designName) || {
+            _id: designName,
+            language: 'javascript',
+            views: {},
+        }
+        const view = designDoc.views[viewName]
+        // map function already exists
+        if (!!view && view.map === mapFunc && view.reduce === reduceFunc) return
+
+        designDoc.views[viewName] = {
+            map: mapFunc
+        }
+        if (reduceFunc) {
+            designDoc.views[viewName].reduce = reduceFunc
+        }
+        const action = designDoc._rev
+            ? 'Updating'
+            : 'Creating'
+        console.log(`${debugTag} ${action} design document: ${this.dbName}/${designName}`)
+        return await this.set(designName, designDoc)
     }
 }

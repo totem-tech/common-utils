@@ -1,10 +1,21 @@
-import { BehaviorSubject, Subject } from 'rxjs'
-import { isDefined, isStr, mapSearch, isMap, isValidNumber, mapSort, isArr, isFn, isNodeJS } from './utils'
+import { BehaviorSubject, map, Subject } from 'rxjs'
+import {
+    isArr,
+    isArr2D,
+    isArrLike,
+    isDefined,
+    isFn,
+    isMap,
+    isNodeJS,
+    isStr,
+    isValidNumber,
+    mapSearch,
+    mapSort,
+} from './utils'
 /* For NodeJS (non-browser applications) the following node module is required: node-localstorage */
 
-let storage
 /**
- * @name    rxForeUpdateCache
+ * @name    rxForceUpdateCache
  * @summary force all or certain instances of DataStorage to reload data from storage
  * 
  * @param   {Boolean|Array}
@@ -13,32 +24,52 @@ let storage
  * ```javascript
  * // Update only certain modules
  * const moduleKey = 'totem_identities'
- * rxForeUpdateCache.next([moduleKey])
+ * rxForceUpdateCache.next([moduleKey])
  * 
  * // Update every single instance of DataStorage that uses storage (has a "name")
- * rxForeUpdateCache.next(true)
+ * rxForceUpdateCache.next(true)
  * ```
  */
-export const rxForeUpdateCache = new Subject()
+export const rxForceUpdateCache = new Subject()
 
-try {
-    if (isNodeJS()) {
-        // for NodeJS server
-        const STORAGE_PATH = process.env.STORAGE_PATH || './server/data'
-        storage = new require('node-localstorage')
-            .LocalStorage(STORAGE_PATH, 500 * 1024 * 1024)
-        const absolutePath = require('path')
-            .resolve(STORAGE_PATH)
-        console.log({ STORAGE_PATH, absolutePath })
-    } else {
-        // for web browser
-        storage = localStorage || {
-            // hack for iframe
-            getItem: () => '',
-            setItem: () => { },
+let _storage = getStorage()
+
+/**
+ * 
+ * @param location The location in which the local storage resides
+ * @param quota The partitioned size of the local storage
+ * 
+ * @returns { LocalStorage }
+ */
+export function getStorage(storagePath, quota = 500 * 1024 * 1024) {
+    try {
+        if (isNodeJS()) {
+            const { LocalStorage } = require('node-localstorage')
+            // for NodeJS server
+            storagePath = storagePath
+                || process.env.STORAGE_PATH
+                || './data'
+            const absolutePath = require('path').resolve(storagePath)
+            console.log('DataStorage', { STORAGE_PATH: storagePath, absolutePath })
+
+            return new LocalStorage(absolutePath, quota)
+        } else if (localStorage) {
+            // for web browser
+            return localStorage
         }
+    } catch (err) {
+        /* ignore error if not nodejs */
+        if (isNodeJS() && err.message.toLowerCase().includes('no such file or directory')) throw err
     }
-} catch (_) { /* ignore error */ }
+
+    console.warn('DataStorage: storage not supported. Writing data will not work. Using workaround to avoid error.')
+    // Hack for IFrame or if "node-localstorage" module is not available.
+    // Caution: All data will be lost as soon as application is closed.
+    const storage = new DataStorage()
+    storage.getItem = (...args) => storage.get(...args)
+    storage.setItem = (...args) => storage.set(...args)
+    return storage
+}
 
 /**
  * @name    read
@@ -48,27 +79,39 @@ try {
  * 
  * @returns {Map}        retieved data
  */
-const read = key => {
+export const read = (key, asMap = true, storage = _storage) => {
+    let data = undefined
     try {
-        const data = JSON.parse(storage.getItem(key) || '[]')
-        return new Map(data)
-    } catch (e) {
-        return new Map()
-    }
+        data = JSON.parse(storage.getItem(key))
+    } catch (_) { }
+
+    return !asMap
+        ? data
+        : new Map(data || [])
 }
+
 /**
  * @name    write
  * @summary write to storage (JSON file if NodeJS, otherwise, browser LocalStorage)
  * 
- * @param   {String}  key file name (NodeJS) or property key (LocalStorage)
- * @param   {*}       value will be converted to JSON string
+ * @param   {String}    key     file name (NodeJS) or property key (LocalStorage)
+ * @param   {String|*}  value   will be converted to JSON string
  */
-const write = (key, value) => {
+export const write = (key, value, asMap = true, storage = _storage) => {
     // invalid key: ignore request
     if (!isStr(key)) return
     try {
-        value = Array.from(value.entries())
-        storage.setItem(key, JSON.stringify(value))
+        if (!isStr(value)) {
+            value = JSON.stringify(
+                asMap
+                    ? Array.from(value)
+                    : isArrLike(value)
+                        ? [...value.values()]
+                        : value
+            )
+        }
+        storage.setItem(key, value)
+        return true
     } catch (e) { }
 }
 
@@ -89,41 +132,63 @@ export default class DataStorage {
      *                      See Subject/BehaviorSubject.subscribe for more details.
      * @param {Map}       initialValue (optional) Default: new Map()
      */
-    constructor(name, disableCache = false, initialValue, onChange) {
-        name = isStr(name) && name
-        this.disableCache = name && disableCache
-        // pre-load data from storage
-        let data = !this.disableCache
-            && (name && read(name))
-            || initialValue
+    constructor(name, disableCache = false, initialValue, onChange, storage = _storage) {
+        let data = (name && read(name, true, storage)) || initialValue
         data = !isMap(data)
-            ? new Map()
+            ? new Map(
+                isArr2D(data)
+                    ? data
+                    : undefined
+            )
             : data
         this.name = name
+        this.disableCache = name && disableCache
         this.rxData = this.disableCache
             ? new Subject()
             : new BehaviorSubject(data)
-        this.size = data.size
-        // automatically write to storage
-        name && this.rxData.subscribe(data => {
-            this.name && write(this.name, data)
-            this.size = data.size
+        // `this.save` can be used to skip write operations temporarily by setting it to false
+        this.save = true
+        this.storage = storage
+        let ignoredFirst = this.disableCache
+        this.rxData.subscribe(data => {
+            if (!ignoredFirst) {
+                // prevent save operation on startup when BehaviorSubject is used
+                ignoredFirst = true
+                return
+            }
+            this.name && this.save && write(
+                this.name,
+                data,
+                true,
+                this.storage,
+            )
+            this.save = true
             isFn(onChange) && onChange(data)
         })
         if (this.disableCache) return
 
         // update cached data from localStorage throughout the application only when triggered
-        name && rxForeUpdateCache.subscribe(refresh => {
-            const doRefresh = isArr(refresh)
-                ? refresh.includes(this.name)
-                : refresh === true
+        rxForceUpdateCache.subscribe(refresh => {
+            const doRefresh = !this.name
+                ? false
+                : isArr(refresh) || isStr(refresh)
+                    ? refresh.includes(this.name)
+                    : refresh === true
             if (!doRefresh) return
-
-            const data = read(this.name)
-            this.size = data.size
+            const data = read(this.name, true, storage)
+            // prevent (unnecessary) writing to storage
+            this.save = false
             this.rxData.next(data)
         })
     }
+
+    /**
+     * @name    clear
+     * @summary clear stoarge data
+     * 
+     * @returns {DataStorage} this
+     */
+    clear() { return this.setAll(new Map(), true) }
 
     /**
      * @name    delete
@@ -174,9 +239,7 @@ export default class DataStorage {
      * 
      * @returns {*} value stored for the supplied @key
      */
-    get(key) {
-        return this.getAll().get(key)
-    }
+    get(key) { return this.getAll().get(key) }
 
     /**
      * @name    forceRead
@@ -188,10 +251,26 @@ export default class DataStorage {
      */
     getAll(forceRead = false) {
         if (!forceRead && !this.disableCache) return this.rxData.value
-        const data = read(this.name)
-        this.size = data.size
+        const data = read(this.name, true, this.storage)
         return data
     }
+
+    /**
+     * @name    has
+     * @summary check if key exists
+     * 
+     * @param   {String}    key 
+     * 
+     * @returns {Boolean}
+     */
+    has(key) { return this.getAll().has(key) }
+
+    /**
+     * @name    keys
+     * 
+     * @returns {Array}
+     */
+    keys() { return [...this.getAll().keys()] }
 
     /**
      * @name map
@@ -203,9 +282,7 @@ export default class DataStorage {
      * 
      * @returns {Array} array of items returned by callback
      */
-    map(callback) {
-        return this.toArray().map(callback)
-    }
+    map(callback) { return this.toArray().map(callback) }
 
     /**
      * @name    search
@@ -279,6 +356,14 @@ export default class DataStorage {
     }
 
     /**
+     * @name    size
+     * @summary size of the data Map
+     * 
+     * @returns {Number}
+     */
+    get size() { return this.getAll().size }
+
+    /**
      * @name    sort
      * @summary sort data by key or simply reverse the entire list. Optionally, save sorted data to storage.
      * 
@@ -306,8 +391,23 @@ export default class DataStorage {
      * 
      * @returns {Array}
      */
-    toArray() {
-        return Array.from(this.getAll())
+    toArray() { return Array.from(this.getAll()) }
+
+    /**
+     * @name    toJSON
+     * @summary converts list of items (Map) to JSON string of 2D Array 
+     * 
+     * @param   {Function}  replacer (optional) for use with `JSON.stringify`. Default: null
+     * @param   {Number}    spacing  (optional) for use with `JSON.stringify`. Default: 0
+     * 
+     * @returns {String}    JSON string
+     */
+    toJSON(replacer, spacing) {
+        return JSON.stringify(
+            this.toArray(),
+            replacer,
+            spacing,
+        )
     }
 
     /**
@@ -319,11 +419,12 @@ export default class DataStorage {
      * 
      * @returns {String}    JSON string
      */
-    toString(replacer = null, spacing = 0) {
-        return JSON.stringify(
-            this.toArray(),
-            replacer,
-            spacing,
-        )
-    }
+    toString() { return this.toJSON(null, 4) }
+
+    /**
+     * @name    values
+     * 
+     * @returns {Array}
+     */
+    values() { return [...this.getAll().values()] }
 }

@@ -1,49 +1,100 @@
 import DataStorage from './DataStorage'
-import storage from './storageHelper'
-import { clearClutter, downloadFile, generateHash, getUrlParam, isNodeJS, textCapitalize } from './utils'
+import storage from '../utils/storageHelper'
+import {
+    clearClutter,
+    downloadFile,
+    generateHash,
+    getUrlParam,
+    isNodeJS,
+    isStr,
+    textCapitalize,
+} from './utils'
 
 export const translations = new DataStorage('totem_static_translations')
 export const EN = 'EN'
 const MODULE_KEY = 'language'
 const rw = value => storage.settings.module(MODULE_KEY, value) || {}
 let _selected = rw().selected || EN
-const isNode = isNodeJS()
-export const BUILD_MODE = !isNode && getUrlParam('build-mode', window.location.href).toLowerCase() == 'true'
+export const BUILD_MODE = isNodeJS()
+    ? process.env.BUILD_MODE
+    : getUrlParam('build-mode', window.location.href)
+        .toLowerCase() == 'true'
     && window.location.hostname !== 'totem.live'
 export const languages = Object.freeze({
-    BN: 'Bengali',
-    DE: 'German',
+    // AR: 'Arabic - عربي',
+    BN: 'Bengali - বাংলা',
+    DE: 'German - Deutsch',
     EN: 'English',
-    ES: 'Spanish',
-    FR: 'French',
-    HI: 'Hindi',
-    IT: 'Italian',
-    JA: 'Japanese',
-    KO: 'Korean',
-    NL: 'Dutch',
-    PL: 'Polish',
-    RU: 'Russian',
-    TR: 'Turkish',
-    UK: 'Ukrainian',
-    ZH: 'Chinese',
+    ES: 'Spanish - Español',
+    FR: 'French - Français',
+    HI: 'Hindi - हिन्दी',
+    ID: 'Indonesian - Bahasa Indonesia',
+    IT: 'Italian - Italiano',
+    JA: 'Japanese - 日本',
+    KO: 'Korean - 한국인',
+    NL: 'Dutch - Nederlandse Taal',
+    PL: 'Polish - Polski',
+    PT: 'Portuguese - Português',
+    RU: 'Russian - Русский',
+    TR: 'Turkish - Türkçe',
+    UK: 'Ukrainian - українська',
+    VI: 'Vietnamese - Tiếng Việt',
+    ZH: 'Chinese - 中国人',
 })
+
+const digits = {
+    // AR: ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'],
+    // BN: ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'],
+    // HI: ['०', '१', '२', '३', '४', '५', '६', '७', '८', '९'],
+    // ZH: ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'],
+}
+
+export const digitsTranslated = (texts = {}, langCode = getSelected()) => !digits[langCode]
+    ? texts
+    : new Proxy(texts, {
+        get: (self, key) => `${self[key]}`.replace(
+            /[0-9]/g,
+            n => digits[langCode][n],
+        ),
+    })
 
 // downloadTextListCSV generates a CSV file with all the unique application texts
 // that can be used to translate by opening the file in Google Drive
 // NB: this function should not be used when BUILD_MODE is false (URL param 'build-mode' not 'true')
-export const downloadTextListCSV = !BUILD_MODE
-    ? null
-    : () => {
-        const langCodes = [EN, ...Object.keys(languages).filter(x => x != EN)]
-        const rest = langCodes.slice(1)
-        const cols = textCapitalize('abcdefghijklmnopqrstuvwxyz').split('')
-        const str = langCodes.join(',') + '\n' + (window.enList || []).map((x, i) => {
-            const rowNo = i + 2
-            const functions = rest.map((_, c) => `"=GOOGLETRANSLATE($A${rowNo}, $A$1, ${cols[c + 1]}$1)"`).join(',')
-            return `"${clearClutter(x)}", ` + functions
-        }).join(',\n')
-        downloadFile(str, `English-texts-${new Date().toISOString()}.csv`, 'text/csv')
-    }
+export const downloadTextListCSV = !BUILD_MODE ? null : () => {
+    const seperator = ','
+    const langCodes = [
+        EN,
+        ...Object
+            .keys(languages)
+            .filter(x => x != EN),
+    ]
+    const rest = langCodes.slice(1)
+    const cols = 'abcdefghijklmnopqrstuvwxyz'
+        .repeat(5)
+        .toUpperCase()
+        .split('')
+    const maxRows = window.enList.length + 1
+    // use batch functions so that translation request is only executed once.
+    // only the first data cell in each column needs this function.
+    // To avoid being rate limited, manuall set "=" when opening in Google Sheets
+    const getRowTranslateFunction = colName =>
+        `BYROW(A2:INDEX(A:A, ${maxRows}), LAMBDA(x, GOOGLETRANSLATE(x, A1, ${colName}1)))`
+    //
+    // `=BYROW(A2:INDEX(A:A, MAX((A:A<>"")*ROW(A:A))), LAMBDA(x, GOOGLETRANSLATE(x, A1, ${colName}1)))`
+
+    const str = langCodes.join(seperator) + '\n' + (window.enList || []).map((x, i) => {
+        // const rowNo = i + 2
+        // const functions = rest.map((_, c) => `"=GOOGLETRANSLATE($A${rowNo}, $A$1, ${cols[c + 1]}$1)"`).join(',')
+        const functions = i >= 1
+            ? langCodes.map(_ => '') // empty cells
+            : rest.map((_, j) =>
+                `"${getRowTranslateFunction(cols[j + 1])}"`
+            )
+        return `"${clearClutter(x)}"${seperator}${functions.join(seperator)}`
+    }).join(',\n')
+    downloadFile(str, `English-texts-${new Date().toISOString()}.csv`, 'text/csv')
+}
 
 // retrieve latest translated texts from server and save to local storage
 /**
@@ -102,15 +153,22 @@ export const setSelected = async (selected, client) => {
 }
 
 // save translated list of texts retrieved from server
-export const setTexts = (langCode, texts, enTexts) => translations.setAll(new Map(
-    // remove all language cache if selected is English
-    langCode === EN ? [] : [
-        [EN, enTexts || translations.get(EN)],
-        [langCode, texts || translations.get(langCode)],
-    ].filter(Boolean)
-))
+export const setTexts = (langCode, texts, enTexts) => translations.setAll(
+    new Map(
+        // remove all language cache if selected is English
+        langCode === EN
+            ? []
+            : [
+                [EN, enTexts || translations.get(EN)],
+                [langCode, texts || translations.get(langCode)],
+            ].filter(Boolean)
+    ),
+    true,
+)
 
-export const translated = (texts = {}, capitalized = false) => {
+export const translated = (texts = {}, capitalized = false, fullSentence, forceLowercase) => {
+    if (isStr(texts)) return translated({ texts }, capitalized)[capitalized ? 1 : 0].texts
+
     const langCode = getSelected()
     // translation not required
     if (langCode === EN && !BUILD_MODE) return [texts, capitalized && textCapitalize(texts)]
@@ -141,10 +199,20 @@ export const translated = (texts = {}, capitalized = false) => {
         if (!translatedText) return
         texts[key] = translatedText
     })
-    return [texts, capitalized && textCapitalize(texts)]
+    texts = digitsTranslated(texts, langCode)
+    capitalized = capitalized && digitsTranslated(
+        textCapitalize(
+            texts,
+            fullSentence,
+            forceLowercase,
+        ),
+        langCode,
+    )
+    return [texts, capitalized]
 }
 
 export default {
+    digitsTranslated,
     translations,
     translated,
     setTexts,
