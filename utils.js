@@ -1,10 +1,10 @@
-import uuid from 'uuid'
+import { v1 as uuidV1 } from 'uuid'
 // import { blake2AsHex, keccakAsHex } from '@polkadot/util-crypto'
 import { ss58Decode } from './convert'
 /*
  * List of optional node-modules and the functions used by them:
  * Module Name          : Function Name
- * ---------------------------
+ * ------------------------------------------------------
  * @polkadot/util-crypto: isAddress, generateHash
  * escapeStringRegexp   : escapeStringRegexp, searchRanked
  * form-data   			: objToFormData
@@ -41,20 +41,24 @@ export const clearClutter = x => x.split('\n')
 
 /**
  * @name	copyToClipboard
- * @summary copies text to clipboard. No compatible with NodeJS.
+ * @summary copies text to browser clipboard. Not compatible with NodeJS.
  * 
  * @param	{String} str 
  */
 export const copyToClipboard = str => {
-	const el = document.createElement('textarea')
-	el.value = str
-	el.setAttribute('readonly', '')
-	el.style.position = 'absolute'
-	el.style.left = '-9999px'
-	document.body.appendChild(el)
-	el.select()
-	document.execCommand('copy')
-	document.body.removeChild(el)
+	try {
+		window.navigator.clipboard.writeText(url)
+	} catch (e) {
+		const el = document.createElement('textarea')
+		el.value = str
+		el.setAttribute('readonly', '')
+		el.style.position = 'absolute'
+		el.style.left = '-9999px'
+		document.body.appendChild(el)
+		el.select()
+		document.execCommand('copy')
+		document.body.removeChild(el)
+	}
 }
 
 export const downloadFile = (content, fileName, contentType) => {
@@ -72,9 +76,15 @@ export const escapeStringRegexp = (str) => {
 // returns @fallbackValue if function call throws error
 export const fallbackIfFails = (func, args = [], fallbackValue = null) => {
 	try {
-		return func(...isFn(args) ? args() : args)
+		return func(
+			...isFn(args)
+				? args()
+				: args
+		)
 	} catch (e) {
-		return fallbackValue
+		return isFn(fallbackValue)
+			? fallbackValue()
+			: fallbackValue
 	}
 }
 
@@ -86,7 +96,7 @@ export const fallbackIfFails = (func, args = [], fallbackValue = null) => {
  * @param	{String}	algo		Supported algorithms: blake2 (default), keccak
  * @param	{Number}	bitLength 	Default: 256
  */
-export const generateHash = (seed = uuid.v1(), algo = 'blake2', bitLength = 256) => {
+export const generateHash = (seed = uuidV1(), algo = 'blake2', bitLength = 256) => {
 	const { blake2AsHex, keccakAsHex } = require('@polkadot/util-crypto')
 	seed = isUint8Arr(seed)
 		? seed
@@ -185,12 +195,32 @@ export const isObj = x => !!x && typeof x === 'object' && !isArr(x) && !isMap(x)
 export const isObjArr = x => isArr(x) && x.every(isObj)
 // Checks if argument is a Map of Objects. Each element type must be object, otherwise will return false.
 export const isObjMap = x => isMap(x) && Array.from(x).every(([_, v]) => isObj(v))
+export const isPositiveInteger = x => isInteger(x) && x > 0
 export const isPromise = x => x instanceof Promise
 export const isSet = x => x instanceof Set
 export const isStr = x => typeof x === 'string'
 export const isSubjectLike = x => isObj(x) && isFn(x.subscribe) && isFn(x.next)
 export const isTouchable = () => fallbackIfFails(() => 'ontouchstart' in document.documentElement, [], false)
 export const isUint8Arr = arr => arr instanceof Uint8Array
+export const isURL = x => x instanceof URL
+export const isValidURL = (x, strict = true) => {
+	try {
+		const isAStr = isStr(x)
+		const url = isURL(x)
+			? x
+			: new URL(x)
+		// If strict mode is set to `true` and if a string value provided, it must match resulting value of new URL(x).
+		// This can be used to ensure that a URL can be queried without altering.
+		if (!isAStr || !strict) return true
+		// catch any auto-correction by `new URL()`. 
+		// Eg: spaces in the domain name being replaced by`%20` or missing `/` in protocol being auto added
+		x = `${x}`
+		if (x.endsWith(url.hostname)) x += '/'
+		return url.href == x
+	} catch (e) {
+		return false
+	}
+}
 export const isValidNumber = x => typeof x == 'number' && !isNaN(x) && isFinite(x)
 export const hasValue = x => {
 	try {
@@ -428,6 +458,22 @@ export const deferred = (callback, delay, thisArg) => {
 }
 
 /**
+ * @name	getFuncParams
+ * @summary extracts the parameter names of a given function. 
+ * 
+ * @param	{Function} func 
+ * 
+ * @returns {Array}
+ */
+export const getFuncParams = func => func
+	.toString()
+	.replace('function', '')
+	.trim()
+	.split('(')[1]
+	.split(')')[0]
+	.split(', ')
+
+/**
  * @name    getUrlParam
  * @summary read parameters of a given URL
  * 
@@ -661,14 +707,7 @@ export const objToUrlParams = (obj = {}, excludeUndefined = true) => Object.keys
 	.join('&')
 
 export const objToFormData = (obj = {}, excludeUndefined = true) => {
-	let formData
-	try {
-		formData = new FormData()
-	} catch (_) {
-		// for nodejs only
-		const FormData = require('form-data')
-		formData = new FormData()
-	}
+	let formData = new FormData()
 	Object.keys(obj).forEach(key => {
 		let value = obj[key]
 		if (excludeUndefined && value === undefined) return

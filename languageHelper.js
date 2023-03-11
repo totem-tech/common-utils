@@ -10,7 +10,7 @@ import {
     textCapitalize,
 } from './utils'
 
-const translations = new DataStorage('totem_static_translations')
+export const translations = new DataStorage('totem_static_translations')
 export const EN = 'EN'
 const MODULE_KEY = 'language'
 const rw = value => storage.settings.module(MODULE_KEY, value) || {}
@@ -115,7 +115,7 @@ export const fetchNSaveTexts = async (client) => {
 
     const selectedHash = generateHash(getTexts(selected) || '')
     const engHash = generateHash(getTexts(EN) || '')
-    const func = client.languageTranslations.promise
+    const func = client.languageTranslations
     const [textsEn, texts] = await Promise.all([
         func(EN, engHash),
         func(selected, selectedHash),

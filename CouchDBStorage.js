@@ -37,7 +37,9 @@ export const getConnection = async (url, global = true) => {
  * 
  * @returns {Boolean} 
  */
-export const isCouchDBStorage = (...args) => args.flat()
+export const isCouchDBStorage = (...args) => args
+    .flat()
+    .flat()
     .every(instance => instance instanceof CouchDBStorage)
 
 /**

@@ -15,6 +15,7 @@ import {
     isValidNumber,
     objHasKeys,
     objWithoutKeys,
+    isValidURL,
 } from './utils'
 
 export let messages = {
@@ -22,9 +23,9 @@ export let messages = {
     array: 'valid array required',
     boolean: 'boolean value required',
     date: 'valid date required',
-    dateMax: 'date date cannot be after',
-    dateMin: 'date cannot be before',
-    decimals: 'number exceeds maximum allowed decimals',
+    dateMax: 'value must be smaller or equal to',
+    dateMin: 'value must be greater or equal to',
+    decimals: 'value exceeds maximum allowed decimals',
     email: 'valid email address required',
     hash: 'valid cryptographic hash string required',
     hex: 'valid hexadecimal string required',
@@ -34,8 +35,8 @@ export let messages = {
     lengthMax: 'maximum length exceeded',
     lengthMin: 'minimum length required',
     number: 'valid number required',
-    numberMax: 'number exceeds maximum allowed',
-    numberMin: 'number is less than minimum required',
+    numberMax: 'value must be smaller or equal to',
+    numberMin: 'value must be greater or euqal to',
     object: 'valid object required',
     regex: 'invalid string pattern',
     regexError: 'regex validation failed',
@@ -65,6 +66,12 @@ export const TYPES = Object.freeze({
     string: 'string',
     url: 'url',
 })
+
+const errorConcat = (message, ...suffix) => {
+    if (!isStr(message)) return message
+
+    return [message, ...suffix].join(' ')
+}
 
 /**
  * @name    setMessages
@@ -96,7 +103,7 @@ const _msgOrTrue = (msg, value) => !msg || msg === true
  * validate(123456, { max: 9999, min: 0, required: true, type: TYPES.number})
  * ```
  * 
- * @returns {String|Null} null if no errors. Otherwise, error message.
+ * @returns {String|Null} null if valid according to supplied config. Otherwise, validation error message.
  */
 export const validate = (value, config, customMessages = {}) => {
     const errorMsgs = {
@@ -278,7 +285,7 @@ export const validate = (value, config, customMessages = {}) => {
         // valid according to the config
         return null
     } catch (err) {
-        return `${errorMsgs.unexpectedError}. ${err}`
+        return errorConcat(errorMsgs.unexpectedError, '\n', err)
     }
 }
 

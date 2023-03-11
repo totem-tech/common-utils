@@ -219,6 +219,7 @@ export const subjectAsPromise = (subject, expectedValue, timeout) => {
                 ? !!expectedValue(value)
                 : expectedValue !== undefined
                     ? value === expectedValue
+                    || expectedValue === subjectAsPromise.anyValueSymbol && hasValue(value)
                     : true
             if (!isExpectedValue) return
             unsubscribe()
@@ -232,24 +233,7 @@ export const subjectAsPromise = (subject, expectedValue, timeout) => {
     })
     return [promise, unsubscribe]
 }
-
-/**
- * @name    unsubscribe
- * @summary unsubscribe to multiple RxJS subscriptions
- * @param   {Object|Array} subscriptions 
- */
-export const unsubscribe = (subscriptions = {}) => Object.values(subscriptions)
-    .forEach(x => {
-        try {
-            if (!x) return
-            const fn = isFn(x)
-                ? x
-                : isFn(x.unsubscribe)
-                    ? x.unsubscribe
-                    : null
-            fn && fn()
-        } catch (e) { } // ignore
-    })
+subjectAsPromise.anyValueSymbol = Symbol('any-value')
 
 /**
  * @name        usePromise
@@ -408,7 +392,7 @@ export const useQueryBlockchain = (
  * @param   {Boolean}   allowSubjectUpdate (optional) whether to allow update of the subject or only state.
  *              CAUTION: if true and @subject is sourced from a DataStorage instance,
  *              it may override values in the LocalStorage values.
- *              Default: false
+ *              Default: `false`
  * 
  * @returns {Array}     [value, setvalue]
  */
@@ -473,7 +457,7 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowMerge = 
                         try {
                             _subject.value[key] = value[key]
                         } catch (err) {
-                            console.warn(err)
+                            console.warn('useRxSubject:', err)
                         }
                     })
                 mounted && _setState({ isBSub, value })
@@ -494,3 +478,21 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowMerge = 
 }
 // To prevent an update return this in valueModifier
 useRxSubject.IGNORE_UPDATE = Symbol('ignore-rx-subject-update')
+
+/**
+ * @name    unsubscribe
+ * @summary unsubscribe to multiple RxJS subscriptions
+ * @param   {Object|Array} subscriptions 
+ */
+export const unsubscribe = (subscriptions = {}) => Object.values(subscriptions)
+    .forEach(x => {
+        try {
+            if (!x) return
+            const fn = isFn(x)
+                ? x
+                : isFn(x.unsubscribe)
+                    ? x.unsubscribe
+                    : null
+            fn && fn()
+        } catch (e) { } // ignore
+    })
