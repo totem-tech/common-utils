@@ -370,14 +370,32 @@ export const arrSearch = (arr, keyValues, matchExact, matchAll, ignoreCase, asAr
 	return result
 }
 
-// Returns new array sorted by key. If sortOriginal is 'truty', existing array will be sorted and returned.
+/**
+ * @name	arrSort
+ * @summary sort an array
+ * 
+ * @param	{Array}		arr array to sort 
+ * @param	{String}	key (optional) name of the property, if object array
+ * @param	{Boolean}	reverse (optional) reverse sort.
+ * 						Default: false
+ * @param	{Boolean}	caseInsensitive (optional) sort without the side-effects of case-sensitivenes.
+ * 						Default: true
+ * @param	{Boolean}	sortOriginal (optional) true => original array, false => keep original array unchanged.
+ * 						Default: false
+ * 
+ * @returns {Array}	sorted array
+ */
 export const arrSort = (arr, key, reverse = false, caseInsensitive = true, sortOriginal = false) => {
-	if (!isObjArr(arr)) return []
 	let sortedArr = (sortOriginal ? arr : [...arr])
 
 	const getValue = (obj, key) => {
-		const value = fallbackIfFails(() => `${obj[key] || ''}`, [], '')
-		return caseInsensitive
+		let value
+		if (isObj(obj) && isDefined(key)) {
+			value = obj[key]
+		} else {
+			value = obj
+		}
+		return isStr(value) && caseInsensitive
 			? value.toLowerCase()
 			: value
 	}
