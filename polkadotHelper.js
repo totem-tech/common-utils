@@ -1,5 +1,5 @@
 import { ApiPromise, ApiRx, WsProvider } from '@polkadot/api'
-import Keyring, { createPair } from '@polkadot/keyring'
+import Keyring from '@polkadot/keyring'
 import { bytesToHex } from './convert'
 import {
     isFn, isArr, isDefined, isObj, isStr, isValidNumber,
@@ -133,9 +133,10 @@ export const keyring = {
             if (isUint8Arr(seed)) {
                 seed = bytesToHex(seed)
             } else if (isObj(seed) && objHasKeys(seed, ['secretKey', 'publicKey'])) {
-                const { secretKey, publicKey } = seed
-                const pair = createPair(TYPE, { secretKey, publicKey })
-                return _keyring.addPair(pair)
+                // const { secretKey, publicKey } = seed
+                // const pair = createPair(TYPE, { secretKey, publicKey })
+                // return _keyring.addPair(pair)
+                throw new Error('createPair has been removed from @polkadot/keyring exports!')
             }
             return _keyring.addFromUri(seed)
         } catch (error) { console.log('Failed to add seed to keyring', error) }

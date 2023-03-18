@@ -117,8 +117,12 @@ PromisE.deferred = () => {
         const id = Symbol()
         ids.push(id)
         try {
-            promise.then(done(resolve, id), done(reject, id))
+            promise.then(
+                done(resolve, id),
+                done(reject, id),
+            )
         } catch (err) {
+            ids = ids.filter(x => x !== id)
             reject(err)
         }
     })

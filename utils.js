@@ -196,7 +196,10 @@ export const isObjArr = x => isArr(x) && x.every(isObj)
 // Checks if argument is a Map of Objects. Each element type must be object, otherwise will return false.
 export const isObjMap = x => isMap(x) && Array.from(x).every(([_, v]) => isObj(v))
 export const isPositiveInteger = x => isInteger(x) && x > 0
-export const isPromise = x => x instanceof Promise
+export const isPromise = x => {
+	const isp = x instanceof Promise
+	return isp
+}
 export const isSet = x => x instanceof Set
 export const isStr = x => typeof x === 'string'
 export const isSubjectLike = x => isObj(x) && isFn(x.subscribe) && isFn(x.next)

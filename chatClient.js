@@ -29,7 +29,7 @@ try {
     // or if not accessed from totem.live
     hostname = TOTEM_LIVE
 }
-const defaultServerURL = `${hostname}:${port}`
+const defaultServerURL = `wss://${hostname}:${port}`
 const MODULE_KEY = 'messaging'
 const PREFIX = 'totem_'
 // include any ChatClient property that is not a function or event that does not have a callback
@@ -790,5 +790,21 @@ export class ChatClient {
         'task-market-apply-response',
         [data],
     )
+
+    /**
+     * @name    taskMarketSearch
+     * @summary search marketplace orders
+     * 
+     * @param   {Object}    filter          (optional)  if not supplied will return latest 100 entries
+     * @param   {String}    filter.keywords (optional)
+     * @param   {Number}    filter.pageNo   (optional)
+     * 
+     * @returns {Map}
+     */
+    taskMarketSearch = async (filter) => await this.emit(
+        'task-market-search',
+        [filter],
+        result => new Map(result)
+    )
 }
-// export default {} //getClient()
+export default getClient()
