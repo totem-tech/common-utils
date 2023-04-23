@@ -5,14 +5,15 @@ import { BehaviorSubject, Subject } from 'rxjs'
 import { query } from './polkadotHelper'
 import PromisE from './PromisE'
 import {
-    isDefined,
     isFn,
     isObj,
     isSubjectLike,
     isValidNumber,
-    objCopy,
 } from './utils'
 
+const isValidElement = (...args) => require('react').isValidElement(...args)
+const memo = (...args) => require('react').memo(...args)
+const PropTypes = () => require('prop-types')
 const useEffect = (...args) => require('react').useEffect(...args)
 const useReducer = (...args) => require('react').useReducer(...args)
 const useState = (...args) => require('react').useState(...args)
@@ -59,7 +60,7 @@ export const copyRxSubject = (rxSource, rxCopy) => {
  *  
  * @returns {Boolean}
  */
-export const isMemo = x => x['$$typeof'] === require('react').memo('div')['$$typeof']
+export const isMemo = x => x['$$typeof'] === memo('div')['$$typeof']
 
 /**
  * @name    iUseReducer
@@ -173,10 +174,9 @@ export const iUseState = (initialState = {}, onUnmount) => {
  * ```
  */
 export const RecursiveShapeType = (propsTypes = {}, recursiveKey = 'children') => {
-    const PropTypes = require('prop-types')
     propsTypes[recursiveKey] = PropTypes.arrayOf(Type)
     function Type(...args) {
-        return PropTypes.shape(propsTypes).apply(null, args)
+        return PropTypes().shape(propsTypes).apply(null, args)
     }
     return Type
 }
@@ -234,6 +234,45 @@ export const subjectAsPromise = (subject, expectedValue, timeout) => {
     return [promise, unsubscribe]
 }
 subjectAsPromise.anyValueSymbol = Symbol('any-value')
+
+/**
+ * @name    toProps
+ * @summary extract/generate props object to be supplied to an element
+ * 
+ * @param   {*} elOrProps 
+ * 
+ * @returns {Object}
+ */
+export const toProps = elOrProps => {
+    if (!elOrProps) return elOrProps
+
+    const props = isValidElement(elOrProps)
+        ? elOrProps.props // react element
+        : isObj(elOrProps)
+            ? elOrProps // plain object
+            : {
+                children: elOrProps, // assume string or other valid content
+            }
+    return { ...props }
+}
+
+/**
+ * @name    unsubscribe
+ * @summary unsubscribe to multiple RxJS subscriptions
+ * @param   {Object|Array} subscriptions 
+ */
+export const unsubscribe = (subscriptions = {}) => Object.values(subscriptions)
+    .forEach(x => {
+        try {
+            if (!x) return
+            const fn = isFn(x)
+                ? x
+                : isFn(x.unsubscribe)
+                    ? x.unsubscribe
+                    : null
+            fn && fn()
+        } catch (e) { } // ignore
+    })
 
 /**
  * @name        usePromise
@@ -478,21 +517,3 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowMerge = 
 }
 // To prevent an update return this in valueModifier
 useRxSubject.IGNORE_UPDATE = Symbol('ignore-rx-subject-update')
-
-/**
- * @name    unsubscribe
- * @summary unsubscribe to multiple RxJS subscriptions
- * @param   {Object|Array} subscriptions 
- */
-export const unsubscribe = (subscriptions = {}) => Object.values(subscriptions)
-    .forEach(x => {
-        try {
-            if (!x) return
-            const fn = isFn(x)
-                ? x
-                : isFn(x.unsubscribe)
-                    ? x.unsubscribe
-                    : null
-            fn && fn()
-        } catch (e) { } // ignore
-    })

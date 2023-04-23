@@ -7,29 +7,16 @@ import storage from './storageHelper'
 import {
     deferred,
     isAsyncFn,
+    isBool,
     isFn,
+    isNodeJS,
     isObj,
     isStr,
     objWithoutKeys,
 } from './utils'
 
-let instance, socket, hostname
-let port = 3001
+let instance, socket
 const DISCONNECT_DELAY_MS = parseInt(process.env.MESSAGING_SERVER_DISCONNECT_DELAY_MS || 300000)
-const TOTEM_LIVE = 'totem.live'
-try {
-    hostname = window.location.hostname
-    if (hostname !== 'localhost' && !hostname.endsWith(TOTEM_LIVE)) throw 'use prod'
-    // use 3003 for dev.totem.live otherwise 3001 for production
-    port = hostname === 'dev.totem.live'
-        ? 3003
-        : port
-} catch (err) {
-    // use production URL as default where `window` is not available
-    // or if not accessed from totem.live
-    hostname = TOTEM_LIVE
-}
-const defaultServerURL = `wss://${hostname}:${port}`
 const MODULE_KEY = 'messaging'
 const PREFIX = 'totem_'
 // include any ChatClient property that is not a function or event that does not have a callback
@@ -99,13 +86,21 @@ export const referralCode = code => {
  * @name    getClient
  * @summary Returns a singleton instance of the websocket client.
  * Instantiates the client if not already done.
+ * 
+ * @description when in dev mode with self-signed certificate, if socket connection fails with "ERR_CERT_AUTHORITY_INVALID", simply open the socket url in the browser by replacing "wss" with "https" and click "proceed" to add the certificate.
+ * 
+ * @param   {String|Boolean} url    if Boolean, true => use staging & falsy => use prod
+ * @param   {Number}         disconnectDelayMs (optional) duration in milliseconds to auto-disconnect from 
+ *                                             webwsocket after period of inactivity.
+ *              
+ *                                             Default: `300000` (or `process.env.MESSAGING_SERVER_DISCONNECT_DELAY_MS`)
  *
  * @returns {ChatClient}
  */
-export const getClient = (url) => {
+export const getClient = (url, disconnectDelayMs) => {
     if (instance) return instance
 
-    instance = new ChatClient(url)
+    instance = new ChatClient(url, disconnectDelayMs)
 
     instance.onConnect(async () => {
         const active = await instance.maintenanceMode.promise(null, null)
@@ -189,14 +184,30 @@ export const translateError = err => {
         .join('')
 }
 
-// Make sure to always keep the callback as the last argument
 export class ChatClient {
-    constructor(url) {
-        this.url = url || defaultServerURL
+    constructor(url, disconnectDelayMs = DISCONNECT_DELAY_MS) {
+        if (!isStr(url)) {
+            const hostProd = 'totem.live'
+            const hostStaging = 'dev.totem.live'
+            const isNode = isNodeJS()
+            const staging = isBool(url)
+                ? url
+                : !isNode && window.location.hostname === hostStaging
+            const hostname = !isNode
+                ? window.location.hostname // if frontend the use the URL
+                : staging
+                    ? hostStaging
+                    : hostProd
+            const port = staging
+                ? 3003
+                : 3001
+            url = `wss://${hostname}:${port}`
+        }
+        this.url = url
         socket = ioClient(this.url, {
             transports: ['websocket'],
             secure: true,
-            // rejectUnauthorized: false,
+            rejectUnauthorized: false,
         })
         this.socket = socket
         // add support for legacy `.promise`
@@ -215,7 +226,7 @@ export class ChatClient {
             log('Disconnecting due to inactivity')
             this.disconnect()
             rxIsLoggedIn.next(false)
-        }, DISCONNECT_DELAY_MS)
+        }, disconnectDelayMs)
         this.isConnected = () => this.socket.connected
         this.onConnect = cb => this.socket.on('connect', cb)
         // this.onConnectTimeout = cb => this.socket.on('connect_timeout', cb);
@@ -308,7 +319,7 @@ export class ChatClient {
         'company-search',
         [query, searchParentIdentity],
         // convert 2D array back to Map
-        result => new Map(result),
+        ([result, limit]) => new Map(result),
     )
 
     /**
