@@ -174,7 +174,7 @@ export const iUseState = (initialState = {}, onUnmount) => {
  * ```
  */
 export const RecursiveShapeType = (propsTypes = {}, recursiveKey = 'children') => {
-    propsTypes[recursiveKey] = PropTypes.arrayOf(Type)
+    propsTypes[recursiveKey] = PropTypes().arrayOf(Type)
     function Type(...args) {
         return PropTypes().shape(propsTypes).apply(null, args)
     }
