@@ -2,8 +2,8 @@ import {
     bytesToHex,
     hexToBytes,
     strToU8a,
-} from "../convert"
-import { keyDataFromEncoded } from "./utils"
+} from '../convert'
+import { keyDataFromEncoded } from './utils'
 
 /**
  * @name    newSignature

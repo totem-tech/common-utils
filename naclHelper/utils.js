@@ -1,11 +1,8 @@
-import { isArr, isHex, isObj, isUint8Arr, objCopy } from "../utils"
 import {
     bytesToHex,
     hexToBytes,
     ss58Encode,
-    u8aToStr,
-    strToU8a,
-} from "../convert"
+} from '../convert'
 
 /**
  * @name    keyDataFromEncoded
@@ -97,4 +94,11 @@ export const randomBytes = (length, asHex = true) => {
     return !asHex
         ? bytes
         : bytesToHex(bytes)
+}
+
+export default {
+    keyDataFromEncoded,
+    keyInfoFromKeyData,
+    newNonce,
+    randomBytes,
 }

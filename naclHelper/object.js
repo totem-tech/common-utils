@@ -1,26 +1,26 @@
 import {
+    bytesToHex,
+    hexToBytes,
+} from '../convert'
+import {
     isArr,
     isHex,
     isObj,
     isUint8Arr,
     objCopy,
-} from "../utils"
-import {
-    bytesToHex,
-    hexToBytes,
-} from "../convert"
+} from '../utils'
 import box from './box'
 import secretBox from './secretBox'
-import { newNonce } from "./utils"
+import { newNonce } from './utils'
 
 /**
  * @name    decryptObj
  * @summary recursively decrypt objects encrypted using the `encryptObj()` function. 
  * 
  * @param   {Object}            obj         data object to decrypt
- * @param   {String|Uint8Array} senderPublicKey (optional) if not supplied, will encrypt using SecretBox. 
+ * @param   {String|Uint8Array} senderPublicKey (optional) if not supplied, will decrypt using SecretBox. 
  *                                          Otherwise, will use Box encryption.
- * @param   {String|Uint8Array} secretKey   sender secret key (box encrypted) or shared secret (secret box encrypted)
+ * @param   {String|Uint8Array} secretKey   recipient secret key (box encrypted) or shared secret (secret box encrypted)
  * @param   {Array}             keys        (optional) `obj` property names, to be decrypted. 
  *                                          If valid array, unlisted properties will not be decrypted.
  *                                          Otherwise, will attempt to decrypt all String (hex) or Uint8Array values.
@@ -110,9 +110,9 @@ export const decryptObj = (obj, senderPublicKey, secretKey, keys, asString = tru
  * // object to encrypt
  * const obj = {
  *     first: 'some text',
- *     second: 1, // will be converted to string: "1"
+ *     second: 1, // will be converted to string: '1'
  *     third: 'ignored property',
- *     fifth: null, // will be converted to string: "null"
+ *     fifth: null, // will be converted to string: 'null'
  * }
  * 
  * // secondary object for recursive encryption

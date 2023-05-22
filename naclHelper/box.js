@@ -3,11 +3,11 @@ import {
     hexToBytes,
     u8aToStr,
     strToU8a,
-} from "../convert"
+} from '../convert'
 import {
     keyDataFromEncoded,
     newNonce,
-} from "./utils"
+} from './utils'
 
 /**
  * @name    decrypt
@@ -72,7 +72,7 @@ export const encrypt = (message, senderSecretKey, recipientPublicKey, nonce, asH
  * 
  * @param   {String}    keyData hex string (keyData or encoded)
  * @param   {Boolean}   asHex   whether to convert to `publicKey` and `secretKey` to hex string or keep as Uint8Array
- * 
+ *  
  * @returns {Object}    { publicKey, secretKey }
  */
 export const encryptionKeypair = (keyData, asHex = true) => {

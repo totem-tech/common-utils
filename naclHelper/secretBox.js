@@ -3,7 +3,8 @@ import {
     hexToBytes,
     u8aToStr,
     strToU8a,
-} from "../convert"
+} from '../convert'
+import { generateHash } from '../utils'
 import { newNonce } from './utils'
 
 /**
@@ -60,7 +61,22 @@ export const secretBoxEncrypt = (message, secret, nonce, asHex = true) => {
     }
 }
 
+/**
+ * @name    secretBoxKeyFromPW
+ * @summary generates a TweetNacl SecretBox compatible secret key (hex string) from supplied seed/password
+ * 
+ * @param   {String}    password
+ * 
+ * @returns {String}    hex string
+ */
+export const secretBoxKeyFromPW = password => generateHash(
+    password,
+    'blake2',
+    256, // DO NOT CHANGE
+)
+
 export default {
     decrypt: secretBoxDecrypt,
     encrypt: secretBoxEncrypt,
+    keyFromPW: secretBoxKeyFromPW,
 }
