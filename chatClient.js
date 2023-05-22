@@ -103,9 +103,9 @@ export const getClient = (url, disconnectDelayMs) => {
     instance = new ChatClient(url, disconnectDelayMs)
 
     instance.onConnect(async () => {
+        rxIsConnected.next(true)
         const active = await instance.maintenanceMode.promise(null, null)
         rxIsInMaintenanceMode.next(active)
-        rxIsConnected.next(true)
         if (!rxIsRegistered.value) return
 
         // auto login on connect to messaging service
@@ -130,7 +130,6 @@ export const getClient = (url, disconnectDelayMs) => {
         rxIsInMaintenanceMode.next(active)
     })
 
-    instance.connect()
     return instance
 }
 

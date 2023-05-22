@@ -5,6 +5,9 @@ import { BehaviorSubject, Subject } from 'rxjs'
 import { query } from './polkadotHelper'
 import PromisE from './PromisE'
 import {
+    deferred,
+    hasValue,
+    isArr,
     isFn,
     isObj,
     isSubjectLike,
@@ -15,6 +18,7 @@ const isValidElement = (...args) => require('react').isValidElement(...args)
 const memo = (...args) => require('react').memo(...args)
 const PropTypes = () => require('prop-types')
 const useEffect = (...args) => require('react').useEffect(...args)
+const useMemo = (...args) => require('react').useMemo(...args)
 const useReducer = (...args) => require('react').useReducer(...args)
 const useState = (...args) => require('react').useState(...args)
 
@@ -31,7 +35,7 @@ const useState = (...args) => require('react').useState(...args)
  * 
  * @returns {Object}    subjectCopy
  */
-export const copyRxSubject = (rxSource, rxCopy) => {
+export const copyRxSubject = (rxSource, rxCopy, valueModifier) => {
     if (!isSubjectLike(rxSource)) return new Subject()
     if (!isSubjectLike(rxCopy)) {
         rxCopy = rxSource instanceof BehaviorSubject
@@ -41,7 +45,13 @@ export const copyRxSubject = (rxSource, rxCopy) => {
 
     const subscribe = rxCopy.subscribe
     rxCopy.subscribe = (...args) => {
-        const sourceSub = rxSource.subscribe(value => rxCopy.next(value))
+        const sourceSub = rxSource.subscribe(value =>
+            rxCopy.next(
+                isFn(valueModifier)
+                    ? valueModifier(value)
+                    : value
+            )
+        )
         const localSub = subscribe.apply(rxCopy, args)
         const { unsubscribe } = localSub
         localSub.unsubscribe = (...args) => {
@@ -275,6 +285,29 @@ export const unsubscribe = (subscriptions = {}) => Object.values(subscriptions)
     })
 
 /**
+ * @name    useStateDeferred
+ * @summary sugar for `useState` hook with delayed/deferred `setState` functionality by default
+ * 
+ * @param   {*|Function} initialState
+ * @param   {Number}     defer        duration in milliseconds
+ * 
+ * @returns {Array}      [state, setStateDeferred, setState]
+ */
+export const useStateDeferred = (initialState, defer = 100) => {
+    const [state, setState] = useState(initialState)
+    const setStateDeferred = useMemo(() =>
+        deferred(setState, defer),
+        [setState, defer]
+    )
+
+    return [
+        state,
+        setStateDeferred,
+        setState,
+    ]
+}
+
+/**
  * @name        usePromise
  * @summary     a custom React hook for use with a Promise
  * @description state update will occur only once when then @promise is either rejected or resolved.
@@ -417,7 +450,7 @@ export const useQueryBlockchain = (
 
 /**
  * @name    useRxSubject
- * @summary custom React hook for use with RxJS subjects
+ * @summary custom React hook for use with RxJS subject and auto update when value changes
  * 
  * @param   {BehaviorSubject|Subject}   subject RxJS subject or subject like Object (with subscribe function)
  *              If not object or doesn't have subcribe function will assume subject to be a static value.
@@ -433,15 +466,26 @@ export const useQueryBlockchain = (
  *              it may override values in the LocalStorage values.
  *              Default: `false`
  * 
- * @returns {Array}     [value, setvalue]
+ * @returns {Array}     [value, setvalue, subject]
  */
-export const useRxSubject = (subject, valueModifier, initialValue, allowMerge = false, allowSubjectUpdate = false) => {
+export const useRxSubject = (
+    subject,
+    valueModifier,
+    initialValue,
+    allowMerge = false,
+    allowSubjectUpdate = false,
+    debug = false
+) => {
     const [_subject] = useState(() =>
         isSubjectLike(subject)
             ? allowSubjectUpdate
                 ? subject
                 : copyRxSubject(subject)
-            : new BehaviorSubject(initialValue)
+            : new BehaviorSubject(
+                initialValue !== undefined
+                    ? initialValue
+                    : subject
+            )
     )
 
     let [{ firstValue, isBSub, value }, _setState] = useState(() => {
@@ -459,6 +503,12 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowMerge = 
         if (value === useRxSubject.IGNORE_UPDATE) {
             value = undefined
         }
+        debug && console.log({
+            firstValue: value,
+            isBSub,
+            value,
+            subject,
+        })
         return {
             firstValue: value,
             isBSub,
@@ -513,6 +563,51 @@ export const useRxSubject = (subject, valueModifier, initialValue, allowMerge = 
         value,
         newValue => _subject.next(newValue),
         _subject,
+    ]
+}
+
+/**
+ * @name    useRxSubjects
+ * @summary custom React hook to observe an array of RxJS subjects and auto-update wehenever any of the value changes
+ * 
+ * @param {Array}       subjects
+ * @param {Function}    valuesModifier
+ * 
+ * 
+ * @example
+ * ```javascript
+ * // Provide RxJS subjects
+ * const [values, subjects] = useRxSubjects([
+ *     new BehaviorSubject(1),
+ *     new BehaviorSubject(2),
+ * ])
+ * console.log(values) // [1,2]
+ * 
+ * // Provide values array instead of subjects.
+ * // Will create new RxJS BehaviorSubjects from the values.
+ * const [values, subjects] = useRxSubjects([1, 2])
+ * console.log(values) // [1,2]
+ * ```
+ * 
+ * @returns [values, RxJS subjects]
+ */
+export const useRxSubjects = (
+    subjects,
+    valuesModifier,
+) => {
+    const results = (
+        !isArr(subjects)
+            ? [subjects]
+            : subjects
+    ).map(x => useRxSubject(x))
+    const values = results.map(x => x[0])
+    const _subjects = results.map(x => x[2])
+
+    return [
+        !isFn(valuesModifier)
+            ? values
+            : valuesModifier(values),
+        _subjects,
     ]
 }
 // To prevent an update return this in valueModifier
