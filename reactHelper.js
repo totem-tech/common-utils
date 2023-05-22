@@ -340,12 +340,16 @@ export const usePromise = (promise, resultModifier, errorModifier) => {
                 : value
             setState(newState)
         }
+        promise = isFn(promise)
+            ? promise()
+            : promise
         new PromisE(promise)
             .then(handler('result', resultModifier, setState))
             .catch(handler('error', errorModifier, setState))
         return () => mounted = false
     }, [setState, promise])
 
+    console.log('usePromise', state.result)
     return [state.result, state.error]
 }
 
