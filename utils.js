@@ -73,19 +73,42 @@ export const escapeStringRegexp = (str) => {
 	const fn = require('escape-string-regexp')
 	return fn(str)
 }
-// returns @fallbackValue if function call throws error
+
+/**
+ * @name	fallbackIfFails
+ * @summary a simple try-catch wrapper for invoking functions to catch errors.
+ * Ensures a value is always returned by avoiding any unexpected errors.
+ * 
+ * @param	{*|Function|Promise}	func 
+ * @param	{Array|Function}		args			arguments to be supplied to `func` fuction 
+ * @param	{*|Function}			fallbackValue	alternative value
+ * 
+ * @returns {*|Promise} if func is a promise the return a promise 
+ */
 export const fallbackIfFails = (func, args = [], fallbackValue = null) => {
+	let result
 	try {
-		return func(
+		if (!isFn(func)) {
+			result = func
+			throw 0
+		}
+		result = func(
 			...isFn(args)
 				? args()
 				: args
 		)
-	} catch (e) {
-		return isFn(fallbackValue)
-			? fallbackValue()
-			: fallbackValue
-	}
+		if (!isPromise(result)) return result
+	} catch (_) { }
+
+	const getAltVal = () => isFn(fallbackValue)
+		? fallbackValue(result)
+		: fallbackValue
+
+	return isPromise(result)
+		? result.catch(getAltVal)
+		: result !== undefined && !isError(result)
+			? result
+			: getAltVal()
 }
 
 /**
@@ -555,17 +578,19 @@ export const objCopy = (source = {}, dest = {}, ignore = [undefined]) => {
  * 
  * @param	{Object}	obj
  * @param	{Array}		keys		property names
- * @param	{Boolean}	recursive	(optional) Default: false
+ * @param	{Boolean}	recursive	(optional) Default: `false`
+ * @param	{Boolean}	ignoreIfNotExist (optional) if truthy, only include property if `obj.hasOwnProperty(key)`
+ * 										 Default: `true`
  * 
  * @returns	{Object}
  */
-export const objClean = (obj, keys, recursive = false) => {
+export const objClean = (obj, keys, recursive = false, ignoreIfNotExist = true) => {
 	if (!isObj(obj) || !isArr(keys)) return {}
 
 	const result = {}
 	for (let i = 0; i < keys.length; i++) {
 		const key = keys[i]
-		if (!obj.hasOwnProperty(key)) continue
+		if (ignoreIfNotExist && !obj.hasOwnProperty(key)) continue
 
 		let value = obj[key]
 		result[key] = value
@@ -739,37 +764,41 @@ export const objToFormData = (obj = {}, excludeUndefined = true) => {
  * @name	objWithoutKeys
  * @summary constructs a new object excluding specific properties
  * 
- * @param	{Object} obj 
- * @param	{Array}  keys property names to exclude
+ * @param	{Object}	input 
+ * @param	{Array}		keys	property names to exclude
+ * @param	{Object}	output	(optional) to delete unwanted props from the original `input` use it here.
+ * 								Default: a copy of the `input` object
  * 
  * @returns {Object}
  */
-export const objWithoutKeys = (obj, keys) => {
-	if (!isObj(obj)) return {}
-	if (!isArr(keys) || !keys.length) return obj
+export const objWithoutKeys = (input, keys, output = { ...input }) => {
+	if (!isObj(input)) return {}
+	if (!isArr(keys) || !keys.length) return input
 
-	const result = { ...obj }
-	const allKeys = Object.keys(result)
-	for (let i = 0; i < allKeys.length; i++) {
-		const key = allKeys[i]
-		// ignore property
-		if (!keys.includes(key)) continue
-		delete result[key]
+	for (let i = 0; i < keys.length; i++) {
+		delete output[keys[i]]
 	}
-	return result
+	return output
 }
 
+/**
+ * @name	mapFilter
+ * @summary Array.filter but for Map.
+ * 
+ * @param	{Map}		map 
+ * @param	{Function}	callback 
+ * 
+ * @returns {Map}
+ */
 export const mapFilter = (map, callback) => {
 	const result = new Map()
 	if (!isMap(map)) return result
+	if (!isFn(callback)) return map
 
-	Array.from(map).forEach(x => {
-		const key = x[0]
-		const value = x[1]
-		if (callback(value, key, map)) {
-			result.set(key, value)
-		}
-	})
+	for (let [key, value] of map.entries()) {
+		if (!callback(value, key, map)) return
+		result.set(key, value)
+	}
 	return result
 }
 
@@ -791,13 +820,16 @@ export const mapFindByKey = (map, key, value, matchExact) => {
 		const val = key === null
 			? item
 			: item[key]
-		if (!matchExact && (isStr(val) || isArr(val)) ? val.indexOf(value) >= 0 : val === value) return item
+		const found = !matchExact && (isStr(val) || isArr(val))
+			? val.indexOf(value) >= 0
+			: val === value
+		if (found) return item
 	}
 }
 
 /**
  * @name	mapJoin
- * @summary joins two maps
+ * @summary creates a new Map by combining two Maps
  * 
  * @param	{Map} source 
  * @param	{Map} dest   any existing values will be overriden
@@ -823,6 +855,7 @@ export const mapJoin = (source, dest = new Map()) => new Map([
 export const mapSearch = (map, keyValues, matchExact, matchAll, ignoreCase) => {
 	const result = new Map()
 	if (!isObj(keyValues) || !isMap(map)) return result
+
 	const keys = Object.keys(keyValues)
 	for (let [itemKey, item] of map.entries()) {
 		let matched = false
@@ -840,7 +873,10 @@ export const mapSearch = (map, keyValues, matchExact, matchAll, ignoreCase) => {
 				value = `${value}`
 			}
 
-			matched = !matchExact && (isStr(value) || isArr(value)) ? value.indexOf(keyword) >= 0 : value === keyword
+			matched = !matchExact && (isStr(value) || isArr(value))
+				? value.indexOf(keyword) >= 0
+				: value === keyword
+			// skip item if doesn't match according to preference
 			if ((matchAll && !matched) || (!matchAll && matched)) break
 		}
 		matched && result.set(itemKey, item)
@@ -1016,13 +1052,20 @@ export const strFill = (str, maxLen = 2, filler = ' ', after = false) => {
  * @name	textCapitalize
  * @summary capitalizes the first letter of input
  * 
- * @param	{String|Object} input 
+ * @param	{String|Object|Array} input 			
  * @param	{Boolean} 		fullSentence   (optional) whether to capitalize every single word or just the first word
  * @param	{Boolean}		forceLowercase (optional) convert string to lower case before capitalizing
+ * @param	{Object|Array}	output		   (optional) create a new object or merge with existing one.
+ * 										   Default: `input` (overrides texts)
  * 
  * @returns {*}
  */
-export const textCapitalize = (input, fullSentence = false, forceLowercase = false) => {
+export const textCapitalize = (
+	input,
+	fullSentence = false,
+	forceLowercase = false,
+	output = input,
+) => {
 	if (!input) return input
 	if (isStr(input)) {
 		if (forceLowercase) input = input.toLowerCase()
@@ -1031,17 +1074,28 @@ export const textCapitalize = (input, fullSentence = false, forceLowercase = fal
 			.map(word => textCapitalize(word, false))
 			.join(' ')
 	}
-	return !isObj(input)
-		? ''
-		: Object.keys(input)
-			.reduce((obj, key) => {
-				obj[key] = textCapitalize(
-					input[key],
-					fullSentence,
-					forceLowercase,
-				)
-				return obj
-			}, isArr(input) ? [] : {})
+	if (!input || typeof input !== 'object') return ''
+
+
+	Object
+		.keys(input)
+		.forEach(key =>
+			output[key] = textCapitalize(
+				input[key],
+				fullSentence,
+				forceLowercase,
+			)
+		)
+	return output
+	// return Object.keys(input)
+	// 	.reduce((obj, key) => {
+	// 		obj[key] = textCapitalize(
+	// 			input[key],
+	// 			fullSentence,
+	// 			forceLowercase,
+	// 		)
+	// 		return obj
+	// 	}, isArr(input) ? [] : {})
 }
 
 /**
@@ -1077,7 +1131,7 @@ export const textEllipsis = (text, maxLen, numDots, split = true) => {
 
 /**
  * @name	toArray
- * @summary convert string or other itearables to Array
+ * @summary convert string or other itearables' values to Array
  * 
  * @param	{String|Array|Map|Set}	value 
  * @param	{String}				seperator (optional) only used when value is a string

@@ -70,7 +70,7 @@ export const copyRxSubject = (rxSource, rxCopy, valueModifier) => {
  *  
  * @returns {Boolean}
  */
-export const isMemo = x => x['$$typeof'] === memo('div')['$$typeof']
+export const isMemo = x => x?.['$$typeof'] === memo('div')['$$typeof']
 
 /**
  * @name    iUseReducer
@@ -249,20 +249,23 @@ subjectAsPromise.anyValueSymbol = Symbol('any-value')
  * @name    toProps
  * @summary extract/generate props object to be supplied to an element
  * 
- * @param   {*} elOrProps 
+ * @param   {String|Element|Object} elOrProps
+ * @param   {String}                childrenProp    (optional) Default: `children`
+ * @param   {Boolean}               extractElementProps
  * 
  * @returns {Object}
  */
-export const toProps = elOrProps => {
-    if (!elOrProps) return elOrProps
+export const toProps = (elOrProps = {}, childrenProp, extractElementProps = false) => {
+    if (elOrProps === null) return elOrProps
 
+    childrenProp = childrenProp || 'children'
     const props = isValidElement(elOrProps)
-        ? elOrProps.props // react element
+        ? extractElementProps
+            ? elOrProps.props // react element
+            : { [childrenProp || 'children']: elOrProps }
         : isObj(elOrProps)
             ? elOrProps // plain object
-            : {
-                children: elOrProps, // assume string or other valid content
-            }
+            : { [childrenProp || 'children']: elOrProps } // assume string or element
     return { ...props }
 }
 
@@ -349,7 +352,6 @@ export const usePromise = (promise, resultModifier, errorModifier) => {
         return () => mounted = false
     }, [setState, promise])
 
-    console.log('usePromise', state.result)
     return [state.result, state.error]
 }
 
@@ -491,8 +493,16 @@ export const useRxSubject = (
                     : subject
             )
     )
+    const setValue = useMemo(() => newValue => _subject.next(newValue), [_subject])
 
-    let [{ firstValue, isBSub, value }, _setState] = useState(() => {
+    let [
+        {
+            firstValue,
+            isBSub,
+            value,
+        },
+        _setState
+    ] = useState(() => {
         const isBSub = _subject instanceof BehaviorSubject
         let value = isBSub
             ? _subject.value
@@ -513,6 +523,7 @@ export const useRxSubject = (
             value,
             subject,
         })
+
         return {
             firstValue: value,
             isBSub,
@@ -565,10 +576,23 @@ export const useRxSubject = (
 
     return [
         value,
-        newValue => _subject.next(newValue),
+        setValue,
         _subject,
     ]
 }
+
+/**
+ * @name    useRxSubjectOrValue
+ * @summary sugar for useRxSubject with condition to only use it if a subject is supplied.
+ * If no subject is supplied, will return it immediately
+ * 
+ * @param   {*} subject subject or value
+ * 
+ * @returns {*}
+ */
+export const useRxSubjectOrValue = (subject, ...args) => !isSubjectLike(subject)
+    ? subject
+    : useRxSubject(subject, ...args)[0]
 
 /**
  * @name    useRxSubjects

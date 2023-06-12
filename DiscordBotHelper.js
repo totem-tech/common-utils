@@ -5,7 +5,7 @@ const token = process.env.Discord_Bot_Token
 // Create an instance of a Discord client
 const client = new Client()
 
-
+// WIP
 class DiscordBot {
     constructor(token) {
         this.client = new Client()

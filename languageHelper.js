@@ -1,8 +1,10 @@
+import { BehaviorSubject } from 'rxjs'
 import DataStorage from './DataStorage'
 import storage from '../utils/storageHelper'
 import {
     clearClutter,
     downloadFile,
+    fallbackIfFails,
     generateHash,
     getUrlParam,
     isNodeJS,
@@ -11,14 +13,15 @@ import {
 } from './utils'
 
 export const translations = new DataStorage('totem_static_translations')
-export const EN = 'EN'
-const MODULE_KEY = 'language'
+// language the app texts are written
+export const APP_LANG = fallbackIfFails(() => process.env.APP_LANG || 'EN', [], 'EN')
+export const MODULE_KEY = 'language'
 const rw = value => storage.settings.module(MODULE_KEY, value) || {}
-let _selected = rw().selected || EN
+let _selected = rw().selected || APP_LANG
 export const BUILD_MODE = isNodeJS()
     ? process.env.BUILD_MODE
     : getUrlParam('build-mode', window.location.href)
-        .toLowerCase() == 'true'
+        .toLowerCase() === 'true'
     && window.location.hostname !== 'totem.live'
 export const languages = Object.freeze({
     // AR: 'Arabic - عربي',
@@ -64,10 +67,10 @@ export const digitsTranslated = (texts = {}, langCode = getSelected()) => !digit
 export const downloadTextListCSV = !BUILD_MODE ? null : () => {
     const seperator = ','
     const langCodes = [
-        EN,
+        APP_LANG,
         ...Object
             .keys(languages)
-            .filter(x => x != EN),
+            .filter(x => x != APP_LANG),
     ]
     const rest = langCodes.slice(1)
     const cols = 'abcdefghijklmnopqrstuvwxyz'
@@ -96,7 +99,6 @@ export const downloadTextListCSV = !BUILD_MODE ? null : () => {
     downloadFile(str, `English-texts-${new Date().toISOString()}.csv`, 'text/csv')
 }
 
-// retrieve latest translated texts from server and save to local storage
 /**
  * @name    fetchNSaveTexts
  * @summary retrieve and cache English and translated texts based on selected language
@@ -108,16 +110,16 @@ export const downloadTextListCSV = !BUILD_MODE ? null : () => {
 export const fetchNSaveTexts = async (client) => {
     if (!client) return console.trace('Client not specified')
     const selected = getSelected()
-    if (selected === EN) {
+    if (selected === APP_LANG) {
         setTexts(selected, null, null)
         return
     }
 
     const selectedHash = generateHash(getTexts(selected) || '')
-    const engHash = generateHash(getTexts(EN) || '')
+    const engHash = generateHash(getTexts(APP_LANG) || '')
     const func = client.languageTranslations
     const [textsEn, texts] = await Promise.all([
-        func(EN, engHash),
+        func(APP_LANG, engHash),
         func(selected, selectedHash),
     ])
 
@@ -156,58 +158,70 @@ export const setSelected = async (selected, client) => {
 export const setTexts = (langCode, texts, enTexts) => translations.setAll(
     new Map(
         // remove all language cache if selected is English
-        langCode === EN
+        langCode === APP_LANG
             ? []
             : [
-                [EN, enTexts || translations.get(EN)],
+                [APP_LANG, enTexts || translations.get(APP_LANG)],
                 [langCode, texts || translations.get(langCode)],
             ].filter(Boolean)
     ),
     true,
 )
 
-export const translated = (texts = {}, capitalized = false, fullSentence, forceLowercase) => {
-    if (isStr(texts)) return translated({ texts }, capitalized)[capitalized ? 1 : 0].texts
-
-    const langCode = getSelected()
-    // translation not required
-    if (langCode === EN && !BUILD_MODE) return [texts, capitalized && textCapitalize(texts)]
-
-    const en = translations.get(EN) || []
-    // list of selected language texts
-    const selected = translations.get(langCode) || []
-    // attempt to build a single list of english texts for translation
-    if (BUILD_MODE) {
-        window.enList = window.enList || []
-        Object.values(texts).forEach(text => {
-            if (!text) return
-            text = clearClutter(text)
-            enList.indexOf(text) === -1 && enList.push(text)
-        })
-        window.enList = enList.sort()
+export const translated = (
+    texts = {},
+    capitalized = false,
+    fullSentence,
+    forceLowercase,
+) => {
+    if (isStr(texts)) {
+        const result = translated({ texts }, capitalized)
+        return result[capitalized ? 1 : 0].texts
     }
 
-    Object.keys(texts).forEach(key => {
-        if (!texts[key]) return
-        const text = clearClutter(texts[key])
-        const enIndex = en.indexOf(text)
-        const translatedText = selected[enIndex]
-        // fall back to original/English,
-        // if selected language is not supported 
-        // or due to network error language data download failed
-        // or somehow supplied text wasn't translated
-        if (!translatedText) return
-        texts[key] = translatedText
-    })
+    const langCode = getSelected()
+    if (langCode !== APP_LANG || BUILD_MODE) {
+        const en = translations.get(APP_LANG) || []
+        // list of selected language texts
+        const selected = translations.get(langCode) || []
+        // attempt to build a single list of english texts for translation
+        if (BUILD_MODE) {
+            window.enList = window.enList || []
+            Object.values(texts).forEach(text => {
+                if (!text) return
+                text = clearClutter(text)
+                enList.indexOf(text) === -1 && enList.push(text)
+            })
+            window.enList = enList.sort()
+        }
+
+        Object.keys(texts).forEach(key => {
+            if (!texts[key]) return
+            const text = clearClutter(texts[key])
+            const enIndex = en.indexOf(text)
+            const translatedText = selected[enIndex]
+            // fall back to original/English,
+            // if selected language is not supported 
+            // or due to network error language data download failed
+            // or somehow supplied text wasn't translated
+            if (!translatedText) return
+            texts[key] = translatedText
+        })
+    }
+
     texts = digitsTranslated(texts, langCode)
-    capitalized = capitalized && digitsTranslated(
-        textCapitalize(
-            texts,
-            fullSentence,
-            forceLowercase,
-        ),
-        langCode,
-    )
+    if (capitalized) {
+        const textsNoCaps = { ...texts }
+        capitalized = digitsTranslated(
+            textCapitalize(
+                texts,
+                fullSentence,
+                forceLowercase,
+            ),
+            langCode,
+        )
+        texts = textsNoCaps
+    }
     return [texts, capitalized]
 }
 

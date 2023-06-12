@@ -1,12 +1,21 @@
 import { BehaviorSubject } from 'rxjs'
-import { getUrlParam as _getUrlParam, isBool, isDefined, isFn } from './utils'
+import {
+    getUrlParam as _getUrlParam,
+    isBool,
+    isDefined,
+    isFn,
+    isNodeJS,
+} from './utils'
 import storage from './storageHelper'
 import { useRxSubject } from './reactHelper'
 
 const MODULE_KEY = 'window'
 let _forcedLayout = ''
 const rw = value => storage.settings.module(MODULE_KEY, value) || {}
-export const checkDarkPreferred = () => window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+export const isBrowser = !isNodeJS()
+const _window = isBrowser ? window : {}
+const _document = isBrowser ? document : {}
+export const checkDarkPreferred = () => !!_window.matchMedia?.('(prefers-color-scheme: dark)')?.matches
 export const MOBILE = 'mobile'
 export const DESKTOP = 'desktop'
 export const rxGridColumns = new BehaviorSubject(gridColumns())
@@ -30,14 +39,20 @@ export const gridClasses = [
 // forceLayout enforces and reverts a specific layout size and ignores layout change when window resizes
 //
 // Params:
-// @size    string: a valid size name listed in `validSizes`. If not valid will set to dynamic layout base on `window.innerWidth` value.
+// @size    string: a valid size name listed in `validSizes`. If not valid will set to dynamic layout base on `_window.innerWidth` value.
 export const forceLayout = size => {
-    _forcedLayout = [DESKTOP, MOBILE].includes(size) ? size : ''
-    window.onresize()
+    _forcedLayout = [DESKTOP, MOBILE].includes(size)
+        ? size
+        : ''
+    _window.onresize?.()
 }
 
 export function getLayout() {
-    return _forcedLayout || (window.innerWidth <= 991 ? MOBILE : DESKTOP)
+    return _forcedLayout || (
+        _window.innerWidth <= 991
+            ? MOBILE
+            : DESKTOP
+    )
 }
 
 /**
@@ -50,7 +65,7 @@ export function getLayout() {
  * 
  * @returns {String|Object}
  */
-export const getUrlParam = (name, url = window.location.href) => _getUrlParam(name, url)
+export const getUrlParam = (name, url = _window?.location?.href) => _getUrlParam(name, url)
 
 // gridColumns read/writes main content grid column count
 export function gridColumns(numCol) {
@@ -58,9 +73,11 @@ export function gridColumns(numCol) {
     value && rxGridColumns.next(numCol)
     return rw(value).gridColumns || 1
 }
+
 export const setClass = (selector, obj, retry = true) => {
-    const el = document.querySelector(selector)
+    const el = _document.querySelector?.(selector)
     if (!el) return retry && setTimeout(() => setClass(selector, obj, false), 100)
+
     Object.keys(obj).forEach(className => {
         const func = obj[className] ? 'add' : 'remove'
         el.classList[func](className)
@@ -96,22 +113,22 @@ export const setInvertedBrowser = (useBrowser) => {
  */
 export const toggleFullscreen = (selector) => {
     // target element to toggle fullscreen
-    const el = document.querySelector(selector) || {}
-    var fsEl = document.fullscreenElement
-        || document.webkitFullscreenElement
-        || document.mozFullScreenElement
-        || document.msFullscreenElement
+    const el = _document.querySelector?.(selector) || {}
+    var fsEl = _document.fullscreenElement
+        || _document.webkitFullscreenElement
+        || _document.mozFullScreenElement
+        || _document.msFullscreenElement
     const isFS = isDefined(fsEl)
 
     // function to exit fullscreen
-    const exitFS = document.exitFullscreen
-        || document.mozCancelFullScreen
-        || document.webkitExitFullscreen
-        || document.msExitFullscreen
+    const exitFS = _document.exitFullscreen
+        || _document.mozCancelFullScreen
+        || _document.webkitExitFullscreen
+        || _document.msExitFullscreen
 
     // exit if already in fullscreen mode
     if (isFS) {
-        exitFS.call(document)
+        exitFS?.call?.(document)
         // target element has just been toggled 
         if (fsEl === el) return
     }
@@ -123,7 +140,7 @@ export const toggleFullscreen = (selector) => {
         || el.msRequestFullscreen /* IE/Edge */
 
 
-    isFn(goFS) && setTimeout(() => goFS.call(el), isFS ? 50 : 0)
+    setTimeout(() => goFS?.call?.(el), isFS ? 50 : 0)
     toggleFullscreen.lastSelector = el && selector || ''
     return el
 }
@@ -153,38 +170,42 @@ export const useInverted = (reverse = false) => {
     })
     return inverted
 }
-// set layout name on window resize 
-window.onresize = () => {
-    const layout = getLayout()
-    rxLayout.value !== layout && rxLayout.next(layout)
+
+if (isBrowser) {
+    // set layout name on window resize 
+    _window.onresize = () => {
+        const layout = getLayout()
+        rxLayout.value !== layout && rxLayout.next(layout)
+    }
+    _window.addEventListener?.('online', () => rxOnline.next(true))
+    _window.addEventListener?.('offline', () => rxOnline.next(false))
+    let ignoredFirstInverted = false
+    rxInverted.subscribe(inverted => {
+        ignoredFirstInverted && rw({
+            inverted,
+            invertedBrowser: false,
+        })
+        ignoredFirstInverted = true
+        setClass('body', { inverted })
+    })
+    rxLayout.subscribe(layout => {
+        setClass('body', {
+            desktop: layout === DESKTOP,
+            mobile: layout === MOBILE,
+        })
+    })
+    // keeps track of whether window/tab is visible
+    _document.addEventListener('visibilitychange', () =>
+        rxVisible.next(_document.visibilityState === 'visible')
+    )
+    rxGridColumns.subscribe(numCol => {
+        const el = _document.getElementById('main-content')
+        if (!el) return
+        const next = gridClasses[numCol - 1]
+        el.classList.remove('simple-grid', ...gridClasses.filter(c => c && c !== next))
+        next && el.classList.add('simple-grid', next)
+    })
 }
-window.addEventListener('online', () => rxOnline.next(true))
-window.addEventListener('offline', () => rxOnline.next(false))
-let ignoredFirstInverted = false
-rxInverted.subscribe(inverted => {
-    ignoredFirstInverted && rw({
-        inverted,
-        invertedBrowser: false,
-    })
-    ignoredFirstInverted = true
-    setClass('body', { inverted })
-})
-rxLayout.subscribe(layout => {
-    setClass('body', {
-        desktop: layout === DESKTOP,
-        mobile: layout === MOBILE,
-    })
-})
-document.addEventListener('visibilitychange', () =>
-    rxVisible.next(document.visibilityState === 'visible')
-)
-rxGridColumns.subscribe(numCol => {
-    const el = document.getElementById('main-content')
-    if (!el) return
-    const next = gridClasses[numCol - 1]
-    el.classList.remove('simple-grid', ...gridClasses.filter(c => c && c !== next))
-    next && el.classList.add('simple-grid', next)
-})
 export default {
     checkDarkPreferred,
     MOBILE,
