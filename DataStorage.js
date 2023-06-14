@@ -1,4 +1,4 @@
-import { BehaviorSubject, map, Subject } from 'rxjs'
+import { BehaviorSubject, Subject } from 'rxjs'
 import {
     isArr,
     isArr2D,

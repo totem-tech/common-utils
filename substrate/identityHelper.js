@@ -1,7 +1,13 @@
 import { cryptoWaitReady } from '@polkadot/util-crypto'
 import { BehaviorSubject } from 'rxjs'
 import DataStorage from '../DataStorage'
-import { isNodeJS, isObj, isStr, objClean, objHasKeys } from '../utils'
+import {
+	isNodeJS,
+	isObj,
+	isStr,
+	objClean,
+	objHasKeys,
+} from '../utils'
 import getKeyringHelper, { KeyringHelper } from './keyringHelper'
 import PolkadotExtensionHelper from './ExtensionHelper'
 

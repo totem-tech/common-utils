@@ -2,7 +2,7 @@ import ioClient from 'socket.io-client'
 import { BehaviorSubject } from 'rxjs'
 import { translated } from './languageHelper'
 import PromisE from './PromisE'
-import { subjectAsPromise } from './reactHelper'
+import { subjectAsPromise } from './reactjs'
 import storage from './storageHelper'
 import {
     deferred,

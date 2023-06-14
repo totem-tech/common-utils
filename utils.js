@@ -151,8 +151,7 @@ export const generateHash = (seed = uuidV1(), algo = 'blake2', bitLength = 256) 
 export const isAddress = (address, type, chainId = 0, ignoreChecksum = false) => {
 	try {
 		switch (`${type}`.toLowerCase()) {
-			case 'ethereum':
-				return isETHAddress(address, chainId || 0)
+			case 'ethereum': return isETHAddress(address, chainId || 0)
 			case 'polkadot':
 			default:
 				// assume Polkadot/Totem address
@@ -173,6 +172,7 @@ export const isArr = x => Array.isArray(x)
 export const isArr2D = x => isArr(x) && x.every(isArr)
 // checks if convertible to an array by using `Array.from(x)`
 export const isArrLike = x => isSet(x) || isMap(x) || isArr(x)
+// check if function is Async. Does not work when Babel/Webpack is used due to code compilation.
 export const isAsyncFn = x => x instanceof (async () => { }).constructor
 	&& x[Symbol.toStringTag] === 'AsyncFunction'
 export const isBool = x => typeof x === 'boolean'
@@ -187,20 +187,6 @@ export const isBond = x => {
 // Date object can sometimes be 'Invalid Date' without any timestamp.
 // Date.getTime() is used to make sure it's a valid Date
 export const isDate = x => x instanceof Date && isValidNumber(x.getTime())
-// checks if dateOrStr is a valid date
-export const isValidDate = dateOrStr => {
-	const date = new Date(dateOrStr)
-	if (!isDate(date)) return false
-
-	// hack to detect & prevent `new Date(dateOrStr)` converting '2021-02-31' to '2021-03-03'
-	const [original, converted] = [`${dateOrStr}`, date.toISOString()]
-		.map(y => y
-			.replace('T', '')
-			.replace('Z', '')
-			.substr(0, 10)
-		)
-	return original === converted
-}
 export const isDefined = x => x !== undefined && x !== null
 export const isError = x => x instanceof Error
 export const isETHAddress = (address, chainId) => {
@@ -226,6 +212,21 @@ export const isSubjectLike = x => isObj(x) && isFn(x.subscribe) && isFn(x.next)
 export const isTouchable = () => fallbackIfFails(() => 'ontouchstart' in document.documentElement, [], false)
 export const isUint8Arr = arr => arr instanceof Uint8Array
 export const isURL = x => x instanceof URL
+// checks if dateOrStr is a valid date
+export const isValidDate = dateOrStr => {
+	const date = new Date(dateOrStr)
+	if (!isDate(date)) return false
+
+	// hack to detect & prevent `new Date(dateOrStr)` converting '2021-02-31' to '2021-03-03'
+	const [original, converted] = [`${dateOrStr}`, date.toISOString()]
+		.map(y => y
+			.replace('T', '')
+			.replace('Z', '')
+			.substr(0, 10)
+		)
+	return original === converted
+}
+export const isValidNumber = x => typeof x == 'number' && !isNaN(x) && isFinite(x)
 export const isValidURL = (x, strict = true) => {
 	try {
 		const isAStr = isStr(x)
@@ -244,7 +245,6 @@ export const isValidURL = (x, strict = true) => {
 		return false
 	}
 }
-export const isValidNumber = x => typeof x == 'number' && !isNaN(x) && isFinite(x)
 export const hasValue = x => {
 	try {
 		if (!isDefined(x)) return false
@@ -302,7 +302,7 @@ export const arrMapSlice = (data, startIndex, endIndex, callback) => {
 	startIndex = startIndex || 0
 	endIndex = !endIndex || endIndex >= len ? len - 1 : endIndex
 	let result = []
-	for (var i = startIndex; i <= endIndex; i++) {
+	for (var i = startIndex;i <= endIndex;i++) {
 		let key = i, value = data[i]
 		if (isAMap) {
 			key = data[i][0]
@@ -364,7 +364,7 @@ export const arrSearch = (arr, keyValues, matchExact, matchAll, ignoreCase, asAr
 	if (!isObj(keyValues) || !isObjArr(arr)) return result
 
 	const keys = Object.keys(keyValues)
-	for (var index = 0; index < arr.length; index++) {
+	for (var index = 0;index < arr.length;index++) {
 		let matched = false
 		const item = arr[index]
 
@@ -549,7 +549,7 @@ export const getUrlParam = (name, url = '') => {
  */
 export const objCopy = (source = {}, dest = {}, ignore = [undefined]) => {
 	const sKeys = Object.keys(source)
-	for (let i = 0; i < sKeys.length; i++) {
+	for (let i = 0;i < sKeys.length;i++) {
 		const key = sKeys[i]
 		if (dest.hasOwnProperty(key) && ignore.includes(source[key])) continue
 
@@ -588,7 +588,7 @@ export const objClean = (obj, keys, recursive = false, ignoreIfNotExist = true) 
 	if (!isObj(obj) || !isArr(keys)) return {}
 
 	const result = {}
-	for (let i = 0; i < keys.length; i++) {
+	for (let i = 0;i < keys.length;i++) {
 		const key = keys[i]
 		if (ignoreIfNotExist && !obj.hasOwnProperty(key)) continue
 
@@ -629,7 +629,7 @@ export const objCreate = (keys, values) => {
 	// arrays of keys and values supplied
 	if (!isArr(values)) values = [values]
 
-	for (let i = 0; i < keys.length; i++) {
+	for (let i = 0;i < keys.length;i++) {
 		const key = keys[i]
 		const value = values[i]
 		obj[key] = value
@@ -650,7 +650,7 @@ export const objCreate = (keys, values) => {
 export function objHasKeys(obj = {}, keys = [], requireValue = false) {
 	if (!isObj(obj) || !isArr(keys)) return false
 
-	for (let i = 0; i < keys.length; i++) {
+	for (let i = 0;i < keys.length;i++) {
 		const key = keys[i]
 		if (!obj.hasOwnProperty(key)) return false
 		if (!requireValue) continue
@@ -775,7 +775,7 @@ export const objWithoutKeys = (input, keys, output = { ...input }) => {
 	if (!isObj(input)) return {}
 	if (!isArr(keys) || !keys.length) return input
 
-	for (let i = 0; i < keys.length; i++) {
+	for (let i = 0;i < keys.length;i++) {
 		delete output[keys[i]]
 	}
 	return output

@@ -3,11 +3,10 @@ import {
     getUrlParam as _getUrlParam,
     isBool,
     isDefined,
-    isFn,
     isNodeJS,
 } from './utils'
 import storage from './storageHelper'
-import { useRxSubject } from './reactHelper'
+import { useRxSubject } from './reactjs'
 
 const MODULE_KEY = 'window'
 let _forcedLayout = ''
