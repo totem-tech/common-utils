@@ -16,19 +16,17 @@ import { copyRxSubject } from '../../rx.js'
  * @name    useRxSubject
  * @summary custom React hook for use with RxJS subject and auto update when value changes
  *
- * @param   {BehaviorSubject|Subject}   subject RxJS subject or subject like Object (with subscribe function)
- *              If not object or doesn't have subcribe function will assume subject to be a static value.
- * @param   {Boolean}   ignoreFirst whether to ignore first change.
- *              Setting `true`, will prevent an additional state update after first load.
- * @param   {Function}  valueModifier (optional) value modifier.
- *              If an async function is supplied, `ignoreFirst` will be assumed `false`.
- *              Args: `[newValue, oldValue, rxSubject]`
- * @param   {*}         initialValue (optional) initial value where appropriate
- * @param   {Boolean}   allowMerge (optional) only applicable if value is an object
- * @param   {Boolean}   allowSubjectUpdate (optional) whether to allow update of the subject or only state.
- *              CAUTION: if true and @subject is sourced from a DataStorage instance,
- *              it may override values in the LocalStorage values.
- *              Default: `false`
+ * @param   {BehaviorSubject}   subject             (optional) RxJS subject to observe, collect & update value from.
+ *                                                  If a not "subject like", will created an instance of BehaviorSubject
+ * @param   {Function}          valueModifier       (optional) callback to modify value received on change.
+ *                                                  Async function is accepted.
+ *                                                  Args: `[newValue, oldValue, rxSubject]`
+ * @param   {*}                 initialValue        (optional) initial value where appropriate
+ * @param   {Boolean}           allowMerge          (optional) only applicable if value is an object
+ * @param   {Boolean}           allowSubjectUpdate  (optional) whether to allow update of the subject or only state.
+ *                                                  CAUTION: if true and `@subject` is sourced from a DataStorage
+ *                                                  instance, it may override values in the LocalStorage values.
+ *                                                  Default: `false`
  *
  * @returns {Array}     [value, setvalue, subject]
  */
@@ -52,7 +50,7 @@ export const useRxSubject = (
             ),
         [subject],
     )
-    const setValue = useMemo(() => newValue => _subject.next(newValue), [_subject])
+    const setValue = useMemo(() => newValue => _subject.next(newValue), [])
 
     let [
         {
@@ -76,12 +74,12 @@ export const useRxSubject = (
         if (value === useRxSubject.IGNORE_UPDATE) {
             value = undefined
         }
-        debug && console.log({
-            firstValue: value,
-            isBSub,
-            value,
-            subject,
-        })
+        // debug && console.log({
+        //     firstValue: value,
+        //     isBSub,
+        //     value,
+        //     subject,
+        // })
 
         return {
             firstValue: value,
@@ -111,7 +109,10 @@ export const useRxSubject = (
             promise.then(newValue => {
                 if (newValue === useRxSubject.IGNORE_UPDATE) return
                 value = allowMerge
-                    ? { ...value, ...newValue }
+                    ? {
+                        ...isObj(value) && value,
+                        ...newValue,
+                    }
                     : newValue
 
                 if (allowMerge && isBSub && isObj(_subject.value)) Object
@@ -123,7 +124,11 @@ export const useRxSubject = (
                             console.warn('useRxSubject:', err)
                         }
                     })
-                mounted && _setState({ isBSub, value })
+                mounted && _setState({
+                    firstValue,
+                    isBSub,
+                    value,
+                })
             })
             promise.catch(err => console.log('useRxSubject => unexpected error:', err))
         })

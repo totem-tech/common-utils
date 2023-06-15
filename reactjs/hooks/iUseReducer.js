@@ -6,7 +6,7 @@ import {
 import { BehaviorSubject } from 'rxjs'
 import { isFn } from '../../utils'
 
-/** ToDo: deprecate or simply use `useRxSubject` with an object as initial value
+/** ToDo: deprecate (use `useRxSstate` instead)
  * @name    iUseReducer
  * @summary A sugar for React `userReducer` with added benefit of tracking of component mounted status.
  *          Prevents state update if component is not mounted.
@@ -57,7 +57,7 @@ export const iUseReducer = (reducerFn, initialState = {}, onUnmount) => {
     return [state, setState]
 }
 
-/**
+/** ToDo: deprecate along with iUserReducer
  * @name    reducer
  * @summary simple reducer to mimic Class component setState behavior
  *

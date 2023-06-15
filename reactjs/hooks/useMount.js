@@ -15,7 +15,7 @@ import { fallbackIfFails } from '../../utils'
 export const useMount = (onMount, onUnmount) => {
     useEffect(() => {
         fallbackIfFails(onMount, [true])
-        if (onUnmount === true) onUnmount = onMount
+        if (onMount && onUnmount === true) onUnmount = onMount
 
         return () => fallbackIfFails(onUnmount, [false])
     }, [])

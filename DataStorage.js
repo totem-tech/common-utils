@@ -126,11 +126,12 @@ export default class DataStorage {
      *  - `disableCache = false`: data is never preserved in-memory and every read/write 
      *      operation will be directly from/to the appropriate storage
      *
-     * @param {String}    name filename (NodeJS) or property name (browser LocalStorage).
-     * @param {Boolean}   disableCache (optional) Whether to keep data in-memory. Default: false
-     * @param {Function}  onChange (optional) callback to be invoked on change of data.
-     *                      See Subject/BehaviorSubject.subscribe for more details.
-     * @param {Map}       initialValue (optional) Default: new Map()
+     * @param {String}    name          filename (NodeJS) or property name (browser LocalStorage).
+     * @param {Boolean}   disableCache  (optional) Whether to keep data in-memory. 
+     *                                  Default: `false`
+     * @param {Function}  onChange      (optional) callback to be invoked on change of data.
+     *                                  See Subject/BehaviorSubject.subscribe for more details.
+     * @param {Map}       initialValue  (optional) Default: new Map()
      */
     constructor(name, disableCache = false, initialValue, onChange, storage = _storage) {
         let data = (name && read(name, true, storage)) || initialValue
@@ -200,7 +201,9 @@ export default class DataStorage {
      */
     delete(keys = []) {
         const data = this.getAll()
-        keys = isArr(keys) ? keys : [keys]
+        keys = isArr(keys)
+            ? keys
+            : [keys]
         // nothing to do
         if (!keys.length) return this
 

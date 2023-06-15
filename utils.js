@@ -618,23 +618,21 @@ export const objClean = (obj, keys, recursive = false, ignoreIfNotExist = true) 
  * @name	objCreate
  * @summary constructs a new object with supplied key(s) and value(s)
  * 
- * @param	{String|Array}	keys 
- * @param	{*|Array}		values 
+ * @param	{Array}	keys
+ * @param	{Array}		values	(optional)
+ * @param	{Object}		result	(optional)
+ * 
  * 
  * @returns	{Object}
  */
-export const objCreate = (keys, values) => {
-	const obj = {}
-	if (!isArr(keys)) keys = [keys]
-	// arrays of keys and values supplied
-	if (!isArr(values)) values = [values]
-
+export const objCreate = (keys = [], values = [], result = {}) => {
+	if (!isArr(keys) || !isArr(values) || !isObj(result)) return {}
 	for (let i = 0;i < keys.length;i++) {
 		const key = keys[i]
 		const value = values[i]
-		obj[key] = value
+		result[key] = value
 	}
-	return obj
+	return result
 }
 
 /**
