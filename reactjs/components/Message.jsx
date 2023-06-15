@@ -259,7 +259,7 @@ export const setupDefaults = (name, library) => {
             dp.components.Header = null
             dp.iconMapping = { ...statusIcons }
             dp.iconProps = {
-                style: { fontSize: 22 }
+                style: { fontSize: 35 }
             }
 
             // for legacy status support in the totem-ui repo
