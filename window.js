@@ -1,31 +1,25 @@
 import { BehaviorSubject } from 'rxjs'
-import {
-    getUrlParam as _getUrlParam,
-    isBool,
-    isDefined,
-    isNodeJS,
-} from './utils'
 import storage from './storageHelper'
 import { useRxSubject } from './reactjs'
+import {
+    getUrlParam as _getUrlParam,
+    fallbackIfFails,
+    isBool,
+    isDefined,
+    isFn,
+} from './utils'
 
 const MODULE_KEY = 'window'
 let _forcedLayout = ''
 const rw = value => storage.settings.module(MODULE_KEY, value) || {}
-export const isBrowser = !isNodeJS()
-const _window = isBrowser ? window : {}
-const _document = isBrowser ? document : {}
-export const checkDarkPreferred = () => !!_window.matchMedia?.('(prefers-color-scheme: dark)')?.matches
+const _document = fallbackIfFails(() => document, [], {})
+const _window = fallbackIfFails(() => window, [], {})
+export const checkDarkPreferred = () => !!_window
+    .matchMedia
+    ?.('(prefers-color-scheme: dark)')
+    ?.matches
 export const MOBILE = 'mobile'
 export const DESKTOP = 'desktop'
-export const rxGridColumns = new BehaviorSubject(gridColumns())
-export const rxOnline = new BehaviorSubject()
-export const rxInverted = new BehaviorSubject(
-    [undefined, true].includes(rw().invertedBrowser)
-        ? !!checkDarkPreferred()
-        : rw().inverted
-)
-export const rxLayout = new BehaviorSubject(getLayout())
-export const rxVisible = new BehaviorSubject(true)
 export const gridClasses = [
     '',
     'col-2',
@@ -34,6 +28,16 @@ export const gridClasses = [
     'col-5',
     'col-6',
 ]
+export const isBrowser = !!_document && isFn(_document.getElementById)
+export const rxGridColumns = new BehaviorSubject(gridColumns())
+export const rxInverted = new BehaviorSubject(
+    [undefined, true].includes(rw().invertedBrowser)
+        ? !!checkDarkPreferred()
+        : rw().inverted
+)
+export const rxLayout = new BehaviorSubject(getLayout())
+export const rxOnline = new BehaviorSubject()
+export const rxVisible = new BehaviorSubject(true)
 
 // forceLayout enforces and reverts a specific layout size and ignores layout change when window resizes
 //

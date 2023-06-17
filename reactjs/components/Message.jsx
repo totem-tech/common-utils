@@ -53,7 +53,7 @@ export const icons = {
  * }} />
  * ```
  */
-const Message = React.memo(({
+export const Message = React.memo(({
     children,
     background,
     color,
@@ -247,9 +247,9 @@ Message.propTypes = {
     status: PropTypes.string,
     style: PropTypes.object,
 }
-export default Message
-
-export const setupDefaults = (name, library) => {
+// Optionally, configure default props based on UI library.
+// If not setup, Message will not display any icons.
+Message.setupDefaults = (name, library) => {
     if (!name || !library) return
 
     const dp = Message.defaultProps
@@ -271,8 +271,9 @@ export const setupDefaults = (name, library) => {
             statuses.WARNING = 'warning'
             break
         case '@mui/material':
-            dp.components.Container = library.Alert
-            dp.components.Header = library.AlertTitle
+            const { Alert, AlertTitle } = library
+            dp.components.Container = Alert
+            dp.components.Header = AlertTitle
             // dp.components.Icon = Icon // ToDo: Use custom IconMUI 
             dp.header = { marginBottom: 0 }
             dp.iconProps = {
@@ -292,3 +293,4 @@ export const setupDefaults = (name, library) => {
             }
     }
 }
+export default Message

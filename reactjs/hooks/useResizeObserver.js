@@ -18,5 +18,4 @@ export const useResizeObserver = (ref, callback) => {
 
     return ref
 }
-
 export default useResizeObserver

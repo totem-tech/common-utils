@@ -45,3 +45,5 @@ export const useRxSubjects = (
         _subjects,
     ]
 }
+
+export default useRxSubjects

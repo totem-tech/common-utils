@@ -1,4 +1,5 @@
 export * from './iUseReducer'
+export * from './useIsMobile'
 export * from './useMount'
 export * from './useMutationObserver'
 export * from './usePromise'

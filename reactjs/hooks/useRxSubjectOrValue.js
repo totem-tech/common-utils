@@ -13,3 +13,5 @@ import useRxSubject from './useRxSubject'
 export const useRxSubjectOrValue = (subject, ...args) => !isSubjectLike(subject)
     ? subject
     : useRxSubject(subject, ...args)[0]
+
+export default useRxSubjectOrValue

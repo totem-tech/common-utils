@@ -49,3 +49,4 @@ export const usePromise = (promise, resultModifier, errorModifier) => {
 
     return [state.result, state.error]
 }
+export default usePromise

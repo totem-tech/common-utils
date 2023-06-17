@@ -104,15 +104,20 @@ export const getClient = (url, disconnectDelayMs) => {
 
     instance.onConnect(async () => {
         rxIsConnected.next(true)
-        const active = await instance.maintenanceMode.promise(null, null)
+        const active = await instance.maintenanceMode()
         rxIsInMaintenanceMode.next(active)
         if (!rxIsRegistered.value) return
 
+        // wait until until maintenance mdoe is disabled and then attempt to login
+        await subjectAsPromise(rxIsInMaintenanceMode, false)[0]
         // auto login on connect to messaging service
         const { id, secret } = getUser() || {}
         instance
             .login(id, secret)
-            .then(() => console.log(new Date().toISOString(), 'Logged into messaging service'))
+            .then(() => console.log(
+                new Date().toISOString(),
+                'Logged into messaging service'
+            ))
             .catch(console.error)
     })
     instance.onConnectError(error => {
