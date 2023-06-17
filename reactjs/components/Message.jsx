@@ -1,7 +1,7 @@
 import React, { isValidElement } from 'react'
 import PropTypes from 'prop-types'
 import {
-    icons as statusIcons,
+    icons as semanticIcons,
     isDefined,
     isObj,
     isStr,
@@ -10,7 +10,7 @@ import {
 import { useInverted } from '../../../utils/window'
 import { toProps } from '../toProps'
 
-export const colors = {
+export const statusColors = {
     error: '#b71c1c',
     error_bg: '#ffcdd2',
     info: '#212121',
@@ -31,7 +31,7 @@ export const statuses = {
     warning: 'warning',
 }
 
-export const icons = {
+export const statusIcons = {
     basic: '',
     error: '',
     loading: '',
@@ -69,6 +69,7 @@ export const Message = React.memo(({
     iconProps = {},
     inverted = useInverted(),
     header,
+    library,
     severity,
     status = severity,
     style = {},
@@ -77,6 +78,7 @@ export const Message = React.memo(({
 }) => {
     if (!text && !header) return ''
 
+    const isSemantic = library === 'semantic-ui-react'
     const { opacity = dp?.style?.opacity } = style
     const dp = Message.defaultProps
     const headerProps = {
@@ -175,7 +177,7 @@ export const Message = React.memo(({
             objWithoutKeys(statuses, ['basic', 'loading'])[status]
             || undefined,
         status,
-        ...{
+        ...isSemantic && {
             // Semantic UI status
             positive: status === statuses.success,
             negative: status === statuses.error,
@@ -203,12 +205,12 @@ export const Message = React.memo(({
 Message.defaultProps = {
     background: undefined,
     color: undefined,
-    colorMapping: colors,
+    colorMapping: statusColors,
     components: {
         Content: 'div',
         Header: 'div',
     },
-    iconMapping: icons,
+    iconMapping: statusIcons,
 }
 Message.propTypes = {
     // background color if `Content` not supplied
@@ -253,11 +255,12 @@ Message.setupDefaults = (name, library) => {
     if (!name || !library) return
 
     const dp = Message.defaultProps
+    dp.library = name
     switch (`${name}`.toLowerCase()) {
         case 'semantic-ui-react':
             dp.components.Container = library.Message
             dp.components.Header = null
-            dp.iconMapping = { ...statusIcons }
+            dp.iconMapping = { ...semanticIcons }
             dp.iconProps = {
                 style: { fontSize: 35 }
             }

@@ -17,6 +17,7 @@ export const HASH_REGEX = /^0x[0-9a-f]{64}$/i
 // doesn't work well on URLs with ports!!! Matches emails too!
 export const URL_REGEX = /((([A-Za-z]{3,9}:(?:\/\/)?)(?:[\-;:&=\+\$,\w]+@)?[A-Za-z0-9\.\-]+|(?:www\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+)((?:\/[\+~%\/\.\w\-_]*)?\??(?:[\-\+=&;%@\.\w_]*)#?(?:[\.\!\/\\\w]*))?)/g
 // default icons used in Message component
+// ToDo: move to `reactjs/components/Message`
 export const icons = {
 	basic: '',
 	error: 'exclamation circle',

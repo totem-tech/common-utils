@@ -16,5 +16,5 @@ Memo.propTypes = {
     M: PropTypes.elementType,
     // Rest of the props will be passed on to the component
 }
-
+export default Memo
 
