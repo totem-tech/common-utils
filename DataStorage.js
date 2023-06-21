@@ -459,7 +459,7 @@ export default class DataStorage {
      * @param {Boolean} silent  Whether to throw error if write operation fails.
      *                          Will print error message, regardless.
      */
-    write = (silent = true) => {
+    write(silent = true) {
         this.name && this.save && write(
             this.name,
             this.rxData.value,

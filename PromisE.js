@@ -260,8 +260,10 @@ PromisE.fetch = async (url, options, timeout, asJson = true) => {
     options.method = options.method || 'get'
     if (options.method === 'post') {
         // set default content type to JSON
-        options.headers ??= {}
-        options.headers['Content-Type'] ??= 'application/json'
+        // options.headers ??= {}
+        // options.headers['Content-Type'] ??= 'application/json'
+        options.headers = options.headers || {}
+        options.headers['Content-Type'] = options.headers['Content-Type'] || 'application/json'
     }
     if (isInteger(timeout)) options.signal = getAbortSignal(timeout)
 

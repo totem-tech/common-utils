@@ -120,18 +120,18 @@ subjectAsPromise.anyValueSymbol = Symbol('any-value')
 /**
  * @name    unsubscribe
  * @summary unsubscribe to multiple RxJS subscriptions
- * @param   {Function|Unsubscribable|Array} unsubscribables
+ * @param   {Function|Unsubscribable|Array} unsub
  */
-export const unsubscribe = (unsubscribables = {}) => {
+export const unsubscribe = (unsub = {}) => {
     // single function supplied
-    if (isFn(unsubscribables)) return unsubscribables()
+    if (isFn(unsub)) return unsub()
 
     // single
-    if (isFn(unsubscribables?.unsubscribe)) return unsubscribables.unsubscribe()
+    if (unsub && isFn(unsub.unsubscribe)) return unsub.unsubscribe()
 
     // multi
     Object
-        .values(unsubscribables)
+        .values(unsub)
         .forEach(x => {
             try {
                 if (!x) return
@@ -144,7 +144,3 @@ export const unsubscribe = (unsubscribables = {}) => {
             } catch (e) { } // ignore
         })
 }
-
-
-window.BehaviorSubject = BehaviorSubject
-window.copyRxSubject = copyRxSubject
