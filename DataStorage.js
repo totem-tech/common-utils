@@ -41,7 +41,7 @@ let _storage = getStorage()
  * 
  * @returns { LocalStorage }
  */
-export function getStorage(storagePath, quota = 500 * 1024 * 1024) {
+export function getStorage(storagePath, quota) {
     try {
         if (isNodeJS()) {
             const { LocalStorage } = require('node-localstorage')
@@ -49,7 +49,11 @@ export function getStorage(storagePath, quota = 500 * 1024 * 1024) {
             storagePath = storagePath
                 || process.env.STORAGE_PATH
                 || './data'
+            const fileLimit = process.env.STORAGE_FILE_LIMIT
             const absolutePath = require('path').resolve(storagePath)
+            quota = isValidNumber(quota)
+                ? quota
+                : parseInt(fileLimit || 500 * 1024 * 1024 * 1024)
             console.log('DataStorage', { STORAGE_PATH: storagePath, absolutePath })
 
             return new LocalStorage(absolutePath, quota)
@@ -96,8 +100,18 @@ export const read = (key, asMap = true, storage = _storage) => {
  * 
  * @param   {String}    key     file name (NodeJS) or property key (LocalStorage)
  * @param   {String|*}  value   will be converted to JSON string
+ * @param   {Boolean}   asMap   indicates whether value is a Map
+ * @param   {String|*}  value   will be converted to JSON string
+ * @param   {String|*}  value   will be converted to JSON string
+ * @param   {String|*}  value   will be converted to JSON string
  */
-export const write = (key, value, asMap = true, storage = _storage) => {
+export const write = (
+    key,
+    value,
+    asMap = true,
+    storage = _storage,
+    silent = true
+) => {
     // invalid key: ignore request
     if (!isStr(key)) return
     try {
@@ -112,7 +126,11 @@ export const write = (key, value, asMap = true, storage = _storage) => {
         }
         storage.setItem(key, value)
         return true
-    } catch (e) { }
+    } catch (e) {
+        if (!silent) throw e
+        console.log('DataStorage: failed to write file.', e)
+    }
+
 }
 
 export default class DataStorage {
@@ -157,12 +175,7 @@ export default class DataStorage {
                 ignoredFirst = true
                 return
             }
-            this.name && this.save && write(
-                this.name,
-                data,
-                true,
-                this.storage,
-            )
+            this.write()
             this.save = true
             isFn(onChange) && onChange(data)
         })
@@ -337,12 +350,14 @@ export default class DataStorage {
      * @name    setAll
      * @summary set multiple items at one go
      * 
-     * @param   {Map}     data     list of items
-     * @param   {Boolean} override whether to override or merge with existing data
+     * @param   {Map}     data      list of items
+     * @param   {Boolean} override  whether to override or merge with existing data
+     * @param   {Boolean} writeNow  whether to immediately write to storage. 
+     *                              If truthy, will throw error if fails to write to strorage
      * 
      * @returns {DataStorage}      reference to the DataStorage instance
      */
-    setAll(data, override = true, forceWrite = false) {
+    setAll(data, override = true, writeNow = false) {
         if (!isMap(data)) return this
         if (!override) {
             // merge data
@@ -354,14 +369,10 @@ export default class DataStorage {
             data = existing // merged value
         }
 
-        if (forceWrite) {
+        if (writeNow) {
             this.save = false
-            this.name && write(
-                this.name,
-                data,
-                true,
-                this.storage,
-            )
+            this.write(false)
+            this.save = true
         }
         this.rxData.next(data)
         return this
@@ -439,4 +450,22 @@ export default class DataStorage {
      * @returns {Array}
      */
     values() { return [...this.getAll().values()] }
+
+    /**
+     * @name    write
+     * @summary trigger a synchronous write operation to the localStorage (browser) or file (NodeJS).
+     * If storage doesn't have a `name` or `save` property is falsy will skip writing.
+     * 
+     * @param {Boolean} silent  Whether to throw error if write operation fails.
+     *                          Will print error message, regardless.
+     */
+    write = (silent = true) => {
+        this.name && this.save && write(
+            this.name,
+            this.rxData.value,
+            true,
+            this.storage,
+            silent,
+        )
+    }
 }
