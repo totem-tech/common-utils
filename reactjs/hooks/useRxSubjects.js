@@ -43,7 +43,7 @@ export const useRxSubjects = (
     subjects,
     valuesModifier,
     confs = [],
-    debug
+    defer,
 ) => {
     subjects = !isArr(subjects)
         ? [subjects]
@@ -55,6 +55,9 @@ export const useRxSubjects = (
             confs[i]?.initialValue,
             confs[i]?.allowMerge,
             confs[i]?.allowSubjectUpdate,
+            confs[i]?.defer !== undefined
+                ? config[i].defer
+                : defer
         )
     )
     const values = results.map(([value]) => value)

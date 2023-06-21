@@ -23,17 +23,14 @@ export const useRxStateDeferred = (initialState, defer = 100, conf) => {
         state,
         setState,
         rxState,
-    ] = useRxState(initialState, conf)
-    const setStateDeferred = useMemo(() =>
-        deferred(setState, defer),
-        [setState, defer]
-    )
+        setStateDeferred,
+    ] = useRxState(initialState, { ...conf, defer })
 
     return [
         state,
         setStateDeferred,
-        setState,
         rxState,
+        setState,
     ]
 }
 export default useRxStateDeferred

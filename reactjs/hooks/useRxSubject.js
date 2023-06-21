@@ -6,6 +6,7 @@ import {
 import { BehaviorSubject, Subject } from 'rxjs'
 import PromisE from '../../PromisE'
 import {
+    deferred,
     isFn,
     isObj,
     isSubjectLike,
@@ -36,7 +37,7 @@ export const useRxSubject = (
     initialValue,
     allowMerge = false,
     allowSubjectUpdate = false,
-    debug = false
+    defer = 100
 ) => {
     const _subject = useMemo(
         () => isSubjectLike(subject)
@@ -50,7 +51,16 @@ export const useRxSubject = (
             ),
         [subject],
     )
-    const setValue = useMemo(() => newValue => _subject.next(newValue), [])
+    const [setValue, setValueDeferred] = useMemo(() => {
+        const setState = newValue => _subject.next(newValue)
+
+        return [
+            setState,
+            defer > 0
+                ? deferred(setState, defer)
+                : undefined
+        ]
+    }, [])
 
     let [
         {
@@ -74,12 +84,6 @@ export const useRxSubject = (
         if (value === useRxSubject.IGNORE_UPDATE) {
             value = undefined
         }
-        // debug && console.log({
-        //     firstValue: value,
-        //     isBSub,
-        //     value,
-        //     subject,
-        // })
 
         return {
             firstValue: value,
@@ -91,7 +95,7 @@ export const useRxSubject = (
     useEffect(() => {
         let mounted = true
         let ignoreFirst = !isBSub
-        const subscribed = _subject.subscribe((newValue) => {
+        const subscribed = _subject.subscribe(newValue => {
             if (!ignoreFirst) {
                 ignoreFirst = true
                 if (firstValue === newValue) return
@@ -142,6 +146,7 @@ export const useRxSubject = (
         value,
         setValue,
         _subject,
+        setValueDeferred
     ]
 }
 // To prevent an update return this in valueModifier

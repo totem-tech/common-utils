@@ -6,7 +6,7 @@ import {
 import { BehaviorSubject } from 'rxjs'
 import { isFn } from '../../utils'
 
-/** ToDo: deprecate (use `useRxSstate` instead)
+/** ToDo: deprecate (use `useRxState` instead)
  * @name    iUseReducer
  * @summary A sugar for React `userReducer` with added benefit of tracking of component mounted status.
  *          Prevents state update if component is not mounted.

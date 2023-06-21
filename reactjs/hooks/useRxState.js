@@ -21,7 +21,7 @@ import useMount from './useMount'
  * @param   {BehaviorSubject}   conf.subject        (optional)
  * @param   {Function}          conf.valueModifier  (optional)
  * 
- * @returns {Array} [state, setState, rxState]
+ * @returns {Array} [state, setState, rxState, setStateDeferred]
  */
 export const useRxState = (
     initialState = {},
@@ -30,6 +30,7 @@ export const useRxState = (
 ) => {
     let {
         allowMerge,
+        defer,
         onMount,
         onUnmount,
         subject,
@@ -52,18 +53,19 @@ export const useRxState = (
     allowMerge ??= !!iniState
         && !isValidElement(iniState)
         && isObj(iniState)
-    const [state, setState] = useRxSubject(
-        subject,
+    const [state, setState, ...args] = useRxSubject(
+        rxState,
         valueModifier,
         iniState,
         allowMerge,
         true,
+        defer,
     )
 
     useMount(onMount, onUnmount)
 
     debugTag && console.log(debugTag, state)
 
-    return [state, setState, rxState]
+    return [state, setState, ...args]
 }
 export default useRxState
