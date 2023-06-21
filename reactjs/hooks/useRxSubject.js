@@ -37,10 +37,73 @@ export const useRxSubject = (
     initialValue,
     allowMerge = false,
     allowSubjectUpdate = false,
-    defer = 100
+    defer = 100,
+    debugTag,
 ) => {
-    const _subject = useMemo(
-        () => isSubjectLike(subject)
+    // const _subject = useMemo(
+    //     () => isSubjectLike(subject)
+    //         ? allowSubjectUpdate
+    //             ? subject
+    //             : copyRxSubject(subject)
+    //         : new BehaviorSubject(
+    //             initialValue !== undefined
+    //                 ? initialValue
+    //                 : subject
+    //         ),
+    //     [subject],
+    // )
+    // const [setValue, setValueDeferred] = useMemo(() => {
+    //     const setState = newValue => _subject.next(newValue)
+
+    //     return [
+    //         setState,
+    //         defer > 0
+    //             ? deferred(setState, defer)
+    //             : undefined
+    //     ]
+    // }, [])
+    // let [
+    //     {
+    //         firstValue,
+    //         isBSub,
+    //         value,
+    //     },
+    //     _setValue
+    // ] = useState(() => {
+    //     const isBSub = _subject instanceof BehaviorSubject
+    //     let value = isBSub
+    //         ? _subject.value
+    //         : initialValue
+    //     value = !isFn(valueModifier)
+    //         ? value
+    //         : valueModifier(
+    //             value,
+    //             undefined,
+    //             _subject,
+    //         )
+    //     if (value === useRxSubject.IGNORE_UPDATE) {
+    //         value = undefined
+    //     }
+
+    //     console.log({ value })
+    //     return {
+    //         firstValue: value,
+    //         isBSub,
+    //         value,
+    //     }
+    // })
+
+
+
+
+    const [
+        _subject,
+        firstValue,
+        isBSub,
+        setValue,
+        setValueDeferred
+    ] = useMemo(() => {
+        const _subject = isSubjectLike(subject)
             ? allowSubjectUpdate
                 ? subject
                 : copyRxSubject(subject)
@@ -48,28 +111,14 @@ export const useRxSubject = (
                 initialValue !== undefined
                     ? initialValue
                     : subject
-            ),
-        [subject],
-    )
-    const [setValue, setValueDeferred] = useMemo(() => {
+            )
         const setState = newValue => _subject.next(newValue)
+        let setState2 = setState
+        if (defer > 0) {
+            setState2 = deferred(setState, defer)
+            setState2.defer = defer
+        }
 
-        return [
-            setState,
-            defer > 0
-                ? deferred(setState, defer)
-                : undefined
-        ]
-    }, [])
-
-    let [
-        {
-            firstValue,
-            isBSub,
-            value,
-        },
-        _setState
-    ] = useState(() => {
         const isBSub = _subject instanceof BehaviorSubject
         let value = isBSub
             ? _subject.value
@@ -84,13 +133,16 @@ export const useRxSubject = (
         if (value === useRxSubject.IGNORE_UPDATE) {
             value = undefined
         }
-
-        return {
-            firstValue: value,
-            isBSub,
+        return [
+            _subject,
             value,
-        }
-    })
+            isBSub,
+            setState,
+            setState2,
+        ]
+    }, [subject])
+
+    let [value, _setValue] = useState(firstValue)
 
     useEffect(() => {
         let mounted = true
@@ -128,11 +180,7 @@ export const useRxSubject = (
                             console.warn('useRxSubject:', err)
                         }
                     })
-                mounted && _setState({
-                    firstValue,
-                    isBSub,
-                    value,
-                })
+                mounted && _setValue(value)
             })
             promise.catch(err => console.log('useRxSubject => unexpected error:', err))
         })
@@ -140,7 +188,7 @@ export const useRxSubject = (
             mounted = false
             subscribed.unsubscribe()
         }
-    }, [])
+    }, [_subject])
 
     return [
         value,
