@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { isArr, isFn } from '../../utils'
 import useRxSubject from './useRxSubject'
 
@@ -5,43 +6,64 @@ import useRxSubject from './useRxSubject'
  * @name    useRxSubjects
  * @summary custom React hook to observe an array of RxJS subjects and auto-update wehenever any of the value changes
  *
- * @param {Array}       subjects
- * @param {Function}    valuesModifier
- *
- *
+ * @param   {Array}     subjects        RxJS subjects to observe
+ * @param   {Function}  valuesModifier  (optional) callback to reduce/alter the subject values into a single value.
+ *                                      This will not affect the original subject values.
+ *                                      Args: 
+ *                                      - values    array
+ *                                      - subjects  array
+ * @param   {Array}     confs           (optional) configuration to be passed on to `useRxSubject` for each subject.
+ *                                      Array of objects with one or more of the following properties:
+ *                                      - allowMerge         bool
+ *                                      - allowSubjectUpdate bool
+ *                                      - initialValue       any
+ *                                      - valueModifier      function
+ * 
+ * @returns [values, RxJS subjects]
+ * 
  * @example
  * ```javascript
- * // Provide RxJS subjects
+ * // Observe multiple RxJS subjects
  * const [values, subjects] = useRxSubjects([
  *     new BehaviorSubject(1),
  *     new BehaviorSubject(2),
  * ])
  * console.log(values) // [1,2]
  *
- * // Provide values array instead of subjects.
- * // Will create new RxJS BehaviorSubjects from the values.
+ * // Create new RxJS BehaviorSubjects from the values.
  * const [values, subjects] = useRxSubjects([1, 2])
  * console.log(values) // [1,2]
+ * 
+ * 
+ * // 
  * ```
  *
- * @returns [values, RxJS subjects]
  */
 export const useRxSubjects = (
     subjects,
     valuesModifier,
+    confs = [],
+    debug
 ) => {
-    const results = (
-        !isArr(subjects)
-            ? [subjects]
-            : subjects
-    ).map(x => useRxSubject(x))
-    const values = results.map(x => x[0])
-    const _subjects = results.map(x => x[2])
+    subjects = !isArr(subjects)
+        ? [subjects]
+        : subjects
+    const results = subjects.map((subject, i) =>
+        useRxSubject(
+            subject,
+            confs[i]?.valueModifier,
+            confs[i]?.initialValue,
+            confs[i]?.allowMerge,
+            confs[i]?.allowSubjectUpdate,
+        )
+    )
+    const values = results.map(([value]) => value)
+    const _subjects = results.map(([_v, _s, subject]) => subject)
 
     return [
         !isFn(valuesModifier)
             ? values
-            : valuesModifier(values),
+            : valuesModifier(values, subjects),
         _subjects,
     ]
 }

@@ -1,7 +1,14 @@
-import { BehaviorSubject, Subject } from 'rxjs'
+import {
+    BehaviorSubject,
+    Subscribable,
+    Subject,
+    Unsubscribable,
+} from 'rxjs'
 import PromisE from './PromisE'
 import {
+    deferred,
     hasValue,
+    isArr,
     isFn,
     isSubjectLike,
     isValidNumber
@@ -14,39 +21,56 @@ import {
  * @description The the changes are applied unidirectionally from the source subject to the destination subject.
  * Changes on the destination subject is NOT applied back into the source subject.
  *
- * @param   {Object}    rxSource   RxJS source subject
- * @param   {Object}    rxCopy     (optional) RxJS copy/destination subject
- *                                 Default: `new BehaviorSubject()`
+ * @param   {Subscribable|Array}  rxSource  RxJS source subject(s). If Array, value of rxCopy will also be Array.
+ * @param   {Subscribable}        rxCopy    (optional) RxJS copy/destination subject
+ *                                          Default: `new BehaviorSubject()`
  *
- * @returns {Object}    subjectCopy
+ * @returns {Subscribable}        rxCopy
  */
-export const copyRxSubject = (rxSource, rxCopy, valueModifier) => {
-    if (!isSubjectLike(rxSource)) return new Subject()
-    if (!isSubjectLike(rxCopy)) {
-        rxCopy = rxSource instanceof BehaviorSubject
-            ? new BehaviorSubject(rxSource.value)
-            : new Subject()
-    }
-
-    const subscribe = rxCopy.subscribe
-    rxCopy.subscribe = (...args) => {
-        const sourceSub = rxSource.subscribe(value =>
-            rxCopy.next(
-                isFn(valueModifier)
-                    ? valueModifier(value)
-                    : value
-            )
+export const copyRxSubject = (rxSource, rxCopy, valueModifier, defer) => {
+    const sourceIsArr = isArr(rxSource)
+    const gotSource = !sourceIsArr
+        ? isSubjectLike(rxSource)
+        : rxSource.every(isSubjectLike)
+    rxCopy = isSubjectLike(rxCopy)
+        ? rxCopy
+        : new BehaviorSubject(
+            !sourceIsArr
+                ? rxSource.value
+                : rxSource.map(x => x.value)
         )
-        const localSub = subscribe.apply(rxCopy, args)
-        const { unsubscribe } = localSub
-        localSub.unsubscribe = (...args) => {
-            unsubscribe.apply(localSub, ...args)
-            sourceSub.unsubscribe()
+    if (!gotSource) return rxCopy
+
+    const subscribeOrg = rxCopy.subscribe
+    rxCopy.subscribe = (...args) => {
+        let setValue = value => rxCopy.next(
+            isFn(valueModifier)
+                ? valueModifier(value)
+                : value
+        )
+        if (defer > 0) setValue = deferred(setValue, defer)
+
+        let values = []
+        const subs = !sourceIsArr
+            ? rxSource.subscribe(setValue)
+            : rxSource.map((x, i) =>
+                x.subscribe(value => {
+                    console.log
+                    values[i] = value
+                    setValue(values)
+                })
+            )
+        const sub = subscribeOrg.call(rxCopy, ...args)
+        const unsubscribeOrg = sub.unsubscribe
+        sub.unsubscribe = (...args) => {
+            unsubscribeOrg.call(sub, ...args)
+            unsubscribe(subs)
         }
-        return localSub
+        return sub
     }
     return rxCopy
 }
+
 /**
  * @name    subjectAsPromise
  * @summary sugar for RxJS subject as promise and, optionally, wait until an expected value is received
@@ -93,21 +117,34 @@ export const subjectAsPromise = (subject, expectedValue, timeout) => {
 }
 subjectAsPromise.anyValueSymbol = Symbol('any-value')
 
-
 /**
  * @name    unsubscribe
  * @summary unsubscribe to multiple RxJS subscriptions
- * @param   {Object|Array} subscriptions
+ * @param   {Function|Unsubscribable|Array} unsubscribables
  */
-export const unsubscribe = (subscriptions = {}) => Object.values(subscriptions)
-    .forEach(x => {
-        try {
-            if (!x) return
-            const fn = isFn(x)
-                ? x
-                : isFn(x.unsubscribe)
-                    ? x.unsubscribe
-                    : null
-            fn && fn()
-        } catch (e) { } // ignore
-    })
+export const unsubscribe = (unsubscribables = {}) => {
+    // single function supplied
+    if (isFn(unsubscribables)) return unsubscribables()
+
+    // single
+    if (isFn(unsubscribables?.unsubscribe)) return unsubscribables.unsubscribe()
+
+    // multi
+    Object
+        .values(unsubscribables)
+        .forEach(x => {
+            try {
+                if (!x) return
+                const fn = isFn(x)
+                    ? x
+                    : isFn(x.unsubscribe)
+                        ? x.unsubscribe
+                        : null
+                fn && fn()
+            } catch (e) { } // ignore
+        })
+}
+
+
+window.BehaviorSubject = BehaviorSubject
+window.copyRxSubject = copyRxSubject

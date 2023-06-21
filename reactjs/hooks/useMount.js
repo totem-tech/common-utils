@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { fallbackIfFails } from '../../utils'
+import { fallbackIfFails, isArr } from '../../utils'
 
 /**
  * @name    useMount
@@ -14,10 +14,10 @@ import { fallbackIfFails } from '../../utils'
  */
 export const useMount = (onMount, onUnmount) => {
     useEffect(() => {
-        fallbackIfFails(onMount, [true])
+        onMount && fallbackIfFails(onMount, [true])
         if (onMount && onUnmount === true) onUnmount = onMount
 
-        return () => fallbackIfFails(onUnmount, [false])
+        return () => onUnmount && fallbackIfFails(onUnmount, [false])
     }, [])
 }
 

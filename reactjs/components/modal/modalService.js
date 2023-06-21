@@ -86,25 +86,25 @@ export class ModalService {
             onClose,
             onConfirm,
         } = confirmProps
-        const closeBtnProps = toProps(closeButton)
-        const confirmBtnProps = toProps(confirmButton)
+        const btnClose = toProps(closeButton)
+        const btnConfirm = toProps(confirmButton)
         const doConfirm = accepted => {
             isFn(onConfirm) && onConfirm(accepted)
             this.delete(id)
         }
-        closeButton = closeBtnProps !== null && {
-            ...closeBtnProps,
-            children: closeBtnProps?.children || textsCap.cancel,
-            onClick: (...args) => isFn(closeBtnProps?.onClick)
-                && closeBtnProps.onClick(...args),
+        closeButton = btnClose !== null && {
+            ...btnClose,
+            children: btnClose?.children || textsCap.cancel,
+            onClick: (...args) => isFn(btnClose?.onClick)
+                && btnClose.onClick(...args),
         }
-        confirmButton = confirmBtnProps !== null && {
-            ...confirmBtnProps || {},
-            status: confirmBtnProps?.status || 'success',
-            children: confirmBtnProps?.children || textsCap.confirm,
+        confirmButton = btnConfirm !== null && {
+            ...btnConfirm || {},
+            status: btnConfirm?.status || 'success',
+            children: btnConfirm?.children || textsCap.confirm,
             onClick: (...args) => {
                 doConfirm(true)
-                isFn(confirmBtnProps?.onClick) && confirmBtnProps.onClick(...args)
+                isFn(btnConfirm?.onClick) && btnConfirm.onClick(...args)
             },
         }
         return this.show(
@@ -118,6 +118,7 @@ export class ModalService {
                 content,
                 ignore: [
                     ...component?.defaultProps?.ignore || [],
+                    ...confirmProps?.ignore || [],
                     'onConfirm',
                     'confirmButton',
                 ],

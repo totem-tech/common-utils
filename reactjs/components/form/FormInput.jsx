@@ -2,6 +2,7 @@ import React, {
     isValidElement,
     useCallback,
     useEffect,
+    useMemo,
     useState,
 } from 'react'
 import PropTypes from 'prop-types'
@@ -9,6 +10,7 @@ import { BehaviorSubject } from 'rxjs'
 import { translated } from '../../../languageHelper'
 import {
     className,
+    deferred,
     hasValue,
     isArr,
     isDefined,
@@ -31,7 +33,7 @@ import CharacterCount from '../CharacterCount'
 import Message, { statuses } from '../Message'
 import RxSubjectView from '../RxSubjectView'
 import FormInputGroup from './FormInputGroup'
-import { useOptions } from './useOptions'
+import { useOptions as _useOptions } from './useOptions'
 import { addMissingProps } from './utils'
 import validateCriteria from './validateCriteria'
 
@@ -65,35 +67,10 @@ const defaultComponents = {
 }
 
 export const FormInput = React.memo(props => {
-    const input = { ...props }
-    useMount(
-        () => {
-            addMissingProps(input)
-            onMount?.(input)
-        },
-        () => onUnmount?.(input)
-    )
-
-    // useEffect(() => {
-    //     addMissingProps(input)
-
-    //     // trigger onMount callback
-    //     isFn(onMount) && onMount(input)
-
-    //     // trigger onUnmount callback
-    //     return () => isFn(onUnmount) && onUnmount(input)
-    // }, [])
-
-    if (input.type === 'group') return (
-        <FormInputGroup {...{
-            ...input,
-            components: {
-                FormInput,
-                ...input?.components,
-            }
-        }} />
-    )
-
+    const input = !props.addMissingProps
+        ? props
+        // makes sure required variables are set
+        : useMemo(() => addMissingProps(props), [props])
     let {
         checkedValue = true,
         components,
@@ -113,6 +90,7 @@ export const FormInput = React.memo(props => {
         criteria = [],
         criteriaHeader,
         customMessages,
+        errorClass = 'error',
         hidden = false,
         inputPrefix,
         inputSuffix,
@@ -132,16 +110,18 @@ export const FormInput = React.memo(props => {
         onMount,
         onUnmount,
         prefix,
+        required, // only use if inputProps.required should be different
         rxOptions,
         rxValue: _rxValue,
-        rxValueModifier, // modifies the value passed on to the input
+        rxValueModifier: _rxValueModifier, // modifies the value passed on to the input
         suffix,
-        type: typeAlt,
+        type,
         uncheckedValue = false,
-        useOptions: _useOptions = useOptions,
+        useOptions = _useOptions,
         validate,
     } = input
     components = {
+        InputGroup: FormInputGroup,
         ...defaultComponents,
         ...FormInput.defaultProps?.components,
         ...components,
@@ -149,15 +129,28 @@ export const FormInput = React.memo(props => {
     let {
         Container,
         Input,
+        InputGroup,
         Label,
         LabelDetails,
         Message,
     } = components
+    // trigger onMount callbacks
+    useMount(onMount, onUnmount)
+
+    if (input.type === 'group') return (
+        <InputGroup {...{
+            ...input,
+            components: {
+                FormInput,
+                ...input?.components,
+            }
+        }} />
+    )
     let {
         children: inputChildren,
         checked,
-        disabled,
-        error,
+        disabled = false,
+        error: _error,
         id,
         label: label2,
         maxLength,
@@ -167,102 +160,67 @@ export const FormInput = React.memo(props => {
         onChange,
         onFocus,
         options,
-        required = false,
-        type,
+        required: requiredAlt,
+        type: typeAlt,
         value: _value = '',
     } = inputProps
-    const gotRxValue = useState(() => isSubjectLike(_rxValue))
-
+    required ??= requiredAlt
+    type ??= typeAlt
     content = useRxSubjectOrValue(content)
     disabled = useRxSubjectOrValue(disabled)
     hidden = useRxSubjectOrValue(hidden)
     const isTypeHidden = type === 'hidden'
     const isHidden = hidden || isTypeHidden
 
-    // internal validation error message
+    // internal validation error status
+    const [error, setError] = useState(false)
     const [
-        {
-            error: _error,
-            message: _message,
-        },
-        setMessageDeferred,
-        setMessage,
-    ] = useRxStateDeferred([], messageDefer)
-    message = _message || message
+        rxMessageExt, // used to keep track of and update any external message (props.message)
+        rxIsFocused,  // keeps track of whether input field is focused
+        msgEl, // message element
+        rxValueModifier,
+        rxValue,
+        rxValueIsSubject,
+        msgExtIsSubject,
+        isOptionsType,
+        handleChange,
+    ] = useMemo(() => {
+        const addDeferred = (subject, defer = 0) => {
+            const nextOrg = subject.next.bind(subject)
+            subject.next = value => {
+                subject._timeoutId && clearTimeout(subject._timeoutId)
+                subject._timeoutId = null
+                return nextOrg(value)
+            }
+            const nextDeferred = deferred(nextOrg, defer)
+            subject.deferred = (...args) => {
+                subject._timeoutId = nextDeferred(...args)
+            }
+            // subject.deferred = deferred(v => subject.next(v), defer)
+            return subject
+        }
+        const isOptionsType = (!!options || !!rxOptions) && isFn(useOptions)
+        const msgExtIsSubject = isSubjectLike(message)
+        const rxIsFocused = new BehaviorSubject(false)
+        const rxMessage = new BehaviorSubject(null)
+        addDeferred(rxMessage, messageDefer)
+        const rxMessageExt = msgExtIsSubject
+            ? message
+            : new BehaviorSubject(message)
+        const rxValueIsSubject = isSubjectLike(_rxValue)
+        const rxValue = rxValueIsSubject
+            ? _rxValue
+            : new BehaviorSubject(_value)
 
-    // options for dropdown/selection type fields
-    const [replaceOptionsProp, optionItems] = (!!options || !!rxOptions)
-        && isFn(_useOptions)
-        && _useOptions(input)
-        || []
+        addDeferred(rxValue, 100)
+        const getMessageEl = ([message, messageExt, focused]) => {
+            message = message || messageExt
+            message = !isStr(message) && !isValidElement(message)
+                ? message
+                : { content: message }
 
-
-    // keeps track of whether input field is focused
-    const [rxIsFocused] = useState(() => new BehaviorSubject(false))
-
-    const valueModifier = useCallback((newValue, oldValue, rxValue) => {
-        if (isFn(rxValueModifier)) newValue = rxValueModifier(
-            newValue,
-            oldValue,
-            subject,
-        )
-        // trigger validation if rxValue was changed externally and on first load
-        if (rxValue.___validated !== newValue) setTimeout(() =>
-            handleChange({
-                preventDefault: () => { },
-                target: {
-                    value: newValue,
-                },
-                stopPropagation: () => { },
-            }),
-            1
-        )
-
-        return newValue
-    })
-    // re-render on value change regardless of direction
-    const [value, _, rxValue] = useRxSubject(_rxValue || _value, valueModifier)
-
-    // handle input value change
-    const handleChange = useCallback(
-        handleChangeCb(
-            input,
-            rxValue,
-            setMessageDeferred,
-            setMessage,
-        )
-    )
-
-    // if no rxValue provided and `value` changed externally
-    !gotRxValue && useEffect(() => {
-        setTimeout(() => _value !== value && rxValue.next(_value), 50)
-    }, [_value])
-
-    Input = optionItems && Input === 'input'
-        ? 'select'
-        : Input
-
-    if (hidden) return
-    if (isTypeHidden) return (
-        <input {...{
-            ...inputProps,
-            autoComplete: 'username',
-            style: { display: 'none' },
-            type: 'text',
-            value,
-        }} />
-    )
-
-    if (isStr(message) || isValidElement(message)) message = { content: message }
-
-    const msgEl = message && (
-        <RxSubjectView {...{
-            key: message?.key
-                || message?.content
-                || message?.text,
-            subject: rxIsFocused,
-            valueModifier: focused => message
-                && (focused || !messageHideOnBlur)
+            return !!message
+                && !!(focused || !messageHideOnBlur)
                 && !isHidden
                 && (
                     <Message {...{
@@ -272,7 +230,78 @@ export const FormInput = React.memo(props => {
                             message?.className,
                         ])
                     }} />
-                ),
+                )
+        }
+        const msgEl = (
+            <RxSubjectView {...{
+                key: 'message',
+                subject: [
+                    rxMessage,
+                    rxMessageExt,
+                    rxIsFocused,
+                ],
+                valueModifier: getMessageEl,
+            }} />
+        )
+        const handleChange = handleChangeCb(
+            input,
+            rxValue,
+            rxMessage,
+            setError,
+        )
+        // local rxValue modifier
+        const rxValueModifier = (newValue, oldValue) => {
+            if (isFn(_rxValueModifier)) newValue = _rxValueModifier(
+                newValue,
+                oldValue,
+                rxValue,
+            )
+            !isEqual(rxValue.___validated, newValue) && setTimeout(() => {
+                handleChange({
+                    preventDefault: () => { },
+                    target: {
+                        value: newValue,
+                    },
+                    stopPropagation: () => { },
+                })
+            }, 100)
+            return newValue
+        }
+        return [
+            rxMessageExt,
+            rxIsFocused,
+            msgEl,
+            rxValueModifier,
+            rxValue,
+            rxValueIsSubject,
+            msgExtIsSubject,
+            isOptionsType,
+            handleChange,
+        ]
+    }, [])
+    // synchronise rxMessageExt with external message if necessary
+    !msgExtIsSubject && useEffect(() => rxMessageExt.next(message), [message])
+    // synchronise rxValue with external value if necessary
+    !rxValueIsSubject && useEffect(() => rxValue.deferred(_value), [_value])
+
+    // options for dropdown/selection type fields
+    const [replaceOptionsProp, optionItems] = isOptionsType && useOptions(input) || []
+    // Use `select` tag for Dropdown if no tag or element specified externally
+    Input = optionItems && Input === 'input'
+        ? 'select'
+        : Input
+
+    // re-render on value change regardless of direction
+    const [value] = useRxSubject(rxValue, rxValueModifier)
+
+    if (hidden) return ''
+    if (isTypeHidden) return (
+        <input {...{
+            ...inputProps,
+            autoComplete: 'username',
+            style: { display: 'none' },
+            type: 'text',
+            value,
         }} />
     )
 
@@ -377,50 +406,55 @@ export const FormInput = React.memo(props => {
         || type.startsWith('radio')
 
     return getContainer(
-        <Input {...objWithoutKeys({
-            ...inputProps,
-            checked: isCheckRadio
-                ? value === checkedValue
-                : checked,
-            children: !replaceOptionsProp
-                && optionItems
-                || inputChildren,
-            className: className([
-                'FormInput-Input',
-                inputProps.className,
-            ]),
-            disabled,
-            error: isCheckRadio
-                ? undefined
-                : error || _error,
-            label: label2 && getLabel(
-                label2,
-                !!label
-                    ? null
-                    : true,
-            ),
-            id: `${idPrefix}${id}`,
-            onBlur: (...args) => {
-                rxIsFocused.next(false)
-                isFn(onBlur) && onBlur(...args)
+        <Input {...objWithoutKeys(
+            {
+                ...inputProps,
+                checked: isCheckRadio
+                    ? value === checkedValue
+                    : checked,
+                children: !replaceOptionsProp
+                    && optionItems
+                    || inputChildren,
+                className: className([
+                    'FormInput-Input',
+                    inputProps.className,
+                    error && errorClass
+                ]),
+                disabled,
+                error: isCheckRadio
+                    ? undefined
+                    : _error || error,
+                label: label2 && getLabel(
+                    label2,
+                    !!label
+                        ? null
+                        : true,
+                ),
+                id: `${idPrefix}${id}`,
+                onBlur: (...args) => {
+                    rxIsFocused.next(false)
+                    isFn(onBlur) && onBlur(...args)
+                },
+                onChange: handleChange,
+                onFocus: (...args) => {
+                    rxIsFocused.next(true)
+                    isFn(onFocus) && onFocus(...args)
+                },
+                options: replaceOptionsProp
+                    ? optionItems
+                    : options,
+                style: {
+                    ...inputProps.style,
+                    ...labelInline && { display: 'table-cell' },
+                },
+                value,
             },
-            onChange: handleChange,
-            onFocus: (...args) => {
-                rxIsFocused.next(true)
-                isFn(onFocus) && onFocus(...args)
-            },
-            options: replaceOptionsProp
-                ? optionItems
-                : options,
-            style: {
-                ...inputProps.style,
-                ...labelInline && { display: 'table-cell' },
-            },
-            value,
-        }, [...inputPropsIgnored, isStr(Input) && 'error'])} />
+            [...inputPropsIgnored, isStr(Input) && 'error']
+        )} />
     )
 })
 FormInput.defaultProps = {
+    addMissingProps: true,
     checkedValue: true,
     components: { ...defaultComponents },
     containerProps: {},
@@ -438,9 +472,10 @@ FormInput.defaultProps = {
     messageDefer: 500,
     messageHideOnBlur: true,
     uncheckedValue: false,
-    useOptions,
+    useOptions: _useOptions,
 }
 FormInput.propTypes = {
+    addMissingProps: PropTypes.bool,
     inputProps: PropTypes.shape({
         id: PropTypes.string,
         name: PropTypes.string,
@@ -456,6 +491,7 @@ FormInput.propTypes = {
     //     CriteriaList = 'div',
     //     Icon = null,
     //     Input = 'input',
+    //     InputGroup
     //     Label = 'label',
     // LabelDetails = 'div',
     //     Message = _Message,
@@ -512,7 +548,12 @@ FormInput.propTypes = {
 }
 export default FormInput
 
-const handleChangeCb = (props, rxValue, setMessage) => (event, ...args) => {
+const handleChangeCb = (
+    props,
+    rxValue,
+    rxMessage,
+    setError,
+) => (event, ...args) => {
     let {
         checkedValue = true,
         customMessages,
@@ -525,9 +566,10 @@ const handleChangeCb = (props, rxValue, setMessage) => (event, ...args) => {
     } = props
     let {
         onChange,
-        required = false,
+        requiredAlt,
         type,
     } = inputProps
+    const { required = requiredAlt } = props
     let {
         persist,
         target: {
@@ -538,9 +580,15 @@ const handleChangeCb = (props, rxValue, setMessage) => (event, ...args) => {
             value,
         } = {},
     } = event || {}
-    if (isFn(onChangeSelectValue)) value = onChangeSelectValue(event, ...args)
+    if (isFn(onChangeSelectValue)) {
+        const changedValue = onChangeSelectValue(event, ...args)
+        value = changedValue !== undefined
+            ? changedValue
+            : value
+
+    }
     // value unchanged
-    if (rxValue.___validated === value) return
+    if (isEqual(rxValue.___validated, value)) return
 
     // Forces the synthetic event and it's value to persist
     // Required for use with deferred function
@@ -670,29 +718,38 @@ const handleChangeCb = (props, rxValue, setMessage) => (event, ...args) => {
         && validateCriteria(value, props, hasVal)
         || []
     if (crInvalid && !hasVal) crInvalid = false
-    // prevents re-validation because of the trigger
-    rxValue.___validated = data.value
-    // trigger value change
-    rxValue.value !== data.value
-        && rxValue.next(data.value)
 
     const triggerChange = (err) => {
         const error = !!err || !!crInvalid
-        setMessage({
-            error,
-            message: err && err !== true
-                ? {
-                    content: err,
-                    status: statuses.error
-                }
-                : criteriaMsg,
-        })
+        const message = err && err !== true
+            ? {
+                content: err,
+                status: statuses.error
+            }
+            : criteriaMsg
+
+        if (message) {
+            // delay displaying the mssage and store the timeout ID
+            rxMessage._timeoutId = rxMessage.deferred(message)
+        } else {
+            // remove any pending deffered message
+            rxMessage._timeoutId && clearTimeout(rxMessage._timeoutId)
+            rxMessage._timeoutId = null
+            rxMessage.next(message)
+        }
+        setError(error)
         isFn(onChange) && onChange(
             event,
             { ...data, error },
             ...args
         )
         setCursor()
+
+        // prevents re-validation because of the trigger
+        rxValue.___validated = data.value
+        // trigger value change on the subject
+        !isEqual(rxValue.value, data.value)
+            && rxValue.next(data.value)
     }
 
     if (err || !isFn(validate)) return triggerChange(err)
@@ -705,4 +762,14 @@ const handleChangeCb = (props, rxValue, setMessage) => (event, ...args) => {
     isPromise(err)
         ? err.then(triggerChange)
         : triggerChange(err)
+}
+
+const isEqual = (v1, v2) => {
+    v1 = isStr(v1)
+        ? v1
+        : JSON.stringify(v1)
+    v2 = isStr(v2)
+        ? v2
+        : JSON.stringify(v2)
+    return v1 === v2
 }

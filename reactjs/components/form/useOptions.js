@@ -1,11 +1,16 @@
-import React, { isValidElement, useMemo } from 'react'
+import React, { isValidElement } from 'react'
 import { translated } from '../../../languageHelper'
 import { useRxSubject } from '../../hooks'
-import { isFn, isStr } from '../../../utils'
+import {
+    isArr,
+    isFn,
+    isStr,
+} from '../../../utils'
 
-const textsCap = translated({
+const textsCap = {
     noOptions: 'no options available',
-}, true)[1]
+}
+translated(textsCap, true)
 
 /**
  * @name    useOptions
@@ -26,7 +31,7 @@ const textsCap = translated({
  * @returns {Array}     [replaceOptionsProp bool, optionItems array/element]
  */
 export const useOptions = (input = {}) => {
-    const {
+    let {
         components: {
             Input,
             OptionItem = (
@@ -41,69 +46,77 @@ export const useOptions = (input = {}) => {
             options = [],
             type: typeAlt,
         } = {},
-        optionsEmptyMessage = textsCap.noOptions,
+        optionsEmptyText,
+        optionsReplaceProp,
+        optionsRenderItem: renderItem,
         optionsWrapProps,
-        renderOptionItem: renderItem,
         rxOptions = options,
         rxOptionsModifier,
         type = typeAlt,
     } = input
 
-    const isDropdown = useMemo(() =>
-        ['dropdown', 'select'].includes(
-            `${type}`.toLowerCase()
-        ),
-        [type]
-    )
-    let [[optionItems, replaceOptionsProp]] = useRxSubject(
-        rxOptions,
-        (options, ...args) => {
-            options = !isFn(rxOptionsModifier)
-                ? options
-                : rxOptionsModifier(options, ...args)
-            if (isDropdown && !(options || []).length) options = [{
-                label: optionsEmptyMessage,
-                text: optionsEmptyMessage,
-                value: '',
-            }]
+    const [optionItems] = useRxSubject(rxOptions, options => {
+        options = rxOptionsModifier?.(options) || options
+        // element or element array received
+        const ignore = !isArr(options) //
+            || isValidElement(options) // element supplied
+            || isValidElement(options[0]) // array of item elements
+        if (ignore) return options
 
-            // element or element array received
-            if (isValidElement(options) || isValidElement(options[0])) return [options, false]
+        const emptyText = optionsEmptyText !== undefined
+            ? optionsEmptyText
+            : ['dropdown', 'select']
+                .includes(`${type}`.toLowerCase())
+            && textsCap.noOptions
+        // Add an option to indicate no result available.
+        // Only for specific types.
+        const isEmpty = !options.length
+        const addEmptyItem = isEmpty
+            && emptyText
+        if (addEmptyItem) options = [{
+            label: emptyText,
+            text: emptyText,
+            value: '',
+        }]
 
-            // no options availabe
-            if (!options.length) return []
+        // option items are objects and to be passed on to input element's `option` prop
+        if (!OptionItem && !renderItem) return options
 
-            // option items are objects and to be passed on to input element's `option` prop
-            if ((!OptionItem && !renderItem)) return [options, true]
+        const optionItems = options
+            .map((o, i) => isStr(o)
+                ? {
+                    children: o,
+                    key: o,
+                    value: o,
+                }
+                : {
+                    ...o,
+                    children: o.text || o.label,
+                    key: o.key || `${o.value}${i}`,
+                }
+            )
+            .map((option, index) => (
+                isFn(renderItem)
+                    ? renderItem(
+                        option,
+                        index,
+                        options,
+                        input
+                    )
+                    : !OptionItem
+                        ? option
+                        : <OptionItem {...option} />
+            ))
+        return optionItems
+    })
 
-            const optionItems = options
-                .map((o, i) => isStr(o)
-                    ? {
-                        children: o,
-                        key: o,
-                        value: o,
-                    }
-                    : {
-                        ...o,
-                        children: o.text || o.label,
-                        key: `${o.key}${o.value}${i}`,
-                    }
-                )
-                .map((o, i) => (
-                    isFn(renderItem)
-                        ? renderItem(o, i, options, input)
-                        : !OptionItem ? o : <OptionItem {...o} />
-                ))
-
-            return [optionItems, false]
-        },
-        options, // initial value
-    )
+    // whether to replace inputProps.options
+    // or place the optionItems directly into the DOM
+    optionsReplaceProp ??= !!OptionsWrap
+        || !OptionItem && !renderItem
 
     return [
-        // whether to replace inputProps.options
-        // or place the optionItems directly into the DOM
-        replaceOptionsProp,
+        optionsReplaceProp,
         !OptionsWrap || !optionItems
             ? optionItems || ''
             : <OptionsWrap {...{
@@ -112,5 +125,4 @@ export const useOptions = (input = {}) => {
             }} />
     ]
 }
-
 export default useOptions

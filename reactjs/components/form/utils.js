@@ -20,20 +20,20 @@ export const addMissingProps = (input, keyPrefix = randomInt(99, 9999)) => {
     input.inputProps ??= {}
     const {
         id,
-        inputs: childInputs,
         inputProps: ip,
-        key,
+        inputs: childInputs,
         name,
-        required,
         type = ip?.type,
     } = input
-    if (type === 'group') return childInputs?.forEach?.(addMissingProps)
+    if (type === 'group') {
+        childInputs?.forEach?.(addMissingProps)
+        return input
+    }
 
-    ip.required ??= !!required
     ip.type ??= type || 'text'
     ip.name ??= name || `${ip.type}${keyPrefix}`
     ip.id ??= id || ip.name
-    input.key ??= key || (keyPrefix + ip.name + ip.type)
+    return input
 }
 
 /**

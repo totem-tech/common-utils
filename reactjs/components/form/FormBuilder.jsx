@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types'
 import React, {
+    isValidElement,
     useCallback,
     useEffect,
     useMemo,
@@ -7,18 +8,20 @@ import React, {
 } from 'react'
 import { BehaviorSubject } from 'rxjs'
 import { translated } from '../../../languageHelper'
+import { copyRxSubject } from '../../../rx'
 import {
     arrUnique,
-    deferred,
     isArr,
     isFn,
+    isStr,
     isSubjectLike,
     toArray,
 } from '../../../utils'
-import { useRxSubject, useRxSubjectOrValue } from '../../hooks'
+import { useMount, useRxSubject } from '../../hooks'
 import toProps from '../../toProps'
 import _Button from '../Button'
-import { Message as _Message, statuses } from '../Message'
+import { Message as _Message } from '../Message'
+import { RxSubjectView } from '../RxSubjectView'
 import _FormInput from './FormInput'
 import {
     addMissingProps,
@@ -42,22 +45,23 @@ const defaultComponents = {
     FormInput: _FormInput,
     Message: _Message,
 }
-export const FormBuilder = React.memo(props => {
+export const FormBuilder = React.memo(propsOrg => {
+    const props = { ...propsOrg }
     let {
         actionsPrefix,
         actionsSuffix,
         components,
+        defer = 300,
         submitButtonLoadingProp: loadingProp,
         closeText = textsCap.close,
         closeOnSubmit,
         formProps = {},
-        inputs,
-        inputsCommonProps,
-        inputsDisabled = [],
-        inputsHidden = [],
-        inputsModifier,
-        inputsReadOnly = [],
-        loading,
+        // inputs,
+        // inputsCommonProps,
+        // inputsDisabled = [],
+        // inputsHidden = [],
+        // inputsReadOnly = [],
+        // loading,
         message,
         onChange: formOnChange,
         onClose,
@@ -65,14 +69,241 @@ export const FormBuilder = React.memo(props => {
         onSubmit,
         onUnmount,
         prefix,
-        submitDisabled, // Boolean or BehaviorSubject
+        // submitDisabled, // Boolean or BehaviorSubject
         submitDisabledIfUnchanged: requireChange = false,
-        submitInProgress,// Boolean or BehaviorSubject
+        // submitInProgress,// Boolean or BehaviorSubject
         submitText, // string or element or object
         suffix,
-        values: _values, // Object or BehaviorSubject
-        valuesToCompare,
+        // values: _values, // Object or BehaviorSubject
+        // valuesToCompare,
     } = props
+
+    const {
+        formId,
+        getButton,
+        handleChangeCb,
+        handleSubmit,
+        rxMessage,
+        rxState,
+        toUpdate,
+    } = useMemo(() => {
+        // setup form ID
+        window.___formCount ??= 1000
+        let formId = formProps.id
+        if (!formId || formIds.get(formId)) {
+            // create unique ID if multiple instances of the same form is created 
+            formId = `${formId || 'FormBuilder'}${++___formCount}`
+        }
+        formIds.set(formId, true)
+        formProps.id = formId
+
+        // subject for internal error messages
+        const rxMessage = new BehaviorSubject()
+        const toObserve = [
+            'inputs',
+            'inputsHidden',
+            'inputsDisabled',
+            'inputsReadOnly',
+            'loading',
+            'message',
+            'submitInProgress',
+            'submitDisabled',
+            'values',
+            'valuesToCompare',
+        ]
+        const toUpdate = toObserve
+            .map(key => {
+                const value = propsOrg[key]
+                if (isSubjectLike(value)) return
+                const subject = new BehaviorSubject(value)
+                props[key] = subject
+                return [key, subject]
+            })
+            .filter(Boolean)
+        const rxInputs = props.inputs
+        rxInputs.value?.forEach?.(addMissingProps)
+        const rxValues = props.values
+        const stateModifier = ([
+            inputs,
+            inputsHidden,
+            inputsDisabled,
+            inputsReadOnly,
+            loading,
+            submitInProgress,
+            submitDisabled,
+            valuesToCompare,
+        ]) => {
+            inputsHidden = arrUnique([
+                ...toArray(inputsHidden),
+                ...inputs.filter(({ inputProps = {} }) => {
+                    const { hidden, name } = inputProps
+                    return !inputsHidden.includes(name) && (
+                        isSubjectLike(hidden)
+                            ? hidden.value
+                            : isFn(hidden)
+                                ? !!hidden(values, name)
+                                : hidden
+                    )
+                })
+                    .map(x => x.inputProps.name)
+            ])
+            const inputsInvalid = !!inputs.find(x =>
+                checkInputInvalid(x, inputsHidden)
+            )
+            const valuesChanged = requireChange && checkValuesChanged(
+                inputs,
+                values,
+                valuesToCompare,
+                inputsHidden,
+            )
+
+            // disable submit button if one of the following is true:
+            // 1. none of the input's value has changed
+            // 2. message status or form is "loading" (indicates submit or some input validation is in progress)
+            // 3. one or more inputs contains invalid value (based on validation criteria)
+            // 4. one or more required inputs does not contain a value
+            submitDisabled = submitDisabled
+                || submitInProgress
+                || loading
+                || !!inputsInvalid
+                || valuesChanged
+            return {
+                inputs,
+                inputsHidden,
+                inputsDisabled: toArray(inputsDisabled),
+                inputsReadOnly: toArray(inputsReadOnly),
+                init: true,
+                loading,
+                submitInProgress,
+                submitDisabled,
+                values,
+                valuesToCompare,
+            }
+        }
+        const rxState = copyRxSubject(
+            toObserve.map(key => props[key]),
+            null,
+            stateModifier,
+            defer,
+        )
+
+        const handleSubmit = async (event) => {
+            event.preventDefault()
+            if (submitDisabled || loading) return
+            try {
+                const inputs = rxInputs.value || []
+                const values = getValues(inputs)
+                const allOk = !loading
+                    && !submitDisabled
+                    && !inputs.find(x =>
+                        checkInputInvalid(x, rxState.value.inputsHidden)
+                    )
+                isFn(onSubmit) && await onSubmit(
+                    allOk,
+                    values,
+                    inputs,
+                    event,
+                )
+                closeOnSubmit && onClose?.()
+            } catch (err) {
+                rxMessage.next({
+                    header: textsCap.submitError,
+                    text: `${err}`.replace('Error: ', ''),
+                })
+            }
+        }
+
+        const handleChangeCb = name => async (event, { error, value }) => {
+            const inputs = rxInputs.value || []
+            const input = name && findInput(name, inputs)
+            if (!input) return
+
+            const { inputProps } = input
+            inputProps.error = error
+            inputProps.value = value
+            input.valid = error !== true
+
+            const {
+                inputProps: {
+                    onChange,
+                } = {},
+            } = input
+            const triggerChange = (values) => {
+                values = values || getValues(inputs)
+                rxInputs.next([...inputs])
+                rxValues.next({ ...values })
+            }
+
+            // clear submit error message
+            if (rxMessage.value) setTimeout(() => rxMessage.next(null))
+
+            let values = getValues(inputs)
+            let doTrigger = await onChange?.(
+                values,
+                inputs,
+                event,
+            )
+
+            if (!isFn(formOnChange)) return doTrigger !== false && triggerChange()
+
+            const formValid = !inputs.find(x =>
+                checkInputInvalid(x, rxState.value.inputsHidden)
+            )
+            doTrigger = await formOnChange(
+                formValid,
+                doTrigger
+                    ? getValues(inputs)
+                    : values,
+                inputs,
+                name,
+            )
+
+            doTrigger !== false && triggerChange()
+        }
+
+        const getButton = (textOrProps, extraProps) => {
+            if (textOrProps === null) return
+            const {
+                Component = Button,
+                ...props
+            } = toProps(textOrProps)
+            return (
+                <Component {...{
+                    ...props,
+                    ...extraProps,
+                    children: props.children || extraProps.children,
+                    onClick: (...args) => {
+                        args[0]?.preventDefault?.()
+                        props.onClick?.(...args)
+                        extraProps?.onClick?.(...args)
+                    },
+                    style: {
+                        ...extraProps?.style,
+                        ...props.style,
+                    },
+                }} />
+            )
+        }
+
+        return {
+            formId,
+            getButton,
+            handleChangeCb,
+            handleSubmit,
+            rxMessage,
+            rxState,
+            toUpdate,
+        }
+    }, [])
+
+    // synchronize with local subjects
+    toUpdate.forEach(([key, subject]) =>
+        useEffect(() => {
+            subject.next(propsOrg[key])
+        }, [propsOrg[key]])
+    )
+    // delay form state update when multiple update is triggered concurrently/too frequently
+    const [state] = useRxSubject(rxState)
     let { // default components
         Actions = 'div',
         Button = _Button,
@@ -80,184 +311,33 @@ export const FormBuilder = React.memo(props => {
         FormInput = _FormInput,
         Message = _Message,
     } = { ...defaultComponents, ...components }
-    const [formId] = useState(() => {
-        window.___formCount ??= 1000
-        if (!formProps.id || formIds.get(formProps.id)) {
-            formProps.id = `${formProps.id || 'FormBuilder'}${++___formCount}`
-        }
-        formIds.set(formProps.id, true)
-        return formProps.id
-    })
-    const [_message, setMessage] = useState()
-    inputsHidden = toArray(useRxSubjectOrValue(inputsHidden), ',')
-    message = useRxSubjectOrValue(message)
-    submitInProgress = useRxSubjectOrValue(submitInProgress)
-    submitDisabled = useRxSubjectOrValue(submitDisabled)
-    valuesToCompare = useRxSubjectOrValue(valuesToCompare)
-    const [values, _setValues] = useRxSubject(
-        _values,
-        x => x || {},
-        _values || valuesToCompare,
-        false,
-        true,
-    )
-    const [_inputs, _setInputs] = useRxSubject(inputs, (inputs = []) => {
-        inputs?.forEach?.(addMissingProps)
-        return inputs
-    })
-    // delay form state update when multiple update is triggered concurrently/too frequently
-    const setState = useMemo(() =>
-        deferred(({ inputs, values }) => {
-            inputs && _setInputs([...inputs])
-            values && _setValues({ ...values })
-        }, 50),
-        [],
-    )
-    message = _message || message
-    loading = loading
-        || submitInProgress
-        || message?.status === statuses.loading
+    const {
+        init,
+        inputs = [],
+        // inputsHidden = [],
+        // inputsDisabled = [],
+        // inputsReadOnly = [],
+        loading = false,
+        // submitInProgress = false,
+        submitDisabled = false,
+        values = {},
+        // valuesToCompare = {},
+    } = state
 
-    const handleChangeCb = useCallback((name, inputs) => async (event, { error, value }) => {
-        inputs = isSubjectLike(inputs)
-            ? inputs.value
-            : inputs
-        const input = name && findInput(name, inputs)
-        if (!input) return
-
-        const { inputProps } = input
-        inputProps.error = error
-        inputProps.value = value
-        input.valid = error !== true
-
-        const {
-            inputProps: {
-                onChange,
-            } = {},
-        } = input
-        const triggerChange = (values) => {
-            values = values || getValues(inputs)
-            setState({ inputs, values })
-        }
-
-        // clear submit error message
-        if (_message) setTimeout(() => setMessage())
-
-        let values = getValues(inputs)
-        let doTrigger = await onChange?.(
+    useMount(
+        () => onMount?.(
+            props,
+            formId,
             values,
-            inputs,
-            event,
-        )
-
-        if (!isFn(formOnChange)) return doTrigger !== false && triggerChange()
-
-        const formValid = !_inputs.find(x => checkInputInvalid(x, inputsHidden))
-        doTrigger = await formOnChange(
-            formValid,
-            doTrigger
-                ? getValues(_inputs)
-                : values,
-            _inputs,
-            name,
-        )
-
-        doTrigger !== false && triggerChange()
-    })
-
-    const handleSubmit = useCallback(async (event) => {
-        event.preventDefault()
-        if (submitDisabled || loading) return
-        try {
-            const values = getValues(_inputs)
-            const allOk = !loading
-                && !submitDisabled
-                && !_inputs.find(x => checkInputInvalid(x, inputsHidden))
-            isFn(onSubmit) && await onSubmit(
-                allOk,
-                values,
-                _inputs,
-                event,
-            )
-            closeOnSubmit && onClose?.()
-        } catch (err) {
-            setMessage({
-                header: textsCap.submitError,
-                text: `${err}`
-                    .replace('Error: ', ''),
-            })
-        }
-    })
-
-    // disable submit button if one of the following is true:
-    // 1. none of the input's value has changed
-    // 2. message status or form is "loading" (indicates submit or some input validation is in progress)
-    // 3. one or more inputs contains invalid value (based on validation criteria)
-    // 4. one or more required inputs does not contain a value
-    inputsHidden = arrUnique([
-        ...inputsHidden,
-        ..._inputs
-            .filter(({ inputProps = {} }) => {
-                const { hidden, name } = inputProps
-                return !inputsHidden.includes(name) && (
-                    isSubjectLike(hidden)
-                        ? hidden.value
-                        : isFn(hidden)
-                            ? !!hidden(values, name)
-                            : hidden
-                )
-            })
-            .map(x => x.inputProps.name)
-    ])
-    submitDisabled = submitDisabled
-        || submitInProgress
-        || loading
-        || !!_inputs.find(x => checkInputInvalid(x, inputsHidden))
-        || requireChange && checkValuesChanged(
-            _inputs,
-            values,
-            valuesToCompare,
-            inputsHidden,
-        )
-
-    useEffect(() => {
-        onMount?.(
+            submitDisabled,
+        ),
+        () => onUnmount?.(
             props,
             formId,
             values,
             submitDisabled,
         )
-        return () => onUnmount?.(
-            props,
-            formId,
-            values,
-            submitDisabled,
-        )
-    }, [])
-
-    const getButton = (textOrProps, extraProps) => {
-        if (textOrProps === null) return
-        const {
-            Component = Button,
-            ...props
-        } = toProps(textOrProps)
-        return (
-            <Component {...{
-                ...props,
-                ...extraProps,
-                children: props.children || extraProps.children,
-                onClick: (...args) => {
-                    args[0]?.preventDefault?.()
-                    props.onClick?.(...args)
-                    extraProps?.onClick?.(...args)
-                },
-                style: {
-                    ...extraProps?.style,
-                    ...props.style,
-                },
-            }} />
-        )
-    }
+    )
 
     return (
         <Form {...{
@@ -269,16 +349,13 @@ export const FormBuilder = React.memo(props => {
             {prefix}
 
             {/* Form inputs */}
-            {_inputs
+            {init && inputs
                 .map(addInterceptorCb(
-                    inputs,
-                    inputsHidden,
-                    values,
+                    { ...props, ...state },
                     handleChangeCb,
-                    props,
                     formId,
                 ))
-                .map(input => <FormInput {...input} xkey={input.key} />)}
+                .map(input => <FormInput {...input} />)}
 
             {/* submit button */}
             {(submitText || onClose) && (
@@ -309,7 +386,19 @@ export const FormBuilder = React.memo(props => {
             )}
 
             {/* Form message */}
-            {message && <Message {...message} />}
+            {init && (
+                <RxSubjectView {...{
+                    key: 'message',
+                    subject: [rxMessage, message],
+                    valueModifier: ([message, messageExt]) => {
+                        message = message || messageExt
+                        const props = isStr(message) || isValidElement(message)
+                            ? { content: message }
+                            : message
+                        return !!message && <Message {...props} />
+                    }
+                }} />
+            )}
 
             {suffix}
         </Form>
@@ -408,22 +497,22 @@ FormBuilder.propTypes = {
 export default FormBuilder
 
 const addInterceptorCb = (
-    inputs,
-    inputsHidden = [],
-    values,
-    handleChange,
     props = {},
+    handleChange,
     formId,
     parentIndex = null,
 ) => (input, index) => {
     let {
+        inputs,
         inputsCommonProps,
         inputsDisabled = [],
+        inputsHidden = [],
         inputsReadOnly = [],
+        values,
     } = props
     let {
         content,
-        hidden,
+        hidden = false,
         idPrefix,
         inputs: childInputs,
         inputProps = {},
@@ -453,6 +542,7 @@ const addInterceptorCb = (
     return {
         ...commonProps,
         ...input,
+        addMissingProps: false,
         components: {
             ...commonProps?.components,
             ...input?.components,
@@ -460,7 +550,7 @@ const addInterceptorCb = (
         content: isFn(content)
             ? content(values, name)
             : content,
-        disabled: toArray(inputsDisabled).includes(name) || (
+        disabled: inputsDisabled.includes(name) || (
             isFn(disabled)
                 ? disabled(values, name)
                 : disabled
@@ -476,11 +566,8 @@ const addInterceptorCb = (
         inputs: isGroup
             ? childInputs.map(
                 addInterceptorCb(
-                    inputs,
-                    inputsHidden,
-                    values,
-                    handleChange,
                     props,
+                    handleChange,
                     formId,
                     parentIndex || index,
                 )
@@ -499,7 +586,7 @@ const addInterceptorCb = (
                     parentIndex || index,
                     parentIndex ? index : undefined
                 ),
-            readOnly: toArray(inputsReadOnly).includes(name) || readOnly,
+            readOnly: inputsReadOnly.includes(name) || readOnly,
         },
         key: key || name,
         validate: !isFn(validate)

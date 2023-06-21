@@ -1,4 +1,4 @@
-import { isValidElement, useMemo, useState } from 'react'
+import { isValidElement, useMemo } from 'react'
 import { BehaviorSubject } from 'rxjs'
 import { isFn, isObj } from '../../utils'
 import useRxSubject from './useRxSubject'
@@ -12,8 +12,9 @@ import useMount from './useMount'
  *                                          Function arguments: rxState BehaviorSubject
  *                                          Default: `{}`
  * @param   {Object|Function}   conf            if function, it will be used as `valueModifier`
- * @param   {Function}          conf.allowMerge     (optional) in case of whether to merge old and new values into an object.
- *                                                  If `valueModifier` is supplied, it needs to merge the first argument with the returned value.
+ * @param   {Function}          conf.allowMerge     (optional) whether to merge old and new values into an object.
+ *                                                  If `valueModifier` is used, it needs to merge the first
+ *                                                  argument with the returned value otherwise `allowMerge` won't work.
  *                                                  Default: `true` if initial state is an object.         
  * @param   {Function}          conf.onMount        (optional)
  * @param   {Function}          conf.onUnmount      (optional)
@@ -25,6 +26,7 @@ import useMount from './useMount'
 export const useRxState = (
     initialState = {},
     conf = {},
+    debugTag
 ) => {
     let {
         allowMerge,
@@ -34,7 +36,7 @@ export const useRxState = (
         valueModifier,
     } = conf
     if (isFn(conf)) valueModifier = conf
-    const [rxState, iniState] = useState(() => {
+    const [rxState, iniState] = useMemo(() => {
         const rxState = subject instanceof BehaviorSubject
             ? subject
             : new BehaviorSubject({})
@@ -51,7 +53,7 @@ export const useRxState = (
         && !isValidElement(iniState)
         && isObj(iniState)
     const [state, setState] = useRxSubject(
-        rxState,
+        subject,
         valueModifier,
         iniState,
         allowMerge,
@@ -59,6 +61,8 @@ export const useRxState = (
     )
 
     useMount(onMount, onUnmount)
+
+    debugTag && console.log(debugTag, state)
 
     return [state, setState, rxState]
 }

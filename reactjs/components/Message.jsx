@@ -78,9 +78,11 @@ export const Message = React.memo(({
 }) => {
     if (!text && !header) return ''
 
+    const dp = Message.defaultProps || {}
     const isSemantic = library === 'semantic-ui-react'
-    const { opacity = dp?.style?.opacity } = style
-    const dp = Message.defaultProps
+    const {
+        opacity = dp.style?.opacity
+    } = style
     const headerProps = {
         ...isObj(dp.header) && dp.header,
         ...toProps(header),

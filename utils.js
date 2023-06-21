@@ -496,6 +496,7 @@ export const deferred = (callback, delay, thisArg) => {
 	return (...args) => {
 		if (timeoutId) clearTimeout(timeoutId)
 		timeoutId = setTimeout(() => callback.apply(thisArg, args), delay || 50)
+		return timeoutId
 	}
 }
 

@@ -1,4 +1,4 @@
-import { isSubjectLike } from '../../utils'
+import { isFn, isSubjectLike } from '../../utils'
 import useRxSubject from './useRxSubject'
 
 /**
@@ -10,8 +10,18 @@ import useRxSubject from './useRxSubject'
  *
  * @returns {*}
  */
-export const useRxSubjectOrValue = (subject, ...args) => !isSubjectLike(subject)
-    ? subject
-    : useRxSubject(subject, ...args)[0]
+export const useRxSubjectOrValue = (
+    subject,
+    valueModifier,
+    ...args
+) => !isSubjectLike(subject)
+        ? isFn(valueModifier)
+            ? valueModifier(subject)
+            : subject
+        : useRxSubject(
+            subject,
+            valueModifier,
+            ...args
+        )[0]
 
 export default useRxSubjectOrValue
