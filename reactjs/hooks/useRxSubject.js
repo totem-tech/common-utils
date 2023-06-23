@@ -22,8 +22,10 @@ import { copyRxSubject } from '../../rx.js'
  * @param   {Function}          valueModifier       (optional) callback to modify value received on change.
  *                                                  Async function is accepted.
  *                                                  Args: `[newValue, oldValue, rxSubject]`
- * @param   {*}                 initialValue        (optional) initial value where appropriate
- * @param   {Boolean}           allowMerge          (optional) only applicable if value is an object
+ * @param   {*}                 initialValue        (optional) initial value if `subject.value` is undefined
+ * @param   {Boolean}           allowMerge          (optional) whether to merge previous value with new value.
+ *                                                  Only applicable if value is an object
+ *                                                  Default: true (if first value is an object)
  * @param   {Boolean}           allowSubjectUpdate  (optional) whether to allow update of the subject or only state.
  *                                                  CAUTION: if true and `@subject` is sourced from a DataStorage
  *                                                  instance, it may override values in the LocalStorage values.
@@ -35,7 +37,7 @@ export const useRxSubject = (
     subject,
     valueModifier,
     initialValue,
-    allowMerge = false,
+    allowMerge,
     allowSubjectUpdate = false,
     defer = 100,
     debugTag,
@@ -85,16 +87,12 @@ export const useRxSubject = (
     //         value = undefined
     //     }
 
-    //     console.log({ value })
     //     return {
     //         firstValue: value,
     //         isBSub,
     //         value,
     //     }
     // })
-
-
-
 
     const [
         _subject,
@@ -120,9 +118,8 @@ export const useRxSubject = (
         }
 
         const isBSub = _subject instanceof BehaviorSubject
-        let value = isBSub
-            ? _subject.value
-            : initialValue
+        let value = _subject.value
+        value ??= initialValue
         value = !isFn(valueModifier)
             ? value
             : valueModifier(
@@ -133,6 +130,7 @@ export const useRxSubject = (
         if (value === useRxSubject.IGNORE_UPDATE) {
             value = undefined
         }
+        allowMerge ??= isObj(value)
         return [
             _subject,
             value,

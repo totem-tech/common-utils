@@ -186,8 +186,19 @@ PromisE.delay = (delay, result = delay) => new PromisE(resolve =>
  * })
  * ```
  */
-PromisE.getSocketEmitter = (socket, timeoutGlobal, errorArgIndex = 0, callbackIndex = null) => {
-    return (eventName, args = [], resultModifier, errorModifier, timeoutLocal, delayPromise) => {
+PromisE.getSocketEmitter = (
+    socket,
+    timeoutGlobal,
+    errorArgIndex = 0,
+    callbackIndex = null
+) => (
+    eventName,
+    args = [],
+    resultModifier,
+    errorModifier,
+    timeoutLocal,
+    delayPromise
+) => {
         args = !isArr(args)
             ? [args]
             : args
@@ -236,7 +247,6 @@ PromisE.getSocketEmitter = (socket, timeoutGlobal, errorArgIndex = 0, callbackIn
         if (!isPositiveInteger(timeout)) return promise
         return PromisE.timeout(timeout, promise)
     }
-}
 
 /**
  * @name    PromisE.fetch

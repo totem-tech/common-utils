@@ -10,18 +10,20 @@ import {
     isStr,
     textCapitalize,
 } from './utils'
+import chatClient from './chatClient'
 
 export const translations = new DataStorage('totem_static_translations')
 // language the app texts are written
-export const APP_LANG = fallbackIfFails(() => process.env.APP_LANG || 'EN', [], 'EN')
+export const APP_LANG = fallbackIfFails(() => process.env.REACT_APP_LANG) || 'EN'
 export const MODULE_KEY = 'language'
 const rw = value => storage.settings.module(MODULE_KEY, value) || {}
 let _selected = rw().selected || APP_LANG
+const _window = fallbackIfFails(() => window, [], {})
 export const BUILD_MODE = isNodeJS()
     ? process.env.BUILD_MODE
-    : getUrlParam('build-mode', window.location.href)
+    : getUrlParam('build-mode', _window.location.href)
         .toLowerCase() === 'true'
-    && window.location.hostname !== 'totem.live'
+    && _window.location.hostname !== 'totem.live'
 export const languages = Object.freeze({
     // AR: 'Arabic - عربي',
     BN: 'Bengali - বাংলা',
@@ -76,7 +78,7 @@ export const downloadTextListCSV = !BUILD_MODE ? null : () => {
         .repeat(5)
         .toUpperCase()
         .split('')
-    const maxRows = window.enList.length + 1
+    const maxRows = _window.enList.length + 1
     // use batch functions so that translation request is only executed once.
     // only the first data cell in each column needs this function.
     // To avoid being rate limited, manuall set "=" when opening in Google Sheets
@@ -85,7 +87,7 @@ export const downloadTextListCSV = !BUILD_MODE ? null : () => {
     //
     // `=BYROW(A2:INDEX(A:A, MAX((A:A<>"")*ROW(A:A))), LAMBDA(x, GOOGLETRANSLATE(x, A1, ${colName}1)))`
 
-    const str = langCodes.join(seperator) + '\n' + (window.enList || []).map((x, i) => {
+    const str = langCodes.join(seperator) + '\n' + (_window.enList || []).map((x, i) => {
         // const rowNo = i + 2
         // const functions = rest.map((_, c) => `"=GOOGLETRANSLATE($A${rowNo}, $A$1, ${cols[c + 1]}$1)"`).join(',')
         const functions = i >= 1
@@ -106,8 +108,9 @@ export const downloadTextListCSV = !BUILD_MODE ? null : () => {
  * 
  * @returns {Boolean}   true: data freshly updated. Falsy: using cache or update not required
  */
-export const fetchNSaveTexts = async (client) => {
+export const fetchNSaveTexts = async (client = chatClient) => {
     if (!client) return console.trace('Client not specified')
+
     const selected = getSelected()
     if (selected === APP_LANG) {
         setTexts(selected, null, null)
@@ -117,9 +120,11 @@ export const fetchNSaveTexts = async (client) => {
     const selectedHash = generateHash(getTexts(selected) || '')
     const engHash = generateHash(getTexts(APP_LANG) || '')
     const func = client.languageTranslations
-    const [textsEn, texts] = await Promise.all([
+    const [textsEn, texts = textsEn] = await Promise.all([
         func(APP_LANG, engHash),
-        func(selected, selectedHash),
+        APP_LANG === selected
+            ? undefined
+            : func(selected, selectedHash),
     ])
 
     // update not required => existing list of language is exactly the same as in the database
@@ -167,6 +172,15 @@ export const setTexts = (langCode, texts, enTexts) => translations.setAll(
     true,
 )
 
+class Translated extends String {
+    constructor(text) {
+        super(text)
+    }
+
+    toLowerCase() { return `${this}`.toLowerCase() }
+
+}
+_window.Translated = Translated
 export const translated = (
     texts = {},
     capitalized = false,
@@ -185,13 +199,13 @@ export const translated = (
         const selected = translations.get(langCode) || []
         // attempt to build a single list of english texts for translation
         if (BUILD_MODE) {
-            window.enList = window.enList || []
+            _window.enList = _window.enList || []
             Object.values(texts).forEach(text => {
                 if (!text) return
                 text = clearClutter(text)
                 enList.indexOf(text) === -1 && enList.push(text)
             })
-            window.enList = enList.sort()
+            _window.enList = enList.sort()
         }
 
         Object.keys(texts).forEach(key => {

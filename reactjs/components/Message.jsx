@@ -1,11 +1,11 @@
-import React, { isValidElement } from 'react'
 import PropTypes from 'prop-types'
+import React, { isValidElement } from 'react'
 import {
     icons as semanticIcons,
     isDefined,
     isObj,
     isStr,
-    objWithoutKeys
+    objWithoutKeys,
 } from '../../../utils/utils'
 import { useInverted } from '../../../utils/window'
 import { toProps } from '../toProps'
@@ -48,9 +48,13 @@ export const statusIcons = {
  * <Message {...{ 
  *   content: 'body',
  *   header: 'title',
+ *   // define specific icon
+ *   icon: { name: 'user', size: 30 },
+ *   // display icon based on status
  *   icon: true,
  *   status: 'success',
  * }} />
+ * 
  * ```
  */
 export const Message = React.memo(({
@@ -122,6 +126,7 @@ export const Message = React.memo(({
         }
 
         const icEl = isValidElement(icon)
+
         if (!icEl) {
             const { name } = icon
             icon = {
@@ -263,9 +268,9 @@ Message.setupDefaults = (name, library) => {
             dp.components.Container = library.Message
             dp.components.Header = null
             dp.iconMapping = { ...semanticIcons }
-            dp.iconProps = {
-                style: { fontSize: 35 }
-            }
+            // dp.iconProps = {
+            //     style: { fontSize: 35 }
+            // }
 
             // for legacy status support in the totem-ui repo
             statuses.BASIC = ''
