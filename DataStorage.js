@@ -126,9 +126,9 @@ export const write = (
         }
         storage.setItem(key, value)
         return true
-    } catch (e) {
-        if (!silent) throw e
-        console.log('DataStorage: failed to write file.', e)
+    } catch (err) {
+        if (!silent) throw err
+        console.error('DataStorage: failed to write file.', err)
     }
 
 }
@@ -175,7 +175,7 @@ export default class DataStorage {
                 ignoredFirst = true
                 return
             }
-            this.write()
+            this.write(data)
             this.save = true
             isFn(onChange) && onChange(data)
         })
@@ -371,7 +371,7 @@ export default class DataStorage {
 
         if (writeNow) {
             this.save = false
-            this.write(false)
+            this.write(data, false)
             this.save = true
         }
         this.rxData.next(data)
@@ -459,10 +459,10 @@ export default class DataStorage {
      * @param {Boolean} silent  Whether to throw error if write operation fails.
      *                          Will print error message, regardless.
      */
-    write(silent = true) {
+    write(data, silent = true) {
         this.name && this.save && write(
             this.name,
-            this.rxData.value,
+            data,
             true,
             this.storage,
             silent,

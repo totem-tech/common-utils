@@ -57,7 +57,7 @@ export const connect = (
     const tId = setTimeout(() => !provider.isConnected() && reject(timeoutMsg), timeout)
     // reject if connection fails
     provider.websocket.onerror = err => {
-        console.log(failedMsg, err)
+        // console.log(failedMsg, err)
         clearTimeout(tId)
         provider.disconnect()
         reject(failedMsg)

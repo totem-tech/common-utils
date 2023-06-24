@@ -19,6 +19,7 @@ let instance, socket
 const DISCONNECT_DELAY_MS = parseInt(process.env.MESSAGING_SERVER_DISCONNECT_DELAY_MS || 300000)
 const MODULE_KEY = 'messaging'
 const PREFIX = 'totem_'
+export const ROLE_ADMIN = 'admin'
 // include any ChatClient property that is not a function or event that does not have a callback
 const nonCbs = ['isConnected', 'disconnect']
 // read or write to messaging settings storage
@@ -108,10 +109,15 @@ export const getClient = (url, disconnectDelayMs) => {
         rxIsInMaintenanceMode.next(active)
         if (!rxIsRegistered.value) return
 
+        const {
+            id,
+            roles,
+            secret
+        } = getUser() || {}
+        const isAdmin = roles.includes(ROLE_ADMIN)
         // wait until until maintenance mdoe is disabled and then attempt to login
-        await subjectAsPromise(rxIsInMaintenanceMode, false)[0]
+        !isAdmin && await subjectAsPromise(rxIsInMaintenanceMode, false)[0]
         // auto login on connect to messaging service
-        const { id, secret } = getUser() || {}
         instance
             .login(id, secret)
             .then(() => console.log(
@@ -131,7 +137,7 @@ export const getClient = (url, disconnectDelayMs) => {
         rxIsLoggedIn.next(false)
     })
     instance.onMaintenanceMode(active => {
-        console.log('Maintenance mode', active ? 'active' : 'inactive')
+        console.log(`Maintenance mode ${active ? '' : 'de'}activated`)
         rxIsInMaintenanceMode.next(active)
     })
 

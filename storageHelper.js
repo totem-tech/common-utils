@@ -271,7 +271,12 @@ storage.settings = {
  * 
  * @returns {*}
  */
-storage.cache = (moduleKey, itemKey, value) => rw(cache, moduleKey, itemKey, value)
+storage.cache = (moduleKey, itemKey, value) => rw(
+    cache,
+    moduleKey,
+    itemKey,
+    value
+)
 
 /**
  * @name    storage.cacheDelete

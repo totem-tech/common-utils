@@ -1,12 +1,13 @@
 import { useEffect } from 'react'
 import { fallbackIfFails, isArr } from '../../utils'
+import { BehaviorSubject } from 'rxjs'
 
 /**
  * @name    useMount
  * @summary simple React hook to trigger callback when component mounts and/or unmounts
  * 
  * @param {Function}         onMount   (optional) Callback to be triggered when component mounts.
- *                                     Args: boolean (true => mounted, false => unmounted)
+ *                                     Args: `{ isMounted }`
  * @param {Function|Boolean} onUnmount (optional) Callback invoked when component unmounts.
  *                                     Alternatively, if `onUnmount === true`, `onMount` function will be #
  *                                     invoked when component is unmounted with.
@@ -14,10 +15,14 @@ import { fallbackIfFails, isArr } from '../../utils'
  */
 export const useMount = (onMount, onUnmount) => {
     useEffect(() => {
-        onMount && fallbackIfFails(onMount, [true])
+        const x = { isMounted: true }
+        onMount && fallbackIfFails(onMount, [x])
         if (onMount && onUnmount === true) onUnmount = onMount
 
-        return () => onUnmount && fallbackIfFails(onUnmount, [false])
+        return () => {
+            x.isMounted = false
+            onUnmount && fallbackIfFails(onUnmount, [x])
+        }
     }, [])
 }
 

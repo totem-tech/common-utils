@@ -1,8 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { translated } from '../../languageHelper'
 import { query } from '../../polkadotHelper'
 import PromisE from '../../PromisE'
-import { isFn } from '../../utils'
+import {
+    isArr,
+    isFn,
+    isStr,
+} from '../../utils'
+import useRxStateDeferred from './useRxStateDeferred'
 
 const textsCap = {
     loading: 'loading...'
@@ -11,7 +16,7 @@ translated(textsCap, true)
 
 /**
  * @name    useQueryBlockchain
- * @summary a React Hook to query (and optionally subscribe) blockchain storage
+ * @summary a React Hook to query (and optionally subscribe) blockchain storage.
  *
  * @param   {Object|Promise}    connection
  * @param   {Object}            connection.api  ApiPromise
@@ -23,30 +28,47 @@ translated(textsCap, true)
  * @param   {Boolean}           print   (optional)
  *
  * @returns {Object} { message, result, unsubscribe }
+ * 
+ * @example `javascript
+ * // make sure to use `useMemo` to prevent making redundant queries
+ * const queryArgs = useMemo(() => [
+ *     getConnection(),
+ *     'api.rpc.chain.subscribeFinalizedHeads',
+ *     [],
+ *     false,
+ *     result => result,
+ *     true
+ * ], [])
+ * const result = useQueryBlockchain(...queryArgs)
+ * `
  */
 export const useQueryBlockchain = (
     connection,
     func,
-    args = [],
+    args,
     multi,
     resultModifier,
     subscribe = true,
+    defer = 100,
     loadingText = textsCap.loading,
     print,
 ) => {
-    const [data, setData] = useState({})
+    const [state, setState] = useRxStateDeferred({}, defer)
 
     useEffect(() => {
+        if (!func) return
+
         let mounted = true
         let unsubscribed = false
         let unsubscribe
-        const callback = args.slice(-1)
+        const _args = args || []
+        const callback = _args.slice(-1)
         const handleConnection = async ({ api }) => {
             unsubscribed = false
             const result = await query(
                 api,
                 func,
-                args,
+                _args,
                 multi,
                 print,
             )
@@ -56,7 +78,7 @@ export const useQueryBlockchain = (
             // subscription
             unsubscribe = result
         }
-        const handleError = err => mounted && setData({
+        const handleError = err => mounted && setState({
             message: err && {
                 content: `${err}`,
                 icon: true,
@@ -64,7 +86,7 @@ export const useQueryBlockchain = (
             }
         })
         const handleResult = (resultSanitised, resultOriginal) => {
-            mounted && setData({
+            mounted && setState({
                 message: null,
                 result: isFn(resultModifier)
                     ? resultModifier(resultSanitised, resultOriginal)
@@ -74,29 +96,27 @@ export const useQueryBlockchain = (
             isFn(callback) && callback(resultSanitised, resultOriginal)
         }
         const handleUnsubscribe = () => {
-            if (!isFn(unsubscribe)) return // || unsubscribed
+            if (!isFn(unsubscribe)) return
 
             unsubscribed = true
             unsubscribe()
         }
 
         if (!isFn(callback)) {
-            subscribe && args.push(handleResult)
+            subscribe && _args.push(handleResult)
         } else {
-            // args[args.indexOf(callback)] = handleResult
+            args[args.indexOf(callback)] = handleResult
         }
-        if (func) {
-            setData({
-                message: {
-                    content: loadingText,
-                    icon: true,
-                    status: 'loading',
-                }
-            })
-            PromisE(connection)
-                .then(handleConnection)
-                .catch(handleError)
-        }
+        loadingText !== null && setState({
+            message: {
+                content: loadingText,
+                icon: true,
+                status: 'loading',
+            }
+        })
+        PromisE(connection)
+            .then(handleConnection)
+            .catch(handleError)
 
         return () => {
             mounted = false
@@ -104,6 +124,42 @@ export const useQueryBlockchain = (
         }
     }, [func, args, multi])
 
-    const { message, result, unsubscribe } = data || {}
+    const { message, result, unsubscribe } = state || {}
     return { message, result, unsubscribe }
+}
+export default useQueryBlockchain
+
+// WIP: needs testing
+useQueryBlockchain.multi = (
+    connection,
+    queries,
+    resultsModifier,
+    // common props
+    subscribe = false,
+    defer,
+    loadingText,
+    print
+) => {
+    console.log('mulit', queries)
+    if (!isArr(queries)) return []
+
+    const results = queries.map(query =>
+        useQueryBlockchain(
+            connection,
+            isStr(query)
+                ? query
+                : query?.func,
+            query?.args,
+            query?.multi,
+            query?.resultModifier,
+            query?.subscribe ?? subscribe,
+            query?.defer ?? defer,
+            query?.loadingText ?? loadingText,
+            query?.print ?? print,
+        )
+    )
+
+    return !isFn(resultsModifier)
+        ? results
+        : resultsModifier(results, queries)
 }
