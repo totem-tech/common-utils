@@ -39,16 +39,15 @@ import {
  *
  * @returns {PromisE} with 3 accessible boolean properties: pending, rejected, resolved
  */
-export default function PromisE(promise, log) {
+export default function PromisE(promise, ...args) {
     if (!(promise instanceof Promise)) {
         try {
-            const args = [...arguments]
             // supplied is not a promise instance
             // check if it is an uninvoked async function
             promise = isPromise(promise)
                 ? promise
                 : isAsyncFn(promise)
-                    ? promise.apply(null, args.slice(1)) // pass rest of the arguments to the async function (args[0])
+                    ? promise.apply(null, args) // pass rest of the arguments to the async function (args[0])
                     : isFn(promise)
                         ? new Promise(promise)
                         : Promise.resolve(promise)
@@ -244,8 +243,10 @@ PromisE.getSocketEmitter = (
                 reject(getError(err))
             }
         })
-        if (!isPositiveInteger(timeout)) return promise
-        return PromisE.timeout(timeout, promise)
+
+        return !isPositiveInteger(timeout)
+            ? promise
+            : PromisE.timeout(timeout, promise)
     }
 
 /**

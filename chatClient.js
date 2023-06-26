@@ -20,14 +20,19 @@ const DISCONNECT_DELAY_MS = parseInt(process.env.MESSAGING_SERVER_DISCONNECT_DEL
 const MODULE_KEY = 'messaging'
 const PREFIX = 'totem_'
 export const ROLE_ADMIN = 'admin'
+export const ROLE_SUPPORT = 'support'
 // include any ChatClient property that is not a function or event that does not have a callback
 const nonCbs = ['isConnected', 'disconnect']
 // read or write to messaging settings storage
 const rw = value => storage.settings.module(MODULE_KEY, value) || {}
+export const rxFaucetEnabled = new BehaviorSubject(false)
+export const rxIsAdmin = new BehaviorSubject(false)
+export const rxIsSupport = new BehaviorSubject(false)
 export const rxIsConnected = new BehaviorSubject(false)
 export const rxIsLoggedIn = new BehaviorSubject(null)
 export const rxIsRegistered = new BehaviorSubject(!!(rw().user || {}).id)
 export const rxIsInMaintenanceMode = new BehaviorSubject(false)
+export const rxUserId = new BehaviorSubject((getUser() || {}).id)
 export const rxUserIdentity = new BehaviorSubject((getUser() || {}).address)
 const eventMaintenanceMode = 'maintenance-mode'
 
@@ -111,7 +116,7 @@ export const getClient = (url, disconnectDelayMs) => {
 
         const {
             id,
-            roles,
+            roles = [],
             secret
         } = getUser() || {}
         const isAdmin = roles.includes(ROLE_ADMIN)
@@ -126,19 +131,23 @@ export const getClient = (url, disconnectDelayMs) => {
             ))
             .catch(console.error)
     })
-    instance.onConnectError(error => {
-        log('connectError', error)
+    instance.socket.on('disconnect', () => {
+        log('disconnected')
         rxIsConnected.next(false)
         rxIsLoggedIn.next(false)
     })
-    instance.socket.on('disconnect', () => {
-        log('disconnected')
+    instance.onConnectError(error => {
+        log('connectError', error)
         rxIsConnected.next(false)
         rxIsLoggedIn.next(false)
     })
     instance.onMaintenanceMode(active => {
         console.log(`Maintenance mode ${active ? '' : 'de'}activated`)
         rxIsInMaintenanceMode.next(active)
+    })
+    instance.onFaucetStatus(enabled => {
+        console.log(`Faucet ${enabled ? 'enabled' : 'disabled'}`)
+        rxFaucetEnabled.next(enabled)
     })
 
     return instance
@@ -296,7 +305,10 @@ export class ChatClient {
                 delayPromise, // makes sure user is logged in
             )
             // auto disconnect after pre-configured period of inactivity
-            promise.promise.finally(() => this.disconnectDeferred())
+            const wsPromise = promise.promise || promise // if no timeout
+            wsPromise
+                .catch(() => { })
+                .finally(() => this.disconnectDeferred())
             return promise
         }
     }
@@ -413,6 +425,18 @@ export class ChatClient {
         [date, currencyIds]
     )
 
+    faucetRequest = async address => await this.emit(
+        'faucet-request',
+        [address]
+    )
+
+    faucetStatus = async enabled => await this.emit(
+        'faucet-status',
+        [enabled]
+    )
+
+    onFaucetStatus = cb => isFn(cb) && this.socket.on('faucet-status', cb)
+
     /**
      * @name    idExists
      * @summary Check if User ID Exists
@@ -476,11 +500,13 @@ export class ChatClient {
         'login',
         [id, secret],
         async (data) => {
-            const { address } = data || {}
+            const { address, roles = [] } = data || {}
             rxUserIdentity.next(address)
             // store user roles etc data sent from server
             setUser({ ...getUser(), ...data })
             rxIsLoggedIn.next(true)
+            rxIsAdmin.next(roles.includes(ROLE_ADMIN))
+            rxIsSupport.next(roles.includes(ROLE_SUPPORT))
             return data
         },
         err => {
