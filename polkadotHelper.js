@@ -128,7 +128,7 @@ export const keyring = {
     //
     // Params:
     // @seeds   array: uri/seed
-    add: (seeds = []) => seeds.forEach(seed => {
+    add: (seeds = []) => seeds.map(seed => {
         try {
             if (isUint8Arr(seed)) {
                 seed = bytesToHex(seed)
@@ -136,7 +136,7 @@ export const keyring = {
                 // const { secretKey, publicKey } = seed
                 // const pair = createPair(TYPE, { secretKey, publicKey })
                 // return _keyring.addPair(pair)
-                throw new Error('createPair has been removed from @polkadot/keyring exports!')
+                throw new Error('createPair has been removed from @polkadot/keyring exports! Use seed/uri instead.')
             }
             return _keyring.addFromUri(seed)
         } catch (error) { console.log('Failed to add seed to keyring', error) }
