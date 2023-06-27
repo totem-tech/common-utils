@@ -192,6 +192,13 @@ export const translated = (
         return result[capitalized ? 1 : 0].texts
     }
 
+
+    // gets rid of extra spacing etc.
+    Object
+        .keys(texts)
+        .forEach(key => {
+            texts[key] = clearClutter(texts[key])
+        })
     const langCode = getSelected()
     if (langCode !== APP_LANG || BUILD_MODE) {
         const en = translations.get(APP_LANG) || []
@@ -202,24 +209,27 @@ export const translated = (
             _window.enList = _window.enList || []
             Object.values(texts).forEach(text => {
                 if (!text) return
-                text = clearClutter(text)
+                // text = clearClutter(text)
                 enList.indexOf(text) === -1 && enList.push(text)
             })
             _window.enList = enList.sort()
         }
 
-        Object.keys(texts).forEach(key => {
-            if (!texts[key]) return
-            const text = clearClutter(texts[key])
-            const enIndex = en.indexOf(text)
-            const translatedText = selected[enIndex]
-            // fall back to original/English,
-            // if selected language is not supported 
-            // or due to network error language data download failed
-            // or somehow supplied text wasn't translated
-            if (!translatedText) return
-            texts[key] = translatedText
-        })
+        Object
+            .keys(texts)
+            .forEach(key => {
+                if (!texts[key]) return
+                const text = texts[key]
+                const enIndex = en.indexOf(text)
+                const translatedText = selected[enIndex]
+                // fall back to original/English,
+                // if selected language is not supported 
+                // or due to network error language data download failed
+                // or somehow supplied text wasn't translated
+                if (!translatedText) return
+                texts[key] = translatedText
+            })
+    } else {
     }
 
     texts = digitsTranslated(texts, langCode)
