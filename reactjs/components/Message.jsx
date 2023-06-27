@@ -91,8 +91,8 @@ export const Message = React.memo(({
         ...isObj(dp.header) && dp.header,
         ...toProps(header),
     }
-    text = isStr(text)
-        ? text.replace('Error: ', '') // remove "Error: " from error messages
+    text = !isValidElement(text)
+        ? `${text || ''}`.replace('Error: ', '') // remove "Error: " from error messages
         : text
     const isLoading = status === statuses.loading
     status = isLoading

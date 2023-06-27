@@ -154,7 +154,7 @@ export const getClient = (url, disconnectDelayMs) => {
 }
 
 /**
- * @name    translateInterceptor
+ * @name    translateError
  * @summary translate error messages returned from messaging
  * 
  * @param {Function} cb 
@@ -272,7 +272,13 @@ export class ChatClient {
          * @returns {Promise}
          */
         this.emit = (event, args = [], resultModifier, onError, timeoutLocal) => {
-            let delayPromise
+            let delayPromise, callback
+            if (isFn(args[args.length - 1])) {
+                console.log('args before', args)
+                callback = args.splice(-1)[0]
+
+                console.log('args after', { args, callback })
+            }
             // functions allowed during maintenace mode
             const maintenanceModeKeys = [
                 eventMaintenanceMode,
@@ -295,10 +301,16 @@ export class ChatClient {
             const promise = _emitter(
                 event,
                 args,
-                resultModifier,
+                async result => {
+                    callback?.(null, result)
+                    return isFn(resultModifier)
+                        ? resultModifier(result)
+                        : result
+                },
                 err => {
                     const translatedErr = translateError(err)
                     isFn(onError) && onError(translatedErr, err)
+                    callback?.(err)
                     return translatedErr
                 },
                 timeoutLocal,
@@ -326,7 +338,13 @@ export class ChatClient {
      * 
      * @returns {Object} company
      */
-    company = async (hash, company) => await this.emit('company', [hash, company])
+    company = async (hash, company, ...args) => await this.emit(
+        'company',
+        [
+            hash,
+            company,
+            ...args
+        ])
 
     /**
      * @name    companySearch
@@ -337,9 +355,13 @@ export class ChatClient {
      *  
      * @returns {Map}
      */
-    companySearch = async (query, searchParentIdentity) => await this.emit(
+    companySearch = async (query, searchParentIdentity, ...args) => await this.emit(
         'company-search',
-        [query, searchParentIdentity],
+        [
+            query,
+            searchParentIdentity,
+            ...args
+        ],
         // convert 2D array back to Map
         ([result, limit]) => new Map(result),
     )
@@ -353,9 +375,9 @@ export class ChatClient {
      * 
      * @returns {Map}
      */
-    countries = async (hash) => await this.emit(
+    countries = async (hash, ...args) => await this.emit(
         'countries',
-        [hash],
+        [hash, ...args],
         countries => new Map(countries),
     )
 
@@ -371,9 +393,9 @@ export class ChatClient {
      * 
      * @returns {Object}    contribution entry
      */
-    crowdloan = async (contribution) => await this.emit(
+    crowdloan = async (contribution, ...args) => await this.emit(
         'crowdloan',
-        [contribution],
+        [contribution, ...args],
     )
 
     /**
@@ -394,9 +416,14 @@ export class ChatClient {
      * 
      * @returns {Number}
      */
-    currencyConvert = async (from, to, amount) => await this.emit(
+    currencyConvert = async (from, to, amount, ...args) => await this.emit(
         'currency-convert',
-        [from, to, amount]
+        [
+            from,
+            to,
+            amount,
+            ...args
+        ]
     )
 
     /**
@@ -409,7 +436,10 @@ export class ChatClient {
      *                          an empty result will be returned.
      * @returns {Map}
      */
-    currencyList = async (hash) => await this.emit('currency-list', [hash])
+    currencyList = async (hash, ...args) => await this.emit(
+        'currency-list',
+        [hash, ...args]
+    )
 
     /**
      * @name    currencyPricesByDate
@@ -420,19 +450,23 @@ export class ChatClient {
      * 
      * @returns {Array}
      */
-    currencyPricesByDate = async (date, currencyIds) => await this.emit(
+    currencyPricesByDate = async (date, currencyIds, ...args) => await this.emit(
         'currency-prices-by-date',
-        [date, currencyIds]
+        [
+            date,
+            currencyIds,
+            ...args
+        ]
     )
 
-    faucetRequest = async address => await this.emit(
+    faucetRequest = async (address, ...args) => await this.emit(
         'faucet-request',
-        [address]
+        [address, ...args]
     )
 
-    faucetStatus = async enabled => await this.emit(
+    faucetStatus = async (enabled, ...args) => await this.emit(
         'faucet-status',
-        [enabled]
+        [enabled, ...args]
     )
 
     onFaucetStatus = cb => isFn(cb) && this.socket.on('faucet-status', cb)
@@ -443,7 +477,10 @@ export class ChatClient {
      * 
      * @returns {Boolean}
      */
-    idExists = async (userId) => await this.emit('id-exists', [userId])
+    idExists = async (userId, ...args) => await this.emit(
+        'id-exists',
+        [userId, ...args]
+    )
 
     /**
      * @name    isUserOnline
@@ -451,7 +488,10 @@ export class ChatClient {
      * 
      * @returns {Boolean}
      */
-    isUserOnline = async (userId) => await this.emit('is-user-online', [userId])
+    isUserOnline = async (userId, ...args) => await this.emit(
+        'is-user-online',
+        [userId, ...args]
+    )
 
     /**
      * @name    glAccounts
@@ -461,7 +501,10 @@ export class ChatClient {
      * 
      * @returns {*}
      */
-    glAccounts = async (accountNumbers) => await this.emit('gl-accounts', [accountNumbers])
+    glAccounts = async (accountNumbers, ...args) => await this.emit(
+        'gl-accounts',
+        [accountNumbers, ...args]
+    )
 
     /**
      * @name    languageErrorMessages
@@ -470,7 +513,10 @@ export class ChatClient {
      * 
      * @returns {Array}
      */
-    languageErrorMessages = async () => await this.emit('language-error-messages', [])
+    languageErrorMessages = async (...args) => await this.emit(
+        'language-error-messages',
+        [...args]
+    )
 
     /**
      * @name    languageTranslations
@@ -482,9 +528,13 @@ export class ChatClient {
      * 
      * @returns {Array}
      */
-    languageTranslations = async (langCode, hash) => await this.emit(
+    languageTranslations = async (langCode, hash, ...args) => await this.emit(
         'language-translations',
-        [langCode, hash],
+        [
+            langCode,
+            hash,
+            ...args
+        ],
     )
 
     /**
@@ -496,9 +546,13 @@ export class ChatClient {
      *  
      * @returns {Object} data. Eg: roles etc.
      */
-    login = async (id, secret) => await this.emit(
+    login = async (id, secret, ...args) => await this.emit(
         'login',
-        [id, secret],
+        [
+            id,
+            secret,
+            ...args
+        ],
         async (data) => {
             const { address, roles = [] } = data || {}
             rxUserIdentity.next(address)
@@ -522,7 +576,10 @@ export class ChatClient {
      * @param   {Boolean}     active
      * @param   {Function}    cb 
      */
-    maintenanceMode = async (active) => await this.emit(eventMaintenanceMode, [active])
+    maintenanceMode = async (active, ...args) => await this.emit(
+        eventMaintenanceMode,
+        [active, ...args]
+    )
 
     /**
      * @name    onMaintenanceMode
@@ -543,9 +600,14 @@ export class ChatClient {
      * 
      * @returns {*}
      */
-    message = async (toUserIds, msg, encrypted) => await this.emit(
+    message = async (toUserIds, msg, encrypted, ...args) => await this.emit(
         'message',
-        [toUserIds, msg, encrypted],
+        [
+            toUserIds,
+            msg,
+            encrypted,
+            ...args
+        ],
     )
 
     /**
@@ -568,9 +630,9 @@ export class ChatClient {
      * 
      * @returns {Array} messages
      */
-    messageGetRecent = async (lastMsgTs) => await this.emit(
+    messageGetRecent = async (lastMsgTs, ...args) => await this.emit(
         'message-get-recent',
-        [lastMsgTs],
+        [lastMsgTs, ...args],
     )
 
     /**
@@ -582,9 +644,9 @@ export class ChatClient {
      * 
      * @returns {*}
      */
-    messageGroupName = async (userIds, name) => await this.emit(
+    messageGroupName = async (userIds, name, ...args) => await this.emit(
         'message-group-name',
-        [userIds, name],
+        [userIds, name, ...args],
     )
 
     /**
@@ -597,7 +659,7 @@ export class ChatClient {
      * 
      * @returns {*}
      */
-    newsletterSignup = async (values) => await this.emit('newsletter-signup', [values])
+    newsletterSignup = async (values, ...args) => await this.emit('newsletter-signup', [values, ...args])
 
     /**
      * @name    notify
@@ -611,7 +673,7 @@ export class ChatClient {
      * 
      * @returns {*}
      */
-    notify = async (toUserIds, type, childType, message, data) => await this.emit(
+    notify = async (toUserIds, type, childType, message, data, ...args) => await this.emit(
         'notification',
         [
             toUserIds,
@@ -619,6 +681,7 @@ export class ChatClient {
             childType,
             message,
             data,
+            ...args
         ],
     )
     /**
@@ -645,9 +708,9 @@ export class ChatClient {
      * 
      * @returns {Map}
      */
-    notificationGetRecent = async (tsLast) => await this.emit(
+    notificationGetRecent = async (tsLast, ...args) => await this.emit(
         'notification-get-recent',
-        [tsLast],
+        [tsLast, ...args],
         result => new Map(result),
     )
 
@@ -659,9 +722,9 @@ export class ChatClient {
      * @param   {Boolean}   read    marks as read or unread. Optional if `deleted = true`
      * @param   {Boolean}   deleted (optional) marks as deleted or undeleted
      */
-    notificationSetStatus = async (id, read, deleted) => await this.emit(
+    notificationSetStatus = async (id, read, deleted, ...args) => await this.emit(
         'notification-set-status',
-        [id, read, deleted],
+        [id, read, deleted, ...args],
     )
 
     /**
@@ -672,9 +735,9 @@ export class ChatClient {
      * @param {Object}   project
      * @param {Boolean}  create      whether to create or update project
      */
-    project = async (projectId, project, create) => await this.emit(
+    project = async (projectId, project, create, ...args) => await this.emit(
         'project',
-        [projectId, project, create],
+        [projectId, project, create, ...args],
     )
 
     /**
@@ -685,9 +748,9 @@ export class ChatClient {
      * 
      * @returns {Array} [projects, notFoundIds]
      */
-    projectsByHashes = async (projectIds) => await this.emit(
+    projectsByHashes = async (projectIds, ...args) => await this.emit(
         'projects-by-hashes',
-        [projectIds],
+        [projectIds, ...args],
         ([projects, notFoundIds = []]) => [new Map(projects), notFoundIds],
     )
 
@@ -700,13 +763,14 @@ export class ChatClient {
      * @param   {String}    address     Blockchain identity
      * @param   {String}    referredBy  (optional) referrer user ID
      */
-    register = async (id, secret, address, referredBy) => await this.emit(
+    register = async (id, secret, address, referredBy, ...args) => await this.emit(
         'register',
         [
             id,
             secret,
             address,
             referredBy,
+            ...args
         ],
         () => {
             setUser({ id, secret })
@@ -726,9 +790,14 @@ export class ChatClient {
      * 
      * @returns {String}
      */
-    rewardsClaim = async (platform, handle, postId) => await this.emit(
+    rewardsClaim = async (platform, handle, postId, ...args) => await this.emit(
         'rewards-claim',
-        [platform, handle, postId],
+        [
+            platform,
+            handle,
+            postId,
+            ...args
+        ],
     )
 
     /**
@@ -743,7 +812,10 @@ export class ChatClient {
      * @param   {Function}      callback            callback function expected arguments:
      *                                              @err    String: error message if query failed
      */
-    rewardsClaimKAPEX = async (identity) => await this.emit('rewards-claim-kapex', [identity])
+    rewardsClaimKAPEX = async (identity, ...args) => await this.emit(
+        'rewards-claim-kapex',
+        [identity, ...args]
+    )
 
     /**
      * @name    rewardsGetData
@@ -751,7 +823,10 @@ export class ChatClient {
      * 
      * @returns {Object}    rewards data
      */
-    rewardsGetData = async () => await this.emit('rewards-get-data')
+    rewardsGetData = async (...args) => await this.emit(
+        'rewards-get-data',
+        [...args]
+    )
 
     /**
      * @name    task
@@ -764,9 +839,14 @@ export class ChatClient {
      * @param {Object}   task
      * @param {String}   ownerAddress    task owner identity
      */
-    task = async (id, task, ownerAddress) => await this.emit(
+    task = async (id, task, ownerAddress, ...args) => await this.emit(
         'task',
-        [id, task, ownerAddress],
+        [
+            id,
+            task,
+            ownerAddress,
+            ...args
+        ],
     )
 
     /**
@@ -777,9 +857,9 @@ export class ChatClient {
      * 
      * @returns {Map} list of objects with task details
      */
-    taskGetById = async (ids) => await this.emit(
+    taskGetById = async (ids, ...args) => await this.emit(
         'task-get-by-id',
-        [ids],
+        [ids, ...args],
         result => new Map(result),
     )
 
@@ -791,9 +871,9 @@ export class ChatClient {
      * 
      * @returns {Map}   list of tasks with details
      */
-    taskGetByParentId = async (parentId) => await this.emit(
+    taskGetByParentId = async (parentId, ...args) => await this.emit(
         'task-get-by-parent-id',
-        [parentId],
+        [parentId, ...args],
         result => new Map(result)
     )
 
@@ -807,9 +887,9 @@ export class ChatClient {
      * @param   {String}    application.taskId
      * @param   {String}    application.workerAddress
      */
-    taskMarketApply = async (application) => await this.emit(
+    taskMarketApply = async (application, ...args) => await this.emit(
         'task-market-apply',
-        [application],
+        [application, ...args],
         result => new Map(result),
     )
 
@@ -833,9 +913,9 @@ export class ChatClient {
      * @param   {String}    data.workerAddress
      * @param   {Function}  callback            Args: [error String, updateCount Number]
      */
-    taskMarketApplyResponse = async (data) => await this.emit(
+    taskMarketApplyResponse = async (data, ...args) => await this.emit(
         'task-market-apply-response',
-        [data],
+        [data, ...args],
     )
 
     /**
@@ -848,9 +928,9 @@ export class ChatClient {
      * 
      * @returns {Map}
      */
-    taskMarketSearch = async (filter) => await this.emit(
+    taskMarketSearch = async (filter, ...args) => await this.emit(
         'task-market-search',
-        [filter],
+        [filter, ...args],
         result => new Map(result)
     )
 }
