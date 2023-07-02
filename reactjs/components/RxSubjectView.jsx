@@ -54,6 +54,7 @@ RxSubjectView.defaultProps = {
     allowMerge: false,
     allowSubjectUpdate: false,
 }
+RxSubjectView.IGNORE_UPDATE = useRxSubject.IGNORE_UPDATE
 RxSubjectView.propTypes = {
     allowMerge: PropTypes.bool,
     allowSubjectUpdate: PropTypes.bool,

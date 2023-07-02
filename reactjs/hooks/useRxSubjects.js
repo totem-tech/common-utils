@@ -70,5 +70,5 @@ export const useRxSubjects = (
         _subjects,
     ]
 }
-
+useRxSubjects.IGNORE_UPDATE = useRxSubject.IGNORE_UPDATE
 export default useRxSubjects

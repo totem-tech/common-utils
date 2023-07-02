@@ -11,12 +11,13 @@ import {
     isFn,
     isNodeJS,
     isObj,
+    isPositiveInteger,
     isStr,
     objWithoutKeys,
 } from './utils'
 
 let instance, socket
-const DISCONNECT_DELAY_MS = parseInt(process.env.MESSAGING_SERVER_DISCONNECT_DELAY_MS || 300000)
+const AUTO_DISCONNECT_MS = parseInt(process.env.REACT_APP_CHAT_AUTO_DISCONNECT_MS || 300000)
 const MODULE_KEY = 'messaging'
 const PREFIX = 'totem_'
 export const ROLE_ADMIN = 'admin'
@@ -204,7 +205,7 @@ export const translateError = err => {
 }
 
 export class ChatClient {
-    constructor(url, disconnectDelayMs = DISCONNECT_DELAY_MS) {
+    constructor(url, autoDisconnectMs = AUTO_DISCONNECT_MS) {
         if (!isStr(url)) {
             const hostProd = 'totem.live'
             const hostStaging = 'dev.totem.live'
@@ -240,12 +241,15 @@ export class ChatClient {
             })
 
         this.connect = () => this.socket.connect()
-        this.disconnect = () => this.socket.disconnect()
+        this.disconnect = () => {
+            log('Manual disconnect')
+            this.socket.disconnect()
+        }
         this.disconnectDeferred = deferred(() => {
+            if (!isPositiveInteger(autoDisconnectMs)) return
             log('Disconnecting due to inactivity')
-            this.disconnect()
-            rxIsLoggedIn.next(false)
-        }, disconnectDelayMs)
+            this.socket.disconnect()
+        }, autoDisconnectMs)
         this.isConnected = () => this.socket.connected
         this.onConnect = cb => this.socket.on('connect', cb)
         // this.onConnectTimeout = cb => this.socket.on('connect_timeout', cb);
@@ -317,10 +321,12 @@ export class ChatClient {
                 delayPromise, // makes sure user is logged in
             )
             // auto disconnect after pre-configured period of inactivity
-            const wsPromise = promise.promise || promise // if no timeout
-            wsPromise
-                .catch(() => { })
-                .finally(() => this.disconnectDeferred())
+            if (autoDisconnectMs) {
+                const wsPromise = promise.promise || promise // if no timeout
+                wsPromise
+                    .catch(() => { })
+                    .finally(() => this.disconnectDeferred())
+            }
             return promise
         }
     }

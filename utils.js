@@ -409,8 +409,16 @@ export const arrSearch = (arr, keyValues, matchExact, matchAll, ignoreCase, asAr
  * 
  * @returns {Array}	sorted array
  */
-export const arrSort = (arr, key, reverse = false, caseInsensitive = true, sortOriginal = false) => {
-	let sortedArr = (sortOriginal ? arr : [...arr])
+export const arrSort = (
+	arr,
+	key,
+	reverse = false,
+	caseInsensitive = true,
+	sortOriginal = false
+) => {
+	let sortedArr = sortOriginal
+		? arr
+		: [...arr]
 
 	const getValue = (obj, key) => {
 		let value
@@ -526,7 +534,7 @@ export const getFuncParams = func => func
  * 
  * @returns {String|Object}
  */
-export const getUrlParam = (name, url = '') => {
+export const getUrlParam = (name, url = fallbackIfFails(() => window.location.href, [], '')) => {
 	const params = {}
 	const regex = /[?&]+([^=&]+)=([^&]*)/gi
 	url.replace(
@@ -981,7 +989,8 @@ export const searchRanked = (searchKeys = ['text'], maxResults = 100) => (option
 				if (!option || !hasValue(option[key])) return
 
 				// catches errors caused by the use of some special characters with .match() below
-				let x = JSON.stringify(option[key]).match(regex)
+				let x = fallbackIfFails(() => JSON.stringify(option[key]), [], '')
+					.match(regex)
 				if (!x || uniqueValues[options[i].value]) return
 
 				const matchIndex = x.index
@@ -990,7 +999,7 @@ export const searchRanked = (searchKeys = ['text'], maxResults = 100) => (option
 			} catch (e) {
 				console.log(e)
 			}
-		}).filter(r => !!r)
+		}).filter(Boolean)
 
 		return arrSort(matches, 'matchIndex').map(x => options[x.index])
 	}

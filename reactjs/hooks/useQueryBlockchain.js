@@ -53,6 +53,7 @@ export const useQueryBlockchain = (
     loadingText = textsCap.loading,
     print,
 ) => {
+    connection ??= useQueryBlockchain.defaultConnection
     const [state, setState] = useRxStateDeferred({}, defer)
 
     useEffect(() => {
@@ -63,6 +64,7 @@ export const useQueryBlockchain = (
         let unsubscribe
         const _args = args || []
         const callback = _args.slice(-1)
+        if (isFn(callback)) subscribe = true
         const handleConnection = async ({ api }) => {
             unsubscribed = false
             const result = await query(
@@ -102,10 +104,12 @@ export const useQueryBlockchain = (
             unsubscribe()
         }
 
-        if (!isFn(callback)) {
-            subscribe && _args.push(handleResult)
-        } else {
-            args[args.indexOf(callback)] = handleResult
+        if (subscribe) {
+            _args.push(handleResult)
+            const cbIndex = isFn(callback)
+                ? args.indexOf(callback)
+                : args.length
+            args[cbIndex] = handleResult
         }
         loadingText !== null && setState({
             message: {
@@ -114,19 +118,20 @@ export const useQueryBlockchain = (
                 status: 'loading',
             }
         })
-        PromisE(connection)
+        connection && PromisE(connection)
             .then(handleConnection)
             .catch(handleError)
 
         return () => {
             mounted = false
-            handleUnsubscribe()
+            subscribe && handleUnsubscribe()
         }
     }, [func, args, multi])
 
     const { message, result, unsubscribe } = state || {}
     return { message, result, unsubscribe }
 }
+useQueryBlockchain.defaultConnection = null
 export default useQueryBlockchain
 
 // WIP: needs testing
