@@ -55,7 +55,6 @@ export const copyRxSubject = (rxSource, rxCopy, valueModifier, defer) => {
             ? rxSource.subscribe(setValue)
             : rxSource.map((x, i) =>
                 x.subscribe(value => {
-                    console.log
                     values[i] = value
                     setValue(values)
                 })

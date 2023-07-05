@@ -206,6 +206,7 @@ export const isObjArr = x => isArr(x) && x.every(isObj)
 // Checks if argument is a Map of Objects. Each element type must be object, otherwise will return false.
 export const isObjMap = x => isMap(x) && Array.from(x).every(([_, v]) => isObj(v))
 export const isPositiveInteger = x => isInteger(x) && x > 0
+export const isPositiveNumber = x => isValidNumber(x) && x > 0
 export const isPromise = x => x instanceof Promise
 export const isSet = x => x instanceof Set
 export const isStr = x => typeof x === 'string'
@@ -837,17 +838,37 @@ export const mapFindByKey = (map, key, value, matchExact) => {
 
 /**
  * @name	mapJoin
- * @summary creates a new Map by combining two Maps
+ * @summary creates a new Map by combining two or more Maps
  * 
- * @param	{Map} source 
- * @param	{Map} dest   any existing values will be overriden
+ * @param	{Map[]|Array[]} maps...
  * 
  * @returns {Map}
+ * 
+ * @example	`javascript
+ * const maps = [
+ * 	new Map([['a', 1]]),
+ * 	new Map([['b', 2]]),
+ * ]
+ * const joined = mapJoin(...maps) // Map(2) {'a' => 1, 'b' => 2}
+ * 
+ * // use 2D array
+ * const maps = [
+ * 	[['a', 1]],
+ * 	[['b', 2]],
+ * ]
+ * const joined = mapJoin(...maps) // Map(2) {'a' => 1, 'b' => 2}
+ * `
  */
-export const mapJoin = (source, dest = new Map()) => new Map([
-	...Array.from(dest),
-	...Array.from(source),
-])
+export const mapJoin = (...maps) => new Map(
+	maps
+		.map(map => {
+			const arr = fallbackIfFails(Array.from, [map], [])
+			return isArr2D(arr)
+				? arr
+				: []
+		})
+		.flat()
+)
 
 /**
  * @name	mapSearch

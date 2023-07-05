@@ -31,7 +31,7 @@ import { copyRxSubject } from '../../rx.js'
  *                                                  instance, it may override values in the LocalStorage values.
  *                                                  Default: `false`
  *
- * @returns {Array}     [value, setvalue, subject]
+ * @returns {Array}     [value, setvalue, subject, setValueDeferred]
  */
 export const useRxSubject = (
     subject,
@@ -42,58 +42,6 @@ export const useRxSubject = (
     defer = 100,
     debugTag,
 ) => {
-    // const _subject = useMemo(
-    //     () => isSubjectLike(subject)
-    //         ? allowSubjectUpdate
-    //             ? subject
-    //             : copyRxSubject(subject)
-    //         : new BehaviorSubject(
-    //             initialValue !== undefined
-    //                 ? initialValue
-    //                 : subject
-    //         ),
-    //     [subject],
-    // )
-    // const [setValue, setValueDeferred] = useMemo(() => {
-    //     const setState = newValue => _subject.next(newValue)
-
-    //     return [
-    //         setState,
-    //         defer > 0
-    //             ? deferred(setState, defer)
-    //             : undefined
-    //     ]
-    // }, [])
-    // let [
-    //     {
-    //         firstValue,
-    //         isBSub,
-    //         value,
-    //     },
-    //     _setValue
-    // ] = useState(() => {
-    //     const isBSub = _subject instanceof BehaviorSubject
-    //     let value = isBSub
-    //         ? _subject.value
-    //         : initialValue
-    //     value = !isFn(valueModifier)
-    //         ? value
-    //         : valueModifier(
-    //             value,
-    //             undefined,
-    //             _subject,
-    //         )
-    //     if (value === useRxSubject.IGNORE_UPDATE) {
-    //         value = undefined
-    //     }
-
-    //     return {
-    //         firstValue: value,
-    //         isBSub,
-    //         value,
-    //     }
-    // })
-
     const [
         _subject,
         firstValue,
@@ -147,6 +95,8 @@ export const useRxSubject = (
         let ignoreFirst = !isBSub
         const subscribed = _subject.subscribe(newValue => {
             if (!ignoreFirst) {
+                // BehaviorSubject subscription triggers a result immediately with the pre-existing value.
+                // Ignoring first result reduces one extra state update.
                 ignoreFirst = true
                 if (firstValue === newValue) return
             }
@@ -182,6 +132,7 @@ export const useRxSubject = (
             })
             promise.catch(err => console.log('useRxSubject => unexpected error:', err))
         })
+
         return () => {
             mounted = false
             subscribed.unsubscribe()
