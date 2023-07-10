@@ -24,6 +24,7 @@ export const statusColors = {
 }
 
 export const statuses = {
+    basic: 'basic',
     error: 'error',
     info: 'info',
     loading: 'loading',
@@ -84,6 +85,7 @@ export const Message = React.memo(({
 
     const dp = Message.defaultProps || {}
     const isSemantic = library === 'semantic-ui-react'
+    const isMui = library === '@mui/material'
     const {
         opacity = dp.style?.opacity
     } = style
@@ -180,14 +182,18 @@ export const Message = React.memo(({
             && !useChildren
             && icon,
         // for compatibility with MUI <Alert/>
-        severity: severity ||
-            objWithoutKeys(statuses, ['basic', 'loading'])[status]
-            || undefined,
+        ...isMui && {
+            severity: severity
+                // ignore unsupported status
+                || objWithoutKeys(statuses, ['basic', 'loading'])[status]
+                || undefined
+        },
         status,
         ...isSemantic && {
             // Semantic UI status
-            positive: status === statuses.success,
+            info: status === statuses.info,
             negative: status === statuses.error,
+            positive: status === statuses.success,
             warning: status === statuses.warning || isLoading,
         },
         style: {
@@ -207,6 +213,7 @@ export const Message = React.memo(({
             ...style,
         },
     }
+
     return <Container {...containerProps} />
 })
 Message.defaultProps = {

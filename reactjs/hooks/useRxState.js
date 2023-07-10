@@ -1,8 +1,9 @@
 import { isValidElement, useMemo } from 'react'
-import { BehaviorSubject } from 'rxjs'
-import { isFn, isObj } from '../../utils'
+import { BehaviorSubject, SubjectLike } from 'rxjs'
+import { isFn, isObj, isSubjectLike } from '../../utils'
 import useRxSubject from './useRxSubject'
 import useMount from './useMount'
+import { copyRxSubject } from '../../rx'
 
 /**
  * @name    useRxState
@@ -11,17 +12,17 @@ import useMount from './useMount'
  * @param   {*|Function}        initialState    (optional)
  *                                          Function arguments: rxState BehaviorSubject
  *                                          Default: `{}`
- * @param   {Object|Function}   conf            if function, it will be used as `valueModifier`
- * @param   {Function}          conf.allowMerge     (optional) whether to merge old and new values into an object.
+ * @param   {Object|Function}      conf             if function, it will be used as `valueModifier`
+ * @param   {Function}             conf.allowMerge  (optional) whether to merge old and new values into an object.
  *                                                  If `valueModifier` is used, it needs to merge the first
  *                                                  argument with the returned value otherwise `allowMerge` won't work.
  *                                                  Default: `true` if initial state is an object.         
- * @param   {Function}          conf.onMount        (optional)
- * @param   {Function}          conf.onUnmount      (optional)
- * @param   {BehaviorSubject}   conf.subject        (optional)
- * @param   {Function}          conf.valueModifier  (optional)
+ * @param   {Function}             conf.onMount     (optional)
+ * @param   {Function}             conf.onUnmount   (optional)
+ * @param   {SubjectLike|Function} conf.subject     (optional)
+ * @param   {Function}             conf.valueModifier (optional)
  * 
- * @returns {Array} [state, setState, rxState, setStateDeferred]
+ * @returns {[*, Function, BehaviorSubject, Function]} [state, setState, rxState, setStateDeferred]
  */
 export const useRxState = (
     initialState = {},
@@ -30,15 +31,18 @@ export const useRxState = (
 ) => {
     let {
         allowMerge,
+        allowSubjectUpdate = true,
         defer,
-        onMount,
         onUnmount,
         subject,
         valueModifier,
     } = conf
     if (isFn(conf)) valueModifier = conf
     const [rxState, iniState] = useMemo(() => {
-        const rxState = subject instanceof BehaviorSubject
+        subject = isFn(subject)
+            ? subject()
+            : subject
+        const rxState = isSubjectLike(subject)
             ? subject
             : new BehaviorSubject({})
         initialState = !isFn(initialState)
@@ -53,19 +57,23 @@ export const useRxState = (
     allowMerge ??= !!iniState
         && !isValidElement(iniState)
         && isObj(iniState)
-    const [state, setState, ...args] = useRxSubject(
+    const [state, setState, _, setStateDeferred] = useRxSubject(
         rxState,
         valueModifier,
         iniState,
         allowMerge,
-        true,
+        allowSubjectUpdate,
         defer,
+        onUnmount,
     )
-
-    useMount(onMount, onUnmount)
 
     debugTag && console.log(debugTag, state)
 
-    return [state, setState, ...args]
+    return [
+        state,
+        setState,
+        rxState,
+        setStateDeferred
+    ]
 }
 export default useRxState

@@ -12,6 +12,7 @@ import {
     isSubjectLike,
 } from '../../utils'
 import { copyRxSubject } from '../../rx.js'
+import { useUnmount } from './useMount'
 
 /**
  * @name    useRxSubject
@@ -40,7 +41,7 @@ export const useRxSubject = (
     allowMerge,
     allowSubjectUpdate = false,
     defer = 100,
-    debugTag,
+    onUnmount,
 ) => {
     const [
         _subject,
@@ -49,7 +50,8 @@ export const useRxSubject = (
         setValue,
         setValueDeferred
     ] = useMemo(() => {
-        const _subject = isSubjectLike(subject)
+        const isSub = isSubjectLike(subject)
+        const _subject = isSub
             ? allowSubjectUpdate
                 ? subject
                 : copyRxSubject(subject)
@@ -138,6 +140,8 @@ export const useRxSubject = (
             subscribed.unsubscribe()
         }
     }, [_subject])
+
+    isFn(onUnmount) && useUnmount(() => onUnmount(subject))
 
     return [
         value,

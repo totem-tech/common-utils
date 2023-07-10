@@ -8,6 +8,7 @@ import {
     isStr,
 } from '../../utils'
 import useRxStateDeferred from './useRxStateDeferred'
+import useRxSubjectOrValue from './useRxSubjectOrValue'
 
 const textsCap = {
     loading: 'loading...'
@@ -18,43 +19,57 @@ translated(textsCap, true)
  * @name    useQueryBlockchain
  * @summary a React Hook to query (and optionally subscribe) blockchain storage.
  *
- * @param   {Object|Promise}    connection
- * @param   {Object}            connection.api  ApiPromise
- * @param   {String|Function}   func
- * @param   {Array|*}           args    (optional)
- * @param   {Boolean}           multi   (optional)
- * @param   {Function}          resultModifier (optional)
- * @param   {Boolean}           subscribe (optional)
- * @param   {Boolean}           print   (optional)
+ * @param {Object}                q
+ * @param {BehaviorSubject|Array} q.args  (optional) If last item is a function, `q.subscribe` will be set to `true`.
+ * @param {Object|Promise}        q.connection
+ * @param {Number}                q.defer     (optional)
+ *                                              Default: `100`
+ * @param {BehaviorSubject|String|Function} q.func  blockchain query function. Eg: 'api.query.blances.freeBalance'
+ * @param {String}                q.loadingText
+ * @param {BehaviorSubject|Boolean} q.multi   (optional)
+ * @param {Boolean}               q.print     (optional)
+ * @param {Boolean}               q.subscribe (optional)
+ *                                            Defualt: `true`                                          
+ * @param {Function}              q.valueModifier (optional) callback to modify the query result
  *
  * @returns {Object} { message, result, unsubscribe }
  * 
  * @example `javascript
  * // make sure to use `useMemo` to prevent making redundant queries
- * const queryArgs = useMemo(() => [
- *     getConnection(),
- *     'api.rpc.chain.subscribeFinalizedHeads',
- *     [],
- *     false,
- *     result => result,
- *     true
- * ], [])
- * const result = useQueryBlockchain(...queryArgs)
+ * const query = useMemo(() => ({
+ *     args: [],
+ *     connection: getConnection(),
+ *     func: 'api.rpc.chain.subscribeFinalizedHeads',
+ *     multi: false,
+ *     subscribe: true
+ *     valueModifier: result => result,
+ * }), [])
+ * const result = useQueryBlockchain(query)
  * `
  */
-export const useQueryBlockchain = (
-    connection,
-    func,
+export const useQueryBlockchain = ({
     args,
-    multi,
-    resultModifier,
-    subscribe = true,
+    connection = useQueryBlockchain.defaultConnection,
     defer = 100,
+    func,
     loadingText = textsCap.loading,
+    multi,
     print,
-) => {
-    connection ??= useQueryBlockchain.defaultConnection
-    const [state, setState] = useRxStateDeferred({}, defer)
+    subscribe = true,
+    valueModifier,
+} = {}) => {
+    args = useRxSubjectOrValue(args)
+    func = useRxSubjectOrValue(func)
+    multi = useRxSubjectOrValue(multi)
+    const [state, setState] = useRxStateDeferred({
+        message: !func || loadingText === null
+            ? null
+            : {
+                content: loadingText,
+                icon: true,
+                status: 'loading',
+            }
+    }, defer)
 
     useEffect(() => {
         if (!func) return
@@ -62,36 +77,44 @@ export const useQueryBlockchain = (
         let mounted = true
         let unsubscribed = false
         let unsubscribe
-        const _args = args || []
-        const callback = _args.slice(-1)
+        const queryArgs = [...args || []]
+        const callback = queryArgs.slice(-1)
         if (isFn(callback)) subscribe = true
+
         const handleConnection = async ({ api }) => {
-            unsubscribed = false
+            if (unsubscribed || !mounted) return
+
             const result = await query(
                 api,
                 func,
-                _args,
+                queryArgs,
                 multi,
                 print,
             )
+            if (unsubscribed || !mounted) return
             // once-off query
             if (!isFn(result)) return handleResult(result)
 
             // subscription
             unsubscribe = result
         }
-        const handleError = err => mounted && setState({
-            message: err && {
-                content: `${err}`,
-                icon: true,
-                status: 'error',
-            }
-        })
+
+        const handleError = err => !unsubscribed
+            && mounted
+            && setState({
+                message: err && {
+                    content: `${err}`,
+                    icon: true,
+                    status: 'error',
+                }
+            })
+
         const handleResult = (resultSanitised, resultOriginal) => {
-            mounted && setState({
+            if (unsubscribed || !mounted) return
+            setState({
                 message: null,
-                result: isFn(resultModifier)
-                    ? resultModifier(resultSanitised, resultOriginal)
+                result: isFn(valueModifier)
+                    ? valueModifier(resultSanitised, resultOriginal)
                     : resultSanitised,
                 unsubscribe: handleUnsubscribe,
             })
@@ -105,19 +128,21 @@ export const useQueryBlockchain = (
         }
 
         if (subscribe) {
-            _args.push(handleResult)
+            queryArgs.push(handleResult)
             const cbIndex = isFn(callback)
-                ? args.indexOf(callback)
-                : args.length
-            args[cbIndex] = handleResult
+                ? queryArgs.indexOf(callback)
+                : queryArgs.length
+            queryArgs[cbIndex] = handleResult
         }
-        loadingText !== null && setState({
-            message: {
-                content: loadingText,
-                icon: true,
-                status: 'loading',
-            }
-        })
+        loadingText !== null
+            && !state?.message?.status !== 'loading'
+            && setState({
+                message: {
+                    content: loadingText,
+                    icon: true,
+                    status: 'loading',
+                }
+            })
         connection && PromisE(connection)
             .then(handleConnection)
             .catch(handleError)

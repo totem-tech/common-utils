@@ -27,39 +27,57 @@ import {
  *
  * @returns {Subscribable}        rxCopy
  */
-export const copyRxSubject = (rxSource, rxCopy, valueModifier, defer) => {
+export const copyRxSubject = (
+    rxSource,
+    rxCopy,
+    valueModifier,
+    defer,
+) => {
     const sourceIsArr = isArr(rxSource)
     const gotSource = !sourceIsArr
         ? isSubjectLike(rxSource)
         : rxSource.every(isSubjectLike)
-    rxCopy = isSubjectLike(rxCopy)
-        ? rxCopy
-        : new BehaviorSubject(
-            !sourceIsArr
-                ? rxSource.value
-                : rxSource.map(x => x.value)
+    const gotModifier = isFn(valueModifier)
+
+    if (!isSubjectLike(rxCopy)) {
+        let initialValue = !sourceIsArr
+            ? rxSource?.value
+            : rxSource.map(x => x.value)
+        rxCopy = new BehaviorSubject()
+        if (gotModifier) initialValue = valueModifier(
+            initialValue,
+            undefined,
+            rxCopy
         )
+        rxCopy.next(initialValue)
+    }
     if (!gotSource) return rxCopy
 
-    const subscribeOrg = rxCopy.subscribe
+    const subscribeOrg = rxCopy.subscribe.bind(rxCopy)
     rxCopy.subscribe = (...args) => {
-        let setValue = value => rxCopy.next(
-            isFn(valueModifier)
-                ? valueModifier(value)
-                : value
-        )
+        let setValue = value => {
+            rxCopy.next(
+                gotModifier
+                    ? valueModifier(
+                        value,
+                        rxCopy.value,
+                        rxCopy
+                    )
+                    : value
+            )
+        }
         if (defer > 0) setValue = deferred(setValue, defer)
 
-        let values = []
+        const values = []
         const subs = !sourceIsArr
-            ? rxSource.subscribe(setValue)
+            ? rxSource.subscribe(value => setValue(value))
             : rxSource.map((x, i) =>
                 x.subscribe(value => {
                     values[i] = value
                     setValue(values)
                 })
             )
-        const sub = subscribeOrg.call(rxCopy, ...args)
+        const sub = subscribeOrg(...args)
         const unsubscribeOrg = sub.unsubscribe
         sub.unsubscribe = (...args) => {
             unsubscribeOrg.call(sub, ...args)

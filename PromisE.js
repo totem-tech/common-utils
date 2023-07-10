@@ -1,4 +1,5 @@
 import {
+    deferred,
     isArr,
     isAsyncFn,
     isFn,
@@ -80,52 +81,151 @@ PromisE.all = (...promises) => PromisE(Promise.all(promises.flat()))
 /** 
  * @name PromisE.deferred
  * @summary the adaptation of the `deferred()` function tailored for Promises.
- * @description The main difference is that PromisE.deferred is to be used with promises 
- * and there is no specific time delay. The last/only promise in an on-going promise pool will be handled.
- * The time when a supplied promise is resolved is irrelevant. 
- * Once a promise is handled all previous ones will be ignored and new ones will be added to the pool.
+ * 
  *
- * Params: 	No parameter accepted
+ * @param   {Function}  callback    (optional)
+ * @param   {Number}    defer       (optional)
+ * @param   {Object}    conf        (optional)
+ * @param   {Function}  conf.onError   (optional)
+ * @param   {Function}  conf.onResult  (optional)
+ * @param   {Boolean}   conf.strict     (optional) only used if `throttle` is truthy.
+ *                                      Default: `false`
+ * @param   {Boolean}   conf.throttle   (optional) Default: `false`
+ * 
+ * @description The main difference is that:
+ *  - Notes: 
+ *      1. A "request" simply means invokation of the returned callback function
+ *      2. By "handled" it means a "request" will be resolved or rejected.
+ *  - `PromisE.deferred` is to be used with promises/functions
+ *  - There is no specific time delay.
+ *  - The time when a request is completed is irrelevant. 
+ *  - If not throttled:
+ *      1. Once a request is handled, all previous requests will be ignored and pool starts anew.
+ *      2. If a function is provided in the  returned callback, ALL of them will be invoked, regardless of pool size.
+ *      3. The last/only request in an on-going requests' pool will handled (resolve/reject).
+ *  - If throttled:
+ *      1. Once a requst starts executing, subsequent requests will be added to a queue.
+ *      2. The last/only item in the queue will be handled. Rest will be ignored.
+ *      3. If a function is provided in the returned callback, it will be invoked only if the requst is handled. 
+ *      Thus, improving performance by avoiding unnecessary invokations.
+ *      4. If every single request/function needs to be invoked, avoid using throttle.
+ * 
+ *  - If throttled and `strict` is truthy, all subsequent request while a request is being handled will be ignored.
  * 
  * @example Explanation & example usage:
  * <BR>
  * ```javascript
- *    const df = PromisE.deferred()
- *    const delayer = delay => new Promise(r => setTimeout(() => r(delay),  delay))
- *    df(delayer(5000)).then(console.log)
- *    df(delayer(500)).then(console.log)
- *    df(delayer(1000)).then(console.log)
- *    setTimeout(() => df(delayer(200)).then(console.log), 2000)
+ * const example = throttle => {
+ *     const df = PromisE.deferred(throttle)
+ *     df(() => PromisE.delay(5000)).then(console.log)
+ *     df(() => PromisE.delay(500)).then(console.log)
+ *     df(() => PromisE.delay(1000)).then(console.log)
+ *     // delay 2 seconds and invoke df() again
+ *     setTimeout(() => {
+ *         df(() => PromisE.delay(200)).then(console.log)
+ *     }, 2000)
+ * }
+ * 
+ * // Without throttle
+ * example(false)
+ * // `1000` and `200` will be printed in the console
+ * 
+ * // with throttle
+ * example(true)
+ * // `5000` and `2000` will be printed in the console
+ * 
+ * // with throttle with strict mode
+ * example(true)
+ * // `5000` will be printed in the console
  * ```
  * 
- * @returns {Function} callback accepts only one argument and it must be a promise
+ * @returns {Function} callback accepts only one argument and it must be a either a promise or a function
 */
-PromisE.deferred = () => {
-    let ids = []
-    const done = (cb, id) => function () {
+PromisE.deferred = (
+    callback,
+    defer,
+    {
+        onError = () => { },
+        onResult, // result: whatever is returned from the callback on the execution/request that was "handled"
+        strict,
+        thisArg,
+        throttle = !!callback,
+    } = {}
+) => {
+    let lastPromise
+    const ids = []
+    const queue = []
+    const done = (resolver, id) => result => {
         const index = ids.indexOf(id)
         // Ignore if:
         // 1. this is not the only/last promise
-        // 2. if a successor promise has already resolved/rejected
+        // 2. if a previous promise has already resolved/rejected
         if (index === -1 || index !== ids.length - 1) return
         // invalidates all unfinished previous promises
-        ids = []
-        cb.apply(null, arguments)
+        resolver(result)
+        ids.splice(0)
+        lastPromise = null
+        queue
+            .splice(0)
+            .pop()
+            ?.()
     }
-    return promise => new PromisE((resolve, reject) => {
-        const id = Symbol()
-        ids.push(id)
-        try {
-            promise.then(
-                done(resolve, id),
-                done(reject, id),
-            )
-        } catch (err) {
-            ids = ids.filter(x => x !== id)
-            reject(err)
+    const dp = promise => PromisE((resolve, reject) => {
+        const handler = () => {
+            const id = Symbol()
+            try {
+                ids.push(id)
+                promise = PromisE(
+                    isFn(promise)
+                        ? promise()
+                        : promise
+                )
+                lastPromise = promise
+                promise.then(
+                    done(resolve, id),
+                    done(reject, id)
+                )
+            } catch (err) {
+                // execution failed while invoking promise()
+                done(reject, id)
+            }
         }
+        if (!throttle || !lastPromise) return handler()
+
+        // simply add subsequent requests to the queue and only execute/resolve the last in the queue
+        !strict && queue.push(handler)
     })
+    if (!isFn(callback)) return dp
+
+    const cb = (...args) =>
+        dp(() => callback.call(thisArg, ...args))
+            .then(onResult, onError)
+
+    return isPositiveInteger(defer)
+        ? deferred(cb, defer)
+        : cb
 }
+// PromisE.deferredCb = (
+//     callback,
+//     defer,
+//     {
+//         onResult, // result: whatever is returned from the callback on the execution/request that was "handled"
+//         onError = () => { },
+//         strict,
+//         thisArg,
+//         throttle,
+//     } = {}
+// ) => {
+//     if (!isFn(callback)) return
+
+//     const dp = PromisE.deferred(throttle, strict, 'test')
+//     const cb = (...args) => dp(() => callback.call(thisArg, ...args))
+//         .then(onResult, onError)
+
+//     return isPositiveInteger(defer)
+//         ? deferred(cb, defer)
+//         : cb
+// }
 
 /**
  * @name    PromisE.delay
