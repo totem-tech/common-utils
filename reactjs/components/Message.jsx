@@ -89,10 +89,6 @@ export const Message = React.memo(({
     const {
         opacity = dp.style?.opacity
     } = style
-    const headerProps = {
-        ...isObj(dp.header) && dp.header,
-        ...toProps(header),
-    }
     text = !isValidElement(text)
         ? `${text || ''}`.replace('Error: ', '') // remove "Error: " from error messages
         : text
@@ -154,13 +150,18 @@ export const Message = React.memo(({
     const shouldAlignCenter = !icon && (!text || !header)
     if (shouldAlignCenter) style.textAlign ??= 'center'
 
-    const useChildren = !!Header || !text && isValidElement(children)
+    const useChildren = !!Header
+        || !text && isValidElement(children)
+
+    const headerProps = useChildren && {
+        ...isObj(dp.header) && dp.header,
+        ...toProps(header),
+    }
     const containerProps = {
         ...props,
         // use Header component provided
-        children: !useChildren
-            ? undefined
-            : (
+        ...useChildren && {
+            children: (
                 <>
                     {Header && header && (
                         <Header {...{
@@ -174,7 +175,8 @@ export const Message = React.memo(({
                     {text}
                 </>
             ),
-        color,
+        },
+        // color,
         // no `Header` component, pass on `content` and `header` to `Container`
         content: !useChildren && text || undefined,
         header: !useChildren && header || undefined,
@@ -190,7 +192,7 @@ export const Message = React.memo(({
         },
         status,
         ...isSemantic && {
-            // Semantic UI status
+            // Semantic UI statuses
             info: status === statuses.info,
             negative: status === statuses.error,
             positive: status === statuses.success,

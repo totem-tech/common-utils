@@ -27,11 +27,13 @@ import { isFn } from '../../utils'
  * const element = <UseHook {...{ hooks, render }} />
  * `
  */
-export const UseHook = React.memo(({ hooks = [], render }) => {
-    const result = hooks.map(([hook, ...hookArgs]) =>
-        isFn(hook)
-            ? hook(...hookArgs)
-            : hook
+export const UseHook = React.memo(({
+    hooks = [],
+    render
+}) => {
+    const result = hooks.map(([hook, ...hookArgs]) => isFn(hook)
+        ? hook(...hookArgs)
+        : hook
     )
 
     console.log({ hooks, result })

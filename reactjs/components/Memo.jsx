@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import isMemo from '../isMemo'
 
 const components = new Map()
+// experimental
 export const Memo = ({ M, ...props }) => {
     Memo = useMemo(() => {
         if (isMemo(M)) return M

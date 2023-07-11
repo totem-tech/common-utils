@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
-import { fallbackIfFails, isArr } from '../../utils'
-import { BehaviorSubject } from 'rxjs'
+import { fallbackIfFails } from '../../utils'
+import { unsubscribe } from '../../rx'
 
 /**
  * @name    useMount
@@ -33,5 +33,13 @@ export const useMount = (onMount, onUnmount) => {
  * @param   {Function} onUnmount 
 */
 export const useUnmount = onUnmount => useMount(null, onUnmount)
+
+/**
+ * @name    useUnsubscribe
+ * @summary unsubscribe from subscriptions when unmounting a component.
+ * 
+ * @param   {Array|Object|Function} subscriptions
+ */
+export const useUnsubscribe = subscriptions => useUnmount(() => unsubscribe(subscriptions))
 
 export default useMount
