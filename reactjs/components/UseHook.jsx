@@ -31,6 +31,7 @@ export const UseHook = React.memo(({
     hooks = [],
     render
 }) => {
+    console.log({ hooks })
     const result = hooks.map(([hook, ...hookArgs]) => isFn(hook)
         ? hook(...hookArgs)
         : hook

@@ -277,12 +277,7 @@ export class ChatClient {
          */
         this.emit = (event, args = [], resultModifier, onError, timeoutLocal) => {
             let delayPromise, callback
-            if (isFn(args[args.length - 1])) {
-                console.log('args before', args)
-                callback = args.splice(-1)[0]
-
-                console.log('args after', { args, callback })
-            }
+            if (isFn(args.slice(-1)[0])) callback = args.splice(-1)[0]
             // functions allowed during maintenace mode
             const maintenanceModeKeys = [
                 eventMaintenanceMode,
