@@ -251,11 +251,11 @@ export class ChatClient {
             this.socket.disconnect()
         }, autoDisconnectMs)
         this.isConnected = () => this.socket.connected
-        this.onConnect = cb => this.socket.on('connect', cb)
-        // this.onConnectTimeout = cb => this.socket.on('connect_timeout', cb);
-        this.onConnectError = cb => this.socket.on('connect_error', cb);
-        this.onError = cb => this.socket.on('error', cb)
-        this.onReconnect = cb => this.socket.on('reconnect', cb)
+        this.onConnect = (cb, once) => this.on('connect', cb, once)
+        this.onConnectTimeout = (cb, once) => this.on('connect_timeout', cb, once);
+        this.onConnectError = (cb, once) => this.on('connect_error', cb, once);
+        this.onError = (cb, once) => this.on('error', cb, once)
+        this.onReconnect = (cb, once) => this.on('reconnect', cb, once)
         this.rxIsConnected = rxIsConnected
         this.rxIsInMaintenanceMode = rxIsInMaintenanceMode
         this.rxIsLoggedIn = rxIsLoggedIn
@@ -405,7 +405,11 @@ export class ChatClient {
      * 
      * @param   {Function} cb   Args: plegedTotal (number)
      */
-    onCrowdloanPledgeTotal = cb => isFn(cb) && this.socket.on('crowdloan-pledged-total', cb)
+    onCrowdloanPledgeTotal = (cb, once) => this.on(
+        'crowdloan-pledged-total',
+        cb,
+        once
+    )
 
     /**
      * @name    currencyConvert
@@ -470,7 +474,20 @@ export class ChatClient {
         [enabled, ...args]
     )
 
-    onFaucetStatus = cb => isFn(cb) && this.socket.on('faucet-status', cb)
+    /**
+     * @name    onFaucetStatus
+     * @summary listen to faucet status changes
+     * 
+     * @param   {Function}  cb  args: [active boolean]
+     * @param   {Boolean}   once
+     * 
+     * @returns {Function}  unsubscribe
+     */
+    onFaucetStatus = (cb, once) => this.on(
+        'faucet-status',
+        cb,
+        once
+    )
 
     /**
      * @name    idExists
@@ -586,9 +603,13 @@ export class ChatClient {
      * @name    onMaintenanceMode
      * @summary listen for server maintenance status changes
      * 
-     * @param   {Function} cb args: @active Boolean
+     * @param   {Function} cb args: [active Boolean]
      */
-    onMaintenanceMode = cb => isFn(cb) && this.socket.on(eventMaintenanceMode, cb)
+    onMaintenanceMode = (cb, once) => this.on(
+        eventMaintenanceMode,
+        cb,
+        once
+    )
 
     /**
      * @name   message
@@ -612,6 +633,27 @@ export class ChatClient {
     )
 
     /**
+     * @name    on
+     * @summary listen to websocket events
+     * 
+     * @param   {String}    eventName 
+     * @param   {Function}  cb 
+     * @param   {Boolean}   once 
+     * 
+     * @returns {Function}  unsubscribe
+     */
+    on = (eventName, cb, once = false) => {
+        if (!isFn(cb)) return () => { }
+
+        const fn = once
+            ? this.socket.once
+            : this.socket.on
+        fn(eventName, cb)
+
+        return () => this.socket.off(eventName, cb)
+    }
+
+    /**
      * @name    onMessage
      * @summary listen for new chat messages
      * 
@@ -621,7 +663,11 @@ export class ChatClient {
      *                          message     {String}  : encrypted or plain text message
      *                          encrypted   {Bool}    : determines whether @message requires decryption
      */
-    onMessage = cb => isFn(cb) && this.socket.on('message', cb)
+    onMessage = (cb, once) => this.on(
+        'message',
+        cb,
+        once
+    )
 
     /**
      * @name    messageGetRecent
@@ -699,7 +745,11 @@ export class ChatClient {
      *                          - tsCreated  date       : notification creation timestamp
      *                          - cbConfirm  function   : a function to confirm receipt
      */
-    onNotify = cb => isFn(cb) && this.socket.on('notification', cb)
+    onNotify = (cb, once) => this.on(
+        'notification',
+        cb,
+        once
+    )
 
     /**
      * @name    notificationGetRecent
@@ -736,9 +786,31 @@ export class ChatClient {
      * @param {Object}   project
      * @param {Boolean}  create      whether to create or update project
      */
-    project = async (projectId, project, create, ...args) => await this.emit(
+    project = async (
+        projectId,
+        project,
+        create,
+        ...args
+    ) => await this.emit(
         'project',
-        [projectId, project, create, ...args],
+        [
+            projectId,
+            project,
+            create,
+            ...args
+        ],
+    )
+
+    /**
+     * @name    onProject
+     * @summary listen to creation and updates of activities owned by the logged in user.
+     * 
+     * @param   {Function} cb   Args: [activityId, activity]
+     */
+    onActivity = (cb, once) => this.on(
+        'activity',
+        cb,
+        once
     )
 
     /**
@@ -898,9 +970,13 @@ export class ChatClient {
      * @name    onTaskMarketCreated
      * @summary subscribe to new marketplace task creation event
      *
-     * @param   {Function} cb   args: @taskId string
+     * @param   {Function} cb   args: [taskId string]
      */
-    onTaskMarketCreated = cb => isFn(cb) && this.socket.on('task-market-created', cb)
+    onTaskMarketCreated = (cb, once) => this.on(
+        'task-market-created',
+        cb,
+        once
+    )
 
     /**
      * @name    taskMarketApplyResponse
