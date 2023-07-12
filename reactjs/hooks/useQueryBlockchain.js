@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { translated } from '../../languageHelper'
 import { query } from '../../polkadotHelper'
 import PromisE from '../../PromisE'
@@ -9,6 +9,7 @@ import {
 } from '../../utils'
 import useRxStateDeferred from './useRxStateDeferred'
 import useRxSubjectOrValue from './useRxSubjectOrValue'
+import { BehaviorSubject } from 'rxjs'
 
 const textsCap = {
     loading: 'loading...'
@@ -20,16 +21,17 @@ translated(textsCap, true)
  * @summary a React Hook to query (and optionally subscribe) blockchain storage.
  *
  * @param {Object}                q
- * @param {BehaviorSubject|Array} q.args  (optional) If last item is a function, `q.subscribe` will be set to `true`.
+ * @param {BehaviorSubject|Array} q.args     (optional) If last item is a function, `q.subscribe` will be set to `true`.
  * @param {Object|Promise}        q.connection
- * @param {Number}                q.defer     (optional)
+ * @param {Number}                q.defer       (optional)
  *                                              Default: `100`
- * @param {BehaviorSubject|String|Function} q.func  blockchain query function. Eg: 'api.query.blances.freeBalance'
+ * @param {BehaviorSubject|String|Function} q.func blockchain query function. Eg: 'api.query.blances.freeBalance'
  * @param {String}                q.loadingText
- * @param {BehaviorSubject|Boolean} q.multi   (optional)
- * @param {Boolean}               q.print     (optional)
- * @param {Boolean}               q.subscribe (optional)
- *                                            Defualt: `true`                                          
+ * @param {BehaviorSubject|Boolean} q.multi     (optional)
+ * @param {Boolean}               q.print       (optional)
+ * @param {Boolean}               q.subjectOnly (optional) if true, will return `rxState` instaed of the `state` object
+ * @param {Boolean}               q.subscribe   (optional)
+ *                                              Defualt: `true`                                          
  * @param {Function}              q.valueModifier (optional) callback to modify the query result
  *
  * @returns {Object} { message, result, unsubscribe }
@@ -54,22 +56,16 @@ export const useQueryBlockchain = ({
     func,
     loadingText = textsCap.loading,
     multi,
+    onError,
     print,
     subscribe = true,
     valueModifier,
+    subjectOnly = false,
 } = {}) => {
     args = useRxSubjectOrValue(args)
     func = useRxSubjectOrValue(func)
     multi = useRxSubjectOrValue(multi)
-    const [state, setState] = useRxStateDeferred({
-        message: !func || loadingText === null
-            ? null
-            : {
-                content: loadingText,
-                icon: true,
-                status: 'loading',
-            }
-    }, defer)
+    const rxState = useMemo(() => new BehaviorSubject({}), [])
 
     useEffect(() => {
         if (!func) return
@@ -99,29 +95,34 @@ export const useQueryBlockchain = ({
             unsubscribe = result
         }
 
-        const handleError = err => !unsubscribed
-            && mounted
-            && setState({
+        const handleError = err => {
+            if (unsubscribed || !mounted) return
+
+            rxState.next({
                 message: err && {
                     content: `${err}`,
                     icon: true,
                     status: 'error',
                 }
             })
+            isFn(onError) && onError(err)
+        }
 
         const handleResult = (resultSanitised, resultOriginal) => {
             if (unsubscribed || !mounted) return
-            setState({
+
+            const result = isFn(valueModifier)
+                ? valueModifier(resultSanitised, resultOriginal)
+                : resultSanitised
+            rxState.next({
                 message: null,
-                result: isFn(valueModifier)
-                    ? valueModifier(resultSanitised, resultOriginal)
-                    : resultSanitised,
+                result,
                 unsubscribe: handleUnsubscribe,
             })
             isFn(callback) && callback(resultSanitised, resultOriginal)
         }
         const handleUnsubscribe = () => {
-            if (!isFn(unsubscribe)) return
+            if (!isFn(unsubscribe) || unsubscribed) return
 
             unsubscribed = true
             unsubscribe()
@@ -135,8 +136,8 @@ export const useQueryBlockchain = ({
             queryArgs[cbIndex] = handleResult
         }
         loadingText !== null
-            && !state?.message?.status !== 'loading'
-            && setState({
+            && !rxState.value.message?.status !== 'loading'
+            && rxState.next({
                 message: {
                     content: loadingText,
                     icon: true,
@@ -153,8 +154,23 @@ export const useQueryBlockchain = ({
         }
     }, [func, args, multi])
 
-    const { message, result, unsubscribe } = state || {}
-    return { message, result, unsubscribe }
+    if (subjectOnly) return rxState
+
+    const [state] = useRxStateDeferred(
+        {
+            message: !func || loadingText === null
+                ? null
+                : {
+                    content: loadingText,
+                    icon: true,
+                    status: 'loading',
+                }
+        },
+        defer,
+        { subject: rxState }
+    )
+
+    return state //{ message, result, unsubscribe } 
 }
 useQueryBlockchain.defaultConnection = null
 export default useQueryBlockchain
