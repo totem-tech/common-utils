@@ -53,10 +53,15 @@ export const copyRxSubject = (
     }
     if (!gotSource) return rxCopy
 
+    const nextOrg = rxCopy.next.bind(rxCopy)
     const subscribeOrg = rxCopy.subscribe.bind(rxCopy)
+    const unsubscribeOrg = rxCopy.unsubscribe.bind(rxCopy)
+    let unsubscribed = false
+    rxCopy.next = (...args) => !unsubscribed && nextOrg(...args)
     rxCopy.subscribe = (...args) => {
-        let setValue = value => {
-            rxCopy.next(
+        let _unsubscribed = false
+        let setValue = value => !_unsubscribed
+            && rxCopy.next(
                 gotModifier
                     ? valueModifier(
                         value,
@@ -65,7 +70,6 @@ export const copyRxSubject = (
                     )
                     : value
             )
-        }
         if (defer > 0) setValue = deferred(setValue, defer)
 
         const values = []
@@ -80,10 +84,19 @@ export const copyRxSubject = (
         const sub = subscribeOrg(...args)
         const unsubscribeOrg = sub.unsubscribe
         sub.unsubscribe = (...args) => {
+            if (_unsubscribed) return
+
+            _unsubscribed = true
             unsubscribeOrg.call(sub, ...args)
             unsubscribe(subs)
         }
         return sub
+    }
+    rxCopy.unsubscribe = (...args) => {
+        if (unsubscribed) return
+
+        unsubscribed = true
+        unsubscribeOrg(...args)
     }
     return rxCopy
 }
