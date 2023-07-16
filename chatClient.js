@@ -251,8 +251,8 @@ export class ChatClient {
             this.socket.disconnect()
         }, autoDisconnectMs)
         this.isConnected = () => this.socket.connected
-        this.onConnect = (cb, once) => this.on('connect', cb, once)
-        this.onConnectTimeout = (cb, once) => this.on('connect_timeout', cb, once);
+        this.onConnect = cb => this.on('connect', cb)
+        // this.onConnectTimeout = (cb, once) => this.on('connect_timeout', cb, once);
         this.onConnectError = (cb, once) => this.on('connect_error', cb, once);
         this.onError = (cb, once) => this.on('error', cb, once)
         this.onReconnect = (cb, once) => this.on('reconnect', cb, once)
@@ -291,11 +291,13 @@ export class ChatClient {
                     && maintenanceModeKeys.includes(event)
                     && subjectAsPromise(rxIsLoggedIn, true, timeoutLocal)[0]
             }
-            const doWait = rxIsInMaintenanceMode.value && !maintenanceModeKeys.includes(event)
+            const doWait = rxIsInMaintenanceMode.value
+                && !maintenanceModeKeys.includes(event)
             if (doWait) {
                 console.info('Waiting for maintenance mode to be deactivated...')
-                const maintenanceModePromise = subjectAsPromise(rxIsInMaintenanceMode, false)[0]
-                delayPromise = maintenanceModePromise.then(() => maintenanceModePromise)
+                // const maintenanceModePromise = subjectAsPromise(rxIsInMaintenanceMode, false)[0]
+                // delayPromise = maintenanceModePromise.then(() => maintenanceModePromise)
+                delayPromise = subjectAsPromise(rxIsInMaintenanceMode, false)[0]
             }
             const promise = _emitter(
                 event,
@@ -648,7 +650,7 @@ export class ChatClient {
         const fn = once
             ? this.socket.once
             : this.socket.on
-        fn(eventName, cb)
+        fn.call(this.socket, eventName, cb)
 
         return () => this.socket.off(eventName, cb)
     }

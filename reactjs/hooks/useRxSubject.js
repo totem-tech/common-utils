@@ -14,6 +14,8 @@ import {
 import { copyRxSubject } from '../../rx.js'
 import { useUnmount } from './useMount'
 
+export const IGNORE_UPDATE_SYMBOL = Symbol('ignore-rx-subject-update')
+export const UNSUBSCRIBE_SYMBOL = Symbol('ignore-rx-subject-update')
 /**
  * @name    useRxSubject
  * @summary custom React hook for use with RxJS subject and auto update when value changes
@@ -95,7 +97,7 @@ export const useRxSubject = (
     useEffect(() => {
         let mounted = true
         let ignoreFirst = !isBSub
-        const subscribed = _subject.subscribe(newValue => {
+        const subscription = _subject.subscribe(newValue => {
             if (!ignoreFirst) {
                 // BehaviorSubject subscription triggers a result immediately with the pre-existing value.
                 // Ignoring first result reduces one extra state update.
@@ -114,6 +116,7 @@ export const useRxSubject = (
             )
             promise.then(newValue => {
                 if (newValue === useRxSubject.IGNORE_UPDATE) return
+                if (newValue === useRxSubject.UNSUBSCRIBE) return subscription?.unsubscribe?.()
                 value = allowMerge
                     ? {
                         ...isObj(value) && value,
@@ -132,12 +135,14 @@ export const useRxSubject = (
                     })
                 mounted && _setValue(value)
             })
-            promise.catch(err => console.log('useRxSubject => unexpected error:', err))
+            promise.catch(err =>
+                console.log('useRxSubject => unexpected error:', err)
+            )
         })
 
         return () => {
             mounted = false
-            subscribed.unsubscribe()
+            subscription?.unsubscribe?.()
         }
     }, [_subject])
 
@@ -151,6 +156,6 @@ export const useRxSubject = (
     ]
 }
 // To prevent an update return this in valueModifier
-useRxSubject.IGNORE_UPDATE = Symbol('ignore-rx-subject-update')
-
+useRxSubject.IGNORE_UPDATE = IGNORE_UPDATE_SYMBOL
+useRxSubject.UNSUBSCRIBE = UNSUBSCRIBE_SYMBOL
 export default useRxSubject

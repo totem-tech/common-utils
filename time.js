@@ -4,7 +4,7 @@
 import { isDate, isStr, strFill } from './utils'
 
 export const BLOCK_DURATION_SECONDS = 4
-export const BLOCK_DURATION_REGEX = /^(\d{2}):[0-5][0-9]:[0-5][0-9]$/ // valid duration up to 99:59:55
+export const BLOCK_DURATION_REGEX = /^(\d{2}):[0-5][0-9]:[0-5][0-9]$/ // valid duration up to 99:59:59
 
 /**
  * @name    blockToDate
@@ -44,8 +44,12 @@ export const dateToBlock = (date, currentBlock) => {
     return blockNum
 }
 
-export const durationToSeconds = duration => {
-    const [hours = 0, minutes = 0, seconds = 0] = duration.split(':')
+export const durationToSeconds = (duration = '') => {
+    const [
+        hours = 0,
+        minutes = 0,
+        seconds = 0
+    ] = duration.split(':')
     return parseInt(seconds) + parseInt(minutes) * 60 + parseInt(hours) * 60 * 60
 }
 

@@ -26,7 +26,9 @@ export const RxSubjectView = React.memo(props => {
         allowSubjectUpdate,
         confs = [],
         debug,
+        defer,
         initialValue,
+        onUnmount,
         subject,
         valueModifier,
     } = props
@@ -44,6 +46,8 @@ export const RxSubjectView = React.memo(props => {
                 initialValue,
                 allowMerge,
                 allowSubjectUpdate,
+                defer,
+                onUnmount,
             ],
         debug,
     )
@@ -64,4 +68,6 @@ RxSubjectView.propTypes = {
     subject: PropTypes.any.isRequired,
     valueModifier: PropTypes.func,
 }
+RxSubjectView.IGNORE_UPDATE = useRxSubject.IGNORE_UPDATE
+RxSubjectView.UNSUBSCRIBE = useRxSubject.UNSUBSCRIBE
 export default RxSubjectView

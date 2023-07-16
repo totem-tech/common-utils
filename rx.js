@@ -53,23 +53,18 @@ export const copyRxSubject = (
     }
     if (!gotSource) return rxCopy
 
-    const nextOrg = rxCopy.next.bind(rxCopy)
     const subscribeOrg = rxCopy.subscribe.bind(rxCopy)
-    const unsubscribeOrg = rxCopy.unsubscribe.bind(rxCopy)
-    let unsubscribed = false
-    rxCopy.next = (...args) => !unsubscribed && nextOrg(...args)
     rxCopy.subscribe = (...args) => {
-        let _unsubscribed = false
-        let setValue = value => !_unsubscribed
-            && rxCopy.next(
-                gotModifier
-                    ? valueModifier(
-                        value,
-                        rxCopy.value,
-                        rxCopy
-                    )
-                    : value
-            )
+        let unsubscribed = false
+        let setValue = value => !unsubscribed && rxCopy.next(
+            gotModifier
+                ? valueModifier(
+                    value,
+                    rxCopy.value,
+                    rxCopy
+                )
+                : value
+        )
         if (defer > 0) setValue = deferred(setValue, defer)
 
         const values = []
@@ -84,21 +79,44 @@ export const copyRxSubject = (
         const sub = subscribeOrg(...args)
         const unsubscribeOrg = sub.unsubscribe
         sub.unsubscribe = (...args) => {
-            if (_unsubscribed) return
+            if (unsubscribed) return
 
-            _unsubscribed = true
+            unsubscribed = true
             unsubscribeOrg.call(sub, ...args)
             unsubscribe(subs)
         }
         return sub
     }
-    rxCopy.unsubscribe = (...args) => {
-        if (unsubscribed) return
-
-        unsubscribed = true
-        unsubscribeOrg(...args)
-    }
     return rxCopy
+}
+
+export const getRxInterval = (
+    initialValue = 0,
+    delay = 1000,
+    autoStart = true,
+    incrementBy = 1
+) => {
+    let intervalId
+    let rxInterval = {}
+    rxInterval = new BehaviorSubject(parseInt(initialValue) || 0)
+    rxInterval.autoStart = autoStart
+    rxInterval.delay = delay
+    rxInterval.incrementBy = incrementBy
+    rxInterval.pause = () => clearInterval(intervalId)
+    rxInterval.start = () => {
+        intervalId = setInterval(
+            () => rxInterval.next(
+                rxInterval.value + rxInterval.incrementBy
+            ),
+            delay,
+        )
+    }
+    rxInterval.stop = () => {
+        rxInterval.pause()
+        rxInterval.next(0)
+    }
+    autoStart && rxInterval.start()
+    return rxInterval
 }
 
 /**

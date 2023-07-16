@@ -1,5 +1,5 @@
 import React from 'react'
-import { isFn } from '../../utils'
+import { isArr, isFn } from '../../utils'
 
 /**
  * @name    UseHook
@@ -28,16 +28,18 @@ import { isFn } from '../../utils'
  * `
  */
 export const UseHook = React.memo(({
-    hooks = [],
+    args,
+    hook,
+    hooks,
     render
 }) => {
-    console.log({ hooks })
-    const result = hooks.map(([hook, ...hookArgs]) => isFn(hook)
-        ? hook(...hookArgs)
+    const executeHook = ({ args = [], hook }) => isFn(hook)
+        ? hook(...args)
         : hook
-    )
+    const result = isArr(hooks)
+        ? hooks.map(executeHook)
+        : executeHook({ args, hook })
 
-    console.log({ hooks, result })
     return !isFn(render)
         ? result
         : render(result)
