@@ -3,45 +3,61 @@ import {
     useMemo,
     useState,
 } from 'react'
-import { BehaviorSubject, Subject } from 'rxjs'
+import { BehaviorSubject, SubjectLike } from 'rxjs'
 import PromisE from '../../PromisE'
+import { copyRxSubject } from '../../rx.js'
 import {
     deferred,
     isFn,
     isObj,
+    isPositiveInteger,
     isSubjectLike,
 } from '../../utils'
-import { copyRxSubject } from '../../rx.js'
 import { useUnmount } from './useMount'
 
+// returning this symbol in the valueModifier will skip the state update
 export const IGNORE_UPDATE_SYMBOL = Symbol('ignore-rx-subject-update')
-export const UNSUBSCRIBE_SYMBOL = Symbol('ignore-rx-subject-update')
+
 /**
  * @name    useRxSubject
  * @summary custom React hook for use with RxJS subject and auto update when value changes
  *
- * @param   {BehaviorSubject}   subject             (optional) RxJS subject to observe, collect & update value from.
- *                                                  If a not "subject like", will created an instance of BehaviorSubject
- * @param   {Function}          valueModifier       (optional) callback to modify value received on change.
- *                                                  Async function is accepted.
- *                                                  Args: `[newValue, oldValue, rxSubject]`
- * @param   {*}                 initialValue        (optional) initial value if `subject.value` is undefined
- * @param   {Boolean}           allowMerge          (optional) whether to merge previous value with new value.
- *                                                  Only applicable if value is an object
- *                                                  Default: true (if first value is an object)
- * @param   {Boolean}           allowSubjectUpdate  (optional) whether to allow update of the subject or only state.
- *                                                  CAUTION: if true and `@subject` is sourced from a DataStorage
- *                                                  instance, it may override values in the LocalStorage values.
- *                                                  Default: `false`
+ * @param   {SubjectLike} subject             (optional) RxJS subject to observe, collect & update value from.
+ *                                            If a not "subject like", will created an instance of BehaviorSubject
+ * @param   {Function}    valueModifier       (optional) callback to modify the value received on subject change.
+ *                                            Args:
+ *                                            - newValue
+ *                                            - oldValue
+ *                                            - rxSubject
+ *                                            - unsubscribe: unsubscribe from all future updates
+ *                                            If function returns a promise, it will be awaited.
+ *                                            Whatever result is returned from this function/promise will be returned
+ *                                            as the value of this hook, with the exception of the following:
+ *                                            - `IGNORE_UPDATE_SYMBOL`: skip the current update.
+ * @param   {*}           initialValue        (optional) initial value if `subject.value` is undefined
+ * @param   {Boolean}     allowMerge          (optional) whether to merge previous value with new value.
+ *                                            Only applicable if value is an object
+ *                                            Default: true (if first value is an object)
+ * @param   {Boolean}     allowSubjectUpdate  (optional) whether to allow update of the subject or only state.
+ *                                            CAUTION: if true and `@subject` is sourced from a DataStorage
+ *                                            instance, it may override values in the LocalStorage values.
+ *                                            Default: `false`
+ * @param   {Number}      defer               (optional)
+ *                                            Default: `100`
  *
- * @returns {Array}     [value, setvalue, subject, setValueDeferred]
+ * @returns {[
+ * *,
+ * Function,
+ * SubjectLike,
+ * Fuction
+ * ]}   [value, setvalue, subject, setValueDeferred]
  */
 export const useRxSubject = (
     subject,
     valueModifier,
     initialValue,
     allowMerge,
-    allowSubjectUpdate = false,
+    allowSubjectUpdate,
     defer = 100,
     onUnmount,
 ) => {
@@ -50,7 +66,8 @@ export const useRxSubject = (
         firstValue,
         isBSub,
         setValue,
-        setValueDeferred
+        setValueDeferred,
+        shouldSubscribe
     ] = useMemo(() => {
         const isSub = isSubjectLike(subject)
         const _subject = isSub
@@ -64,7 +81,7 @@ export const useRxSubject = (
             )
         const setState = newValue => _subject.next(newValue)
         let setState2 = setState
-        if (defer > 0) {
+        if (isPositiveInteger(defer)) {
             setState2 = deferred(setState, defer)
             setState2.defer = defer
         }
@@ -72,16 +89,16 @@ export const useRxSubject = (
         const isBSub = _subject instanceof BehaviorSubject
         let value = _subject.value
         value ??= initialValue
+        let shouldSubscribe = true
         value = !isFn(valueModifier)
             ? value
             : valueModifier(
                 value,
                 undefined,
                 _subject,
+                () => shouldSubscribe = false
             )
-        if (value === useRxSubject.IGNORE_UPDATE) {
-            value = undefined
-        }
+        if (IGNORE_UPDATE_SYMBOL === value) value = undefined
         allowMerge ??= isObj(value)
         return [
             _subject,
@@ -89,6 +106,7 @@ export const useRxSubject = (
             isBSub,
             setState,
             setState2,
+            shouldSubscribe,
         ]
     }, [subject])
 
@@ -97,7 +115,9 @@ export const useRxSubject = (
     useEffect(() => {
         let mounted = true
         let ignoreFirst = !isBSub
-        const subscription = _subject.subscribe(newValue => {
+        const unsubscribe = deferred(() => subscription?.unsubscribe?.(), 1)
+        const handleChange = newValue => {
+            if (!mounted) return
             if (!ignoreFirst) {
                 // BehaviorSubject subscription triggers a result immediately with the pre-existing value.
                 // Ignoring first result reduces one extra state update.
@@ -112,11 +132,11 @@ export const useRxSubject = (
                         newValue,
                         value,
                         _subject,
+                        unsubscribe
                     )
             )
             promise.then(newValue => {
-                if (newValue === useRxSubject.IGNORE_UPDATE) return
-                if (newValue === useRxSubject.UNSUBSCRIBE) return subscription?.unsubscribe?.()
+                if (newValue === IGNORE_UPDATE_SYMBOL) return
                 value = allowMerge
                     ? {
                         ...isObj(value) && value,
@@ -138,11 +158,12 @@ export const useRxSubject = (
             promise.catch(err =>
                 console.log('useRxSubject => unexpected error:', err)
             )
-        })
+        }
+        const subscription = shouldSubscribe && _subject.subscribe(handleChange)
 
         return () => {
             mounted = false
-            subscription?.unsubscribe?.()
+            unsubscribe()
         }
     }, [_subject])
 
@@ -155,7 +176,4 @@ export const useRxSubject = (
         setValueDeferred
     ]
 }
-// To prevent an update return this in valueModifier
-useRxSubject.IGNORE_UPDATE = IGNORE_UPDATE_SYMBOL
-useRxSubject.UNSUBSCRIBE = UNSUBSCRIBE_SYMBOL
 export default useRxSubject

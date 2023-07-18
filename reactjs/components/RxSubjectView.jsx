@@ -1,10 +1,8 @@
 import PropTypes from 'prop-types'
 import React, { useMemo } from 'react'
-import { BehaviorSubject } from 'rxjs'
 import { isArr, isSubjectLike } from '../../utils'
 import { useRxSubject, useRxSubjects } from '../hooks'
 
-const BS = BehaviorSubject
 /**
  * @name    RxSubjectView
  * @summary a functional component to display & auto-update the value of an RxJs subject.
@@ -58,7 +56,6 @@ RxSubjectView.defaultProps = {
     allowMerge: false,
     allowSubjectUpdate: false,
 }
-RxSubjectView.IGNORE_UPDATE = useRxSubject.IGNORE_UPDATE
 RxSubjectView.propTypes = {
     allowMerge: PropTypes.bool,
     allowSubjectUpdate: PropTypes.bool,
@@ -68,6 +65,4 @@ RxSubjectView.propTypes = {
     subject: PropTypes.any.isRequired,
     valueModifier: PropTypes.func,
 }
-RxSubjectView.IGNORE_UPDATE = useRxSubject.IGNORE_UPDATE
-RxSubjectView.UNSUBSCRIBE = useRxSubject.UNSUBSCRIBE
 export default RxSubjectView

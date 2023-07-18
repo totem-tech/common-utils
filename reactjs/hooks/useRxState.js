@@ -9,7 +9,7 @@ import { copyRxSubject } from '../../rx'
  * @name    useRxState
  * @summary React hook to maintain state utilizing RxJS
  * 
- * @param   {*|Function}        initialState    (optional)
+ * @param   {Function|*}        initialState    (optional)
  *                                          Function arguments: rxState BehaviorSubject
  *                                          Default: `{}`
  * @param   {Object|Function}      conf             if function, it will be used as `valueModifier`
