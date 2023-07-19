@@ -14,6 +14,7 @@ let _forcedLayout = ''
 const rw = value => storage.settings.module(MODULE_KEY, value) || {}
 const _document = fallbackIfFails(() => document, [], {})
 const _window = fallbackIfFails(() => window, [], {})
+const _navigator = fallbackIfFails(() => navigator, [], {})
 export const checkDarkPreferred = () => !!_window
     .matchMedia
     ?.('(prefers-color-scheme: dark)')
@@ -36,7 +37,7 @@ export const rxInverted = new BehaviorSubject(
         : rw().inverted
 )
 export const rxLayout = new BehaviorSubject(getLayout())
-export const rxOnline = new BehaviorSubject()
+export const rxOnline = new BehaviorSubject(_navigator.onLine)
 export const rxVisible = new BehaviorSubject(true)
 
 // forceLayout enforces and reverts a specific layout size and ignores layout change when window resizes

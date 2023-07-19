@@ -108,11 +108,12 @@ export const getClient = (url, disconnectDelayMs) => {
     if (instance) return instance
 
     instance = new ChatClient(url, disconnectDelayMs)
+    const triggerChange = (rx, newValue) => rx.value !== newValue && rx.next(newValue)
 
     instance.onConnect(async () => {
         rxIsConnected.next(true)
         const active = await instance.maintenanceMode()
-        rxIsInMaintenanceMode.next(active)
+        triggerChange(rxIsInMaintenanceMode, active)
         if (!rxIsRegistered.value) return
 
         const {
@@ -134,21 +135,21 @@ export const getClient = (url, disconnectDelayMs) => {
     })
     instance.socket.on('disconnect', () => {
         log('disconnected')
-        rxIsConnected.next(false)
-        rxIsLoggedIn.next(false)
+        triggerChange(rxIsConnected, false)
+        triggerChange(rxIsLoggedIn, false)
     })
     instance.onConnectError(error => {
-        log('connectError', error)
-        rxIsConnected.next(false)
-        rxIsLoggedIn.next(false)
+        // log('connectError', error)
+        triggerChange(rxIsConnected, false)
+        triggerChange(rxIsLoggedIn, false)
     })
     instance.onMaintenanceMode(active => {
         console.log(`Maintenance mode ${active ? '' : 'de'}activated`)
-        rxIsInMaintenanceMode.next(active)
+        triggerChange(rxIsInMaintenanceMode, active)
     })
     instance.onFaucetStatus(enabled => {
         console.log(`Faucet ${enabled ? 'enabled' : 'disabled'}`)
-        rxFaucetEnabled.next(enabled)
+        triggerChange(rxFaucetEnabled, enabled)
     })
 
     return instance
