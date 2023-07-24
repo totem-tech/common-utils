@@ -165,10 +165,10 @@ PromisE.deferred = (
         resolver(result)
         ids.splice(0)
         lastPromise = null
-        queue
+        const handler = queue
             .splice(0)
             .pop()
-            ?.()
+        handler && handler()
     }
     const dp = promise => PromisE((resolve, reject) => {
         const handler = () => {

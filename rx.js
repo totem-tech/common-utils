@@ -45,9 +45,11 @@ export const copyRxSubject = (
 
     const isValid = value => value !== IGNORE_UPDATE_SYMBOL
     if (!isSubjectLike(rxCopy)) {
-        let initialValue = !sourceIsArr
-            ? rxSource?.value
-            : rxSource.map(x => x.value)
+        let initialValue = !gotSource
+            ? undefined
+            : !sourceIsArr
+                ? rxSource.value
+                : rxSource.map(x => x.value)
         rxCopy = new BehaviorSubject()
         if (gotModifier) initialValue = valueModifier(
             initialValue,
