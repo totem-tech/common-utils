@@ -1,9 +1,11 @@
 import { isValidElement, useMemo } from 'react'
 import { BehaviorSubject, SubjectLike } from 'rxjs'
-import { isFn, isObj, isSubjectLike } from '../../utils'
+import {
+    isFn,
+    isObj,
+    isSubjectLike
+} from '../../utils'
 import useRxSubject from './useRxSubject'
-import useMount from './useMount'
-import { copyRxSubject } from '../../rx'
 
 /**
  * @name    useRxState
@@ -30,7 +32,7 @@ export const useRxState = (
     debugTag
 ) => {
     let {
-        allowMerge,
+        allowMerge = true,
         allowSubjectUpdate = true,
         defer,
         onUnmount,

@@ -47,7 +47,7 @@ export default function PromisE(promise, ...args) {
             // check if it is an uninvoked async function
             promise = isPromise(promise)
                 ? promise
-                : isAsyncFn(promise)
+                : isAsyncFn(promise) // may or may not work on nodejs with webpack & babel
                     ? promise.apply(null, args) // pass rest of the arguments to the async function (args[0])
                     : isFn(promise)
                         ? new Promise(promise)

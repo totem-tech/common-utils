@@ -5,6 +5,7 @@ import {
     Unsubscribable,
 } from 'rxjs'
 import PromisE from './PromisE'
+import { IGNORE_UPDATE_SYMBOL } from './reactjs'
 import {
     deferred,
     hasValue,
@@ -21,9 +22,12 @@ import {
  * @description The the changes are applied unidirectionally from the source subject to the destination subject.
  * Changes on the destination subject is NOT applied back into the source subject.
  *
- * @param   {Subscribable|Array}  rxSource  RxJS source subject(s). If Array, value of rxCopy will also be Array.
+ * @param   {Subscribable|Array}  rxSource  RxJS source subject(s). If Array, value of `rxCopy` will also be Array.
  * @param   {Subscribable}        rxCopy    (optional) RxJS copy/destination subject
  *                                          Default: `new BehaviorSubject()`
+ * @param   {Function}            valueModifier (optional) callback to modify the value before copying from `rxSource`.
+ *                                              Accepts async functions.
+ *                                              Args: `newValue, previousValue, rxCopy`
  *
  * @returns {Subscribable}        rxCopy
  */
@@ -39,6 +43,7 @@ export const copyRxSubject = (
         : rxSource.every(isSubjectLike)
     const gotModifier = isFn(valueModifier)
 
+    const isValid = value => value !== IGNORE_UPDATE_SYMBOL
     if (!isSubjectLike(rxCopy)) {
         let initialValue = !sourceIsArr
             ? rxSource?.value
@@ -49,22 +54,27 @@ export const copyRxSubject = (
             undefined,
             rxCopy
         )
-        rxCopy.next(initialValue)
+        isValid(initialValue) && rxCopy.next(initialValue)
     }
     if (!gotSource) return rxCopy
 
     const subscribeOrg = rxCopy.subscribe.bind(rxCopy)
     rxCopy.subscribe = (...args) => {
         let unsubscribed = false
-        let setValue = value => !unsubscribed && rxCopy.next(
-            gotModifier
-                ? valueModifier(
-                    value,
-                    rxCopy.value,
-                    rxCopy
-                )
-                : value
-        )
+        let setValue = async value => {
+            if (unsubscribed) return
+
+            try {
+                value = !gotModifier
+                    ? value
+                    : await valueModifier(
+                        value,
+                        rxCopy.value,
+                        rxCopy
+                    )
+                isValid(value) && rxCopy.next(value)
+            } catch (_) { } //ignore if valueModifier threw exception
+        }
         if (defer > 0) setValue = deferred(setValue, defer)
 
         const values = []
@@ -132,7 +142,12 @@ export const getRxInterval = (
  *                                  - `null` if times out
  *                                  - `undefined` if @subject is not a valid RxJS subject like subscribable
  */
-export const subjectAsPromise = (subject, expectedValue, timeout) => {
+export const subjectAsPromise = (
+    subject,
+    expectedValue,
+    timeout,
+    modifier
+) => {
     if (!isSubjectLike(subject)) return
 
     let subscription, timeoutId, unsubscribed
@@ -153,7 +168,11 @@ export const subjectAsPromise = (subject, expectedValue, timeout) => {
             if (!shouldResolve) return
 
             unsubscribe()
-            resolve(value)
+            resolve(
+                isFn(modifier)
+                    ? modifier(value)
+                    : value
+            )
         })
         timeoutId = isValidNumber(timeout) && setTimeout(() => {
             unsubscribe()

@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import { isArr, isFn } from '../../utils'
 import useRxSubject from './useRxSubject'
 
@@ -33,11 +32,7 @@ import useRxSubject from './useRxSubject'
  * // Create new RxJS BehaviorSubjects from the values.
  * const [values, subjects] = useRxSubjects([1, 2])
  * console.log(values) // [1,2]
- * 
- * 
- * // 
  * ```
- *
  */
 export const useRxSubjects = (
     subjects,
@@ -55,9 +50,10 @@ export const useRxSubjects = (
             confs[i]?.initialValue,
             confs[i]?.allowMerge,
             confs[i]?.allowSubjectUpdate,
-            confs[i]?.defer !== undefined
-                ? config[i].defer
-                : defer
+            confs[i]?.defer ?? defer,
+            confs[i]?.onUnmount,
+            confs[i]?.onError,
+            confs[i]?.debugTag
         )
     )
     const values = results.map(([value]) => value)

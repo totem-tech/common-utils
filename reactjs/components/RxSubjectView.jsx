@@ -23,15 +23,16 @@ export const RxSubjectView = React.memo(props => {
         allowMerge,
         allowSubjectUpdate,
         confs = [],
-        debug,
+        debugTag,
         defer,
         initialValue,
         onUnmount,
+        onError,
         subject,
         valueModifier,
     } = props
     const [hook, multi] = useMemo(() =>
-        isArr(subject) && subject.every(isSubjectLike)
+        isArr(subject) && subject.some(isSubjectLike)
             ? [useRxSubjects, true]
             : [useRxSubject, false]
     )
@@ -46,8 +47,9 @@ export const RxSubjectView = React.memo(props => {
                 allowSubjectUpdate,
                 defer,
                 onUnmount,
+                onError,
             ],
-        debug,
+        debugTag,
     )
 
     return value

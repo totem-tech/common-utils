@@ -57,7 +57,7 @@ export const useQueueItemStatus = (
         : message
 }
 
-function QueueItemStatus({
+export function QueueItemStatus({
     id,
     messageProps,
     rxOnSave,
@@ -90,6 +90,7 @@ QueueItemStatus.propTypes = {
 }
 export default QueueItemStatus
 
+// extract information from last saved queue item and construct a message (object) compatible with `Message` component
 const getMessage = ([
     {
         rootTask = {},
@@ -112,7 +113,7 @@ const getMessage = ([
     const serialNo = getSerialNo(rootTask, task)
     if (status === statuses.error) description = errorMessage
 
-    return {
+    const message = {
         content: description,
         header: `${serialNo}${title} - ${statusText}`,
         icon: true,
@@ -122,6 +123,8 @@ const getMessage = ([
             task,
         },
     }
+
+    return message
 }
 
 const getSerialNo = (rootTask, task) => {

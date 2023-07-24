@@ -5,11 +5,14 @@ import PromisE from '../../PromisE'
 import {
     isArr,
     isFn,
+    isObj,
     isStr,
 } from '../../utils'
 import useRxStateDeferred from './useRxStateDeferred'
 import useRxSubjectOrValue from './useRxSubjectOrValue'
 import { BehaviorSubject } from 'rxjs'
+import useRxState from './useRxState'
+import useRxSubject from './useRxSubject'
 
 const textsCap = {
     loading: 'loading...'
@@ -19,12 +22,11 @@ translated(textsCap, true)
 /**
  * @name    useQueryBlockchain
  * @summary a React Hook to query (and optionally subscribe) blockchain storage.
+ * CAUTION: make sure to store query (`q`) object in a state to prevent infinite loop
  *
  * @param {Object}                q
  * @param {BehaviorSubject|Array} q.args     (optional) If last item is a function, `q.subscribe` will be set to `true`.
- * @param {Object|Promise}        q.connection
- * @param {Number}                q.defer       (optional)
- *                                              Default: `100`
+ * @param {Object|Promise}        q.connection  not requried if `useQueryBlockchain.defaultConnection` is already set.
  * @param {BehaviorSubject|String|Function} q.func blockchain query function. Eg: 'api.query.blances.freeBalance'
  * @param {String}                q.loadingText
  * @param {BehaviorSubject|Boolean} q.multi     (optional)
@@ -52,29 +54,37 @@ translated(textsCap, true)
 export const useQueryBlockchain = ({
     args,
     connection = useQueryBlockchain.defaultConnection,
-    defer = 100,
     func,
     loadingText = textsCap.loading,
     multi,
     onError,
     print,
+    subject,
+    subjectOnly = false,
     subscribe = true,
     valueModifier,
-    subjectOnly = false,
-} = {}) => {
+}) => {
     args = useRxSubjectOrValue(args)
     func = useRxSubjectOrValue(func)
     multi = useRxSubjectOrValue(multi)
-    const rxState = useMemo(() => new BehaviorSubject({}), [])
+    const rxQuery = useMemo(() => subject || new BehaviorSubject({
+        message: !func || loadingText === null || !connection
+            ? null
+            : {
+                content: loadingText,
+                icon: true,
+                status: 'loading',
+            }
+    }), [subject])
 
     useEffect(() => {
-        if (!func) return
+        if (!func || !connection) return () => { }
 
         let mounted = true
         let unsubscribed = false
         let unsubscribe
         const queryArgs = [...args || []]
-        const callback = queryArgs.slice(-1)
+        const callback = isFn(queryArgs.slice(-1)[0]) && queryArgs.splice(-1)
         if (isFn(callback)) subscribe = true
 
         const handleConnection = async ({ api }) => {
@@ -87,7 +97,6 @@ export const useQueryBlockchain = ({
                 multi,
                 print,
             )
-            if (unsubscribed || !mounted) return
             // once-off query
             if (!isFn(result)) return handleResult(result)
 
@@ -98,7 +107,7 @@ export const useQueryBlockchain = ({
         const handleError = err => {
             if (unsubscribed || !mounted) return
 
-            rxState.next({
+            rxQuery.next({
                 message: err && {
                     content: `${err}`,
                     icon: true,
@@ -114,13 +123,14 @@ export const useQueryBlockchain = ({
             const result = isFn(valueModifier)
                 ? valueModifier(resultSanitised, resultOriginal)
                 : resultSanitised
-            rxState.next({
+            rxQuery.next({
                 message: null,
                 result,
                 unsubscribe: handleUnsubscribe,
             })
             isFn(callback) && callback(resultSanitised, resultOriginal)
         }
+
         const handleUnsubscribe = () => {
             if (!isFn(unsubscribe) || unsubscribed) return
 
@@ -128,23 +138,18 @@ export const useQueryBlockchain = ({
             unsubscribe()
         }
 
-        if (subscribe) {
-            queryArgs.push(handleResult)
-            const cbIndex = isFn(callback)
-                ? queryArgs.indexOf(callback)
-                : queryArgs.length
-            queryArgs[cbIndex] = handleResult
-        }
+        if (subscribe) queryArgs.push(handleResult)
+
         loadingText !== null
-            && !rxState.value.message?.status !== 'loading'
-            && rxState.next({
+            && !!rxQuery.value?.message
+            && rxQuery.next({
                 message: {
                     content: loadingText,
                     icon: true,
                     status: 'loading',
                 }
             })
-        connection && PromisE(connection)
+        PromisE(connection)
             .then(handleConnection)
             .catch(handleError)
 
@@ -154,58 +159,39 @@ export const useQueryBlockchain = ({
         }
     }, [func, args, multi])
 
-    if (subjectOnly) return rxState
+    if (subjectOnly) return rxQuery
 
-    const [state] = useRxStateDeferred(
-        {
-            message: !func || loadingText === null
-                ? null
-                : {
-                    content: loadingText,
-                    icon: true,
-                    status: 'loading',
-                }
-        },
-        defer,
-        { subject: rxState }
-    )
-
-    return state //{ message, result, unsubscribe } 
+    return useRxSubject(rxQuery)[0] //{ message, result, unsubscribe } 
 }
 useQueryBlockchain.defaultConnection = null
 export default useQueryBlockchain
 
 // WIP: needs testing
-useQueryBlockchain.multi = (
-    connection,
+useQueryBlockchain.multi = ({
+    connection = useQueryBlockchain.defaultConnection,
+    loadingText,
+    print,
     queries,
-    resultsModifier,
     // common props
     subscribe = false,
-    defer,
-    loadingText,
-    print
-) => {
+    valuesModifier,
+} = {}) => {
     console.log('mulit', queries)
     if (!isArr(queries)) return []
 
-    const results = queries.map(query =>
-        useQueryBlockchain(
+    const values = queries.map(query =>
+        useQueryBlockchain({
             connection,
-            isStr(query)
-                ? query
-                : query?.func,
-            query?.args,
-            query?.multi,
-            query?.resultModifier,
-            query?.subscribe ?? subscribe,
-            query?.defer ?? defer,
-            query?.loadingText ?? loadingText,
-            query?.print ?? print,
-        )
+            loadingText,
+            print,
+            subscribe,
+            ...!isObj(query)
+                ? { func: query }
+                : query,
+        })
     )
 
-    return !isFn(resultsModifier)
-        ? results
-        : resultsModifier(results, queries)
+    return !isFn(valuesModifier)
+        ? values
+        : valuesModifier(values, queries)
 }

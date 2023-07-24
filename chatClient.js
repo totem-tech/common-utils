@@ -782,6 +782,18 @@ export class ChatClient {
     )
 
     /**
+     * @name    onCRUD
+     * @summary listen to create, read, update and deletion of off-chain data.
+     * 
+     * @param   {Function} cb   Args: `{action, data, id, type}`
+     */
+    onCRUD = (cb, once) => this.on(
+        'CRUD',
+        cb,
+        once
+    )
+
+    /**
      * @name    project
      * @summary add/get/update project (Activity)
      * 
@@ -802,18 +814,6 @@ export class ChatClient {
             create,
             ...args
         ],
-    )
-
-    /**
-     * @name    onProject
-     * @summary listen to creation and updates of activities owned by the logged in user.
-     * 
-     * @param   {Function} cb   Args: [activityId, activity]
-     */
-    onActivity = (cb, once) => this.on(
-        'activity',
-        cb,
-        once
     )
 
     /**

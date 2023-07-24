@@ -1,4 +1,5 @@
-export * from './iUseReducer'
+export * from './useCallbackDeferred'
+export * from './iUseReducer' // ToDo: deprecate
 export * from './useIsMobile'
 export * from './useMount'
 export * from './useMutationObserver'

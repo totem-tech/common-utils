@@ -200,7 +200,15 @@ export const isHex = x => fallbackIfFails(() => HEX_REGEX.test(x), [], false)
 export const isInteger = x => Number.isInteger(x)
 export const isMap = x => x instanceof Map
 export const isNodeJS = () => fallbackIfFails(() => !(window && localStorage), [], true)
-export const isObj = x => !!x && typeof x === 'object' && !isArr(x) && !isMap(x) && !isSet(x)
+export const isObj = (x, strict = true) => !!x // excludes null, NaN, Infinity....
+	&& typeof x === 'object'
+	&& (
+		!strict
+		// excludes Array, Map, Set
+		|| !isArr(x)
+		&& !isMap(x)
+		&& !isSet(x)
+	)
 // Checks if argument is an Array of Objects. Each element type must be object, otherwise will return false.
 export const isObjArr = x => isArr(x) && x.every(isObj)
 // Checks if argument is a Map of Objects. Each element type must be object, otherwise will return false.

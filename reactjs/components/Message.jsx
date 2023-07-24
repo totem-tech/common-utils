@@ -196,7 +196,7 @@ export const Message = React.memo(({
             info: status === statuses.info,
             negative: status === statuses.error,
             positive: status === statuses.success,
-            warning: status === statuses.warning || isLoading,
+            warning: status === statuses.warning,
         },
         style: {
             ...isContainerStr && {
@@ -277,10 +277,6 @@ Message.setupDefaults = (name, library) => {
             dp.components.Container = library.Message
             dp.components.Header = null
             dp.iconMapping = { ...semanticIcons }
-            // dp.iconProps = {
-            //     style: { fontSize: 35 }
-            // }
-
             // for legacy status support in the totem-ui repo
             statuses.BASIC = ''
             statuses.ERROR = 'error'
