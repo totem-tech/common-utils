@@ -5,7 +5,6 @@ import {
     Unsubscribable,
 } from 'rxjs'
 import PromisE from './PromisE'
-import { IGNORE_UPDATE_SYMBOL } from './reactjs'
 import {
     deferred,
     hasValue,
@@ -15,6 +14,7 @@ import {
     isValidNumber
 } from './utils'
 
+export const IGNORE_UPDATE_SYMBOL = Symbol('ignore-rx-subject-update')
 /**
  * @name    copyRxSubject
  * @summary creates a new subject that automatically copies the value of the source subject.

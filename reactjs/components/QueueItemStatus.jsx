@@ -7,7 +7,7 @@ import {
     isObj,
     isSubjectLike
 } from '../../utils'
-import { IGNORE_UPDATE_SYMBOL, useRxSubjects } from '../hooks'
+import { IGNORE_UPDATE_SYMBOL, useRxSubjects } from '../../reactjs'
 import Message, { statuses } from './Message'
 
 const statusTexts = {

@@ -16,9 +16,10 @@ import {
     objHasKeys,
     objWithoutKeys,
     isValidURL,
+    isFn,
 } from './utils'
 
-export let messages = {
+export const messages = {
     accept: 'value not acceptable',
     array: 'valid array required',
     boolean: 'boolean value required',
@@ -27,6 +28,7 @@ export let messages = {
     dateMin: 'value must be greater or equal to',
     decimals: 'value exceeds maximum allowed decimals',
     email: 'valid email address required',
+    function: 'valid function required',
     hash: 'valid cryptographic hash string required',
     hex: 'valid hexadecimal string required',
     identity: 'valid identity required',
@@ -57,6 +59,7 @@ export const TYPES = Object.freeze({
     boolean: 'boolean',
     date: 'date',
     email: 'email',
+    function: 'function',
     hash: 'hash',
     hex: 'hex',
     identity: 'identity',
@@ -77,11 +80,13 @@ const errorConcat = (message, ...suffix) => {
  * @name    setMessages
  * @summary Overrides default error messages with custom/translated error messages
  * 
- * @param   {Object} msgObj Object with custom/translated messages. Must contain the correct keys.
+ * @param   {Object} messagesOverrides Object with custom/translated messages. Must contain the correct keys.
  */
-export const setMessages = msgObj => {
-    if (!isObj(msgObj)) return
-    messages = { ...messages, ...msgObj }
+export const setMessages = (messagesOverrides = {}) => {
+    isObj(messagesOverrides) && Object
+        .keys(messagesOverrides)
+        .forEach(key => messages[key] = messagesOverrides[key])
+    return messages
 }
 
 // if msg is falsy, returns true
@@ -118,7 +123,7 @@ export const validate = (value, config, customMessages = {}) => {
         .forEach(key => errorMsgs[key] = errorMsgs[key] || true)
     try {
         let err
-        const {
+        let {
             accept,
             decimals,
             config: childConf,
@@ -179,6 +184,9 @@ export const validate = (value, config, customMessages = {}) => {
                 break
             case 'email':
                 if (!isStr(value) || !EMAIL_REGEX.test(value)) return _msgOrTrue(errorMsgs.email)
+                break
+            case 'function':
+                if (!isFn(value)) return _msgOrTrue(errorMsgs.function)
                 break
             case 'hash':
                 if (!isHash(value)) return _msgOrTrue(errorMsgs.hash)
@@ -274,6 +282,8 @@ export const validate = (value, config, customMessages = {}) => {
             if (!valid) return _msgOrTrue(errorMsgs.reject)
         }
 
+        // if regex is an Array, assume it as arguments to instantiate `RegExp` object
+        if (isArr(regex)) regex = new RegExp(...regex)
         // validate regex expression
         if (regex instanceof RegExp && !regex.test(value)) return _msgOrTrue(errorMsgs.regex)
 
@@ -327,12 +337,12 @@ export const validate = (value, config, customMessages = {}) => {
 export const validateObj = (obj = {}, config = {}, failFast = true, includeLabel = true, customMessages = {}) => {
     try {
         const errorMsgs = { ...messages, ...customMessages }
-        if (!isObj(obj)) return _msgOrTrue(errorMsgs.object)
+        if (!isObj(obj, false)) return _msgOrTrue(errorMsgs.object)
 
         const keys = Object.keys(config)
         let errors = {}
 
-        for (let i = 0; i < keys.length; i++) {
+        for (let i = 0;i < keys.length;i++) {
             const key = keys[i]
             const value = obj[key]
             const keyConf = config[key]

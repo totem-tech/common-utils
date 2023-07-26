@@ -1,8 +1,8 @@
-import ioClient from 'socket.io-client'
 import { BehaviorSubject } from 'rxjs'
+import ioClient from 'socket.io-client'
 import { translated } from './languageHelper'
 import PromisE from './PromisE'
-import { subjectAsPromise } from './reactjs'
+import { subjectAsPromise } from './rx'
 import storage from './storageHelper'
 import {
     deferred,
