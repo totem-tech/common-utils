@@ -5,7 +5,10 @@ import {
     useState,
 } from 'react'
 import { BehaviorSubject, SubjectLike } from 'rxjs'
-import { copyRxSubject } from '../../rx.js'
+import {
+    copyRxSubject,
+    IGNORE_UPDATE_SYMBOL as IUS
+} from '../../rx.js'
 import {
     deferred,
     isFn,
@@ -17,7 +20,7 @@ import {
 import { useUnmount } from './useMount'
 
 // returning this symbol in the valueModifier will skip the state update
-export const IGNORE_UPDATE_SYMBOL = Symbol('ignore-rx-subject-update')
+export const IGNORE_UPDATE_SYMBOL = IUS
 
 /**
  * @name    useRxSubject
