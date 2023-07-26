@@ -17,6 +17,7 @@ import {
     objWithoutKeys,
     isValidURL,
     isFn,
+    fallbackIfFails,
 } from './utils'
 
 export const messages = {
@@ -126,7 +127,7 @@ export const validate = (value, config, customMessages = {}) => {
         let {
             accept,
             decimals,
-            config: childConf,
+            config: propertiesAlt,
             failFast,
             includeLabel,
             instanceOf,
@@ -135,11 +136,12 @@ export const validate = (value, config, customMessages = {}) => {
             maxLength,
             min,
             minLength,
+            properties: childConf = propertiesAlt,
             or, // alternative validation configaration if validation fails
             regex,
             reject,
             required,
-            strict = true,
+            strict = true, // for url or object types
             type,
             unique = false,
         } = config || {}
@@ -153,7 +155,6 @@ export const validate = (value, config, customMessages = {}) => {
             if (!err && gotValue || err !== typeErrMsg) return err
             // secondary (or) validation
             return validate(value, or, errorMsgs)
-
         }
         // if doesn't have any value (undefined/null) and not `required`, assume valid
         if (!gotValue) return required ? _msgOrTrue(errorMsgs.required) : null
@@ -228,14 +229,13 @@ export const validate = (value, config, customMessages = {}) => {
                     && !objHasKeys(value, requiredKeys)
                 ) return _msgOrTrue(errorMsgs.requiredKeys)
                 // validate child properties of the `value` object
-                err = isObj(childConf)
-                    && validateObj(
-                        value,
-                        childConf,
-                        failFast,
-                        includeLabel,
-                        errorMsgs,
-                    )
+                err = isObj(childConf, strict) && validateObj(
+                    value,
+                    childConf,
+                    failFast,
+                    includeLabel,
+                    errorMsgs,
+                )
                 if (err) return err
                 break
             case 'string':
@@ -350,6 +350,7 @@ export const validateObj = (obj = {}, config = {}, failFast = true, includeLabel
                 // config: childConf,
                 customMessages: keyErrMsgs,
                 label,
+                name,
                 // type,
             } = keyConf
             let error = validate(
@@ -369,6 +370,7 @@ export const validateObj = (obj = {}, config = {}, failFast = true, includeLabel
                     ...keyErrMsgs,
                 },
             )
+            // redundant >> remove. validate() takes care of it
             // const validateChildProps = !error
             //     && type === TYPES.object
             //     && isObj(childConf)
@@ -389,7 +391,9 @@ export const validateObj = (obj = {}, config = {}, failFast = true, includeLabel
             //         )
             // }
             if (!error) continue
-            if (includeLabel) error = `${label || key} => ${error}`
+            // in case used with FormInput and label an element
+            const errKey = fallbackIfFails(() => `${label}`, [], name || key)
+            if (includeLabel) error = `${errKey} => ${error}`
             if (failFast) return error
 
             // combine all errors into a single object

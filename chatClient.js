@@ -1,5 +1,5 @@
-import { BehaviorSubject } from 'rxjs'
 import ioClient from 'socket.io-client'
+import { BehaviorSubject } from 'rxjs'
 import { translated } from './languageHelper'
 import PromisE from './PromisE'
 import { subjectAsPromise } from './rx'
@@ -7,6 +7,7 @@ import storage from './storageHelper'
 import {
     deferred,
     isArr,
+    isArr2D,
     isAsyncFn,
     isBool,
     isFn,
@@ -17,7 +18,7 @@ import {
     objWithoutKeys,
     textCapitalize,
 } from './utils'
-import { validateObj } from './validator'
+import { TYPES, validateObj } from './validator'
 
 let instance, socket
 const AUTO_DISCONNECT_MS = parseInt(process.env.REACT_APP_CHAT_AUTO_DISCONNECT_MS || 300000)
@@ -911,23 +912,84 @@ export const getClient = (url, disconnectDelayMs) => {
         Object
             .keys(meta)
             .forEach(eventName => {
-                const { requireLogin, params, } = meta[eventName] || {}
-                if (!isArr(params)) return
+                const eventMeta = meta[eventName] || {}
+                let {
+                    customMessages,
+                    requireLogin,
+                    params: config,
+                    resultType,
+                } = eventMeta
+                if (!isArr(config)) return
 
                 const arr = eventName.split('-')
                 const name = arr[0]
                     + textCapitalize([...arr.slice(1)])
                         .join('')
-                const paramNames = params
-                    .map((p, i) => p?.label || `param${i}`)
-                    .join()
-                // const validate = args => validateObj
-                instance.events[name] = eval(`(function ${name}(${paramNames}) {
-                    // const instance = this
-                    console.log('I am called', instance.events)
-                })`).bind(instance)
+                const paramNames = config
+                    .map((p, i) => p?.label || p?.name || `param${i}`)
+                    .join(', ')
+                // make sure function name matches whats invoked inside `emitHandler`
+                const emitter = async (...args) => {
+                    // make sure correct number of arguments are supplied
+                    args = config.map((_, i) => args[i])
+                    // if callback is provided, exclude it from validation
+                    const requireCalblack = config.slice(-1)[0]?.type === TYPES.function
+                    const lastIndex = config.length - 1
+                    const callbackOrg = requireCalblack
+                        && isObj(args[lastIndex], false)
+                        && args[lastIndex]
+                        || {}
+                    const {
+                        onError,
+                        resultModifier,
+                        timeout,
+                    } = callbackOrg
+                    // include an empty callback
+                    if (requireCalblack && !isFn(args[lastIndex])) args[lastIndex] = () => { }
+                    const err = validateObj(
+                        args,
+                        config,
+                        true,
+                        true,
+                        customMessages
+                    )
+                    if (err) throw new Error(err)
 
-                instance.events[name].meta = meta[eventName] || {}
+                    // make sure events that require user to be logged in are invoked only after user is logged in
+                    requireLogin && await subjectAsPromise(
+                        rxIsLoggedIn,
+                        true,
+                        timeout
+                    )[0]
+
+                    // make sure events that cannot be emitted during maintenance mode are awaited
+                    !maintenanceModeEvents.includes(eventName) && await subjectAsPromise(
+                        rxIsInMaintenanceMode,
+                        false,
+                        timeout
+                    )[0]
+
+                    return await instance.emit(
+                        eventName,
+                        args,
+                        result => {
+                            // reconstruct Map which was converted to 2D Array due to websocket transport
+                            if (resultType === 'Map') result = new Map(result || [])
+                            result = resultModifier(result)
+                            return result
+                        },
+                        onError,
+                        timeout
+                    )
+                }
+                const emitHandler = eval(`(async function ${name}(${paramNames}) {
+                    return await emitter(${paramNames})
+                })`)
+                instance.events[name] = emitHandler
+                instance.events[name].emitter = emitter
+                Object
+                    .keys(eventMeta)
+                    .forEach(key => instance.events[name][key] = eventMeta[key])
             })
         console.log('events', meta, instance.events)
     })
