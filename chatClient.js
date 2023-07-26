@@ -6,6 +6,7 @@ import { subjectAsPromise } from './reactjs'
 import storage from './storageHelper'
 import {
     deferred,
+    isArr,
     isAsyncFn,
     isBool,
     isFn,
@@ -14,7 +15,9 @@ import {
     isPositiveInteger,
     isStr,
     objWithoutKeys,
+    textCapitalize,
 } from './utils'
+import { validateObj } from './validator'
 
 let instance, socket
 const AUTO_DISCONNECT_MS = parseInt(process.env.REACT_APP_CHAT_AUTO_DISCONNECT_MS || 300000)
@@ -36,7 +39,12 @@ export const rxIsInMaintenanceMode = new BehaviorSubject(false)
 export const rxUserId = new BehaviorSubject((getUser() || {}).id)
 export const rxUserIdentity = new BehaviorSubject((getUser() || {}).address)
 const eventMaintenanceMode = 'maintenance-mode'
-
+// events allowed during maintenance mode.
+const maintenanceModeEvents = [
+    eventMaintenanceMode,
+    'login', // without login admin user won't be able to login and therefore, can't turn off maintenance mode.
+    'rewards-get-kapex-payouts', // allow crowdloan rewards data request even when in maintenance mode
+]
 //- migrate existing user data
 const deprecatedKey = PREFIX + 'chat-user'
 try {
@@ -50,160 +58,6 @@ try {
 if (rw().history) rw({ history: null })
 //- migrate end
 
-const log = (...args) => console.log(new Date().toLocaleTimeString(), 'Totem Messaging Service:', ...args)
-
-// retrieves user credentails from local storage
-/** @name    setUser
- * @summary retrieves user credentails from local storage
- * 
- * @returns {Object} user
- */
-export function getUser() { return rw().user }
-/**
- * @name    setUser
- * @summary saves user credentails from local storage
- * 
- * @param   {Object}    user
- * 
- * @returns {Object} user
- */
-export const setUser = (user = {}) => rw({ user })
-/**
- * @name    referralCode
- * @summary get/set referral code to LocalStorage
- * 
- * @param   {String|null} code referral code. Use `null` to remove from storage
- * 
- * @returns {String} referral code
- */
-export const referralCode = code => {
-    const override = code === null
-    const value = isStr(code)
-        ? { referralCode: code }
-        : override
-            // completely remove referral code property from storage
-            ? objWithoutKeys(rw(), ['referralCode'])
-            : undefined
-
-    return (storage.settings.module(MODULE_KEY, value, override) || {})
-        .referralCode
-}
-
-/**
- * @name    getClient
- * @summary Returns a singleton instance of the websocket client.
- * Instantiates the client if not already done.
- * 
- * @description when in dev mode with self-signed certificate, if socket connection fails with "ERR_CERT_AUTHORITY_INVALID", simply open the socket url in the browser by replacing "wss" with "https" and click "proceed" to add the certificate.
- * 
- * @param   {String|Boolean} url    if Boolean, true => use staging & falsy => use prod
- * @param   {Number}         disconnectDelayMs (optional) duration in milliseconds to auto-disconnect from 
- *                                             webwsocket after period of inactivity.
- *              
- *                                             Default: `300000` (or `process.env.MESSAGING_SERVER_DISCONNECT_DELAY_MS`)
- *
- * @returns {ChatClient}
- */
-export const getClient = (url, disconnectDelayMs) => {
-    if (instance) return instance
-
-    instance = new ChatClient(url, disconnectDelayMs)
-    const triggerChange = (rx, newValue) => rx.value !== newValue && rx.next(newValue)
-
-    instance.onConnect(async () => {
-        rxIsConnected.next(true)
-        const active = await instance.maintenanceMode()
-        triggerChange(rxIsInMaintenanceMode, active)
-        if (!rxIsRegistered.value) return
-
-        const {
-            id,
-            roles = [],
-            secret
-        } = getUser() || {}
-        const isAdmin = roles.includes(ROLE_ADMIN)
-        // wait until until maintenance mdoe is disabled and then attempt to login
-        !isAdmin && await subjectAsPromise(rxIsInMaintenanceMode, false)[0]
-        // auto login on connect to messaging service
-        instance
-            .login(id, secret)
-            .then(() => console.log(
-                new Date().toISOString(),
-                'Logged into messaging service'
-            ))
-            .catch(console.error)
-    })
-    instance.socket.on('disconnect', () => {
-        log('disconnected')
-        triggerChange(rxIsConnected, false)
-        triggerChange(rxIsLoggedIn, false)
-    })
-    instance.onConnectError(error => {
-        // log('connectError', error)
-        triggerChange(rxIsConnected, false)
-        triggerChange(rxIsLoggedIn, false)
-    })
-    instance.onMaintenanceMode(active => {
-        console.log(`Maintenance mode ${active ? '' : 'de'}activated`)
-        triggerChange(rxIsInMaintenanceMode, active)
-    })
-    instance.onFaucetStatus(enabled => {
-        console.log(`Faucet ${enabled ? 'enabled' : 'disabled'}`)
-        triggerChange(rxFaucetEnabled, enabled)
-    })
-
-    return instance
-}
-
-/**
- * @name    translateError
- * @summary translate error messages returned from messaging
- * 
- * @param {Function} cb 
- */
-export const translateError = err => {
-    // if no error return as is
-    if (!err) return err
-
-    if (isObj(err)) {
-        const keys = Object.keys(err)
-        // no errors
-        if (keys.length === 0) return null
-        return keys.forEach(key => err[key] = translateError(err[key]))
-    }
-
-    // translate if there is any error message
-    const inputNameSeperator = ' => '
-    const infoSeperator = ': '
-    let inputName = ''
-    let message = err
-    let suffix = ''
-    let arr = err.split(inputNameSeperator)
-    if (arr.length > 1) {
-        inputName = arr[0]
-        message = arr[1]
-    }
-    arr = message.split(infoSeperator)
-    if (arr.length > 1) {
-        message = arr[0]
-        suffix = arr[1]
-    }
-    const texts = translated({
-        inputName,
-        message,
-        suffix,
-    }, true)[1]
-
-    return [
-        texts.inputName,
-        texts.inputName && inputNameSeperator,
-        texts.message,
-        texts.suffix && infoSeperator,
-        texts.suffix
-    ]
-        .filter(Boolean)
-        .join('')
-}
 
 export class ChatClient {
     constructor(url, autoDisconnectMs = AUTO_DISCONNECT_MS) {
@@ -279,21 +133,16 @@ export class ChatClient {
         this.emit = (event, args = [], resultModifier, onError, timeoutLocal) => {
             let delayPromise, callback
             if (isFn(args.slice(-1)[0])) callback = args.splice(-1)[0]
-            // functions allowed during maintenace mode
-            const maintenanceModeKeys = [
-                eventMaintenanceMode,
-                'login',
-                'rewards-get-kapex-payouts',
-            ]
+
             if (!this.isConnected()) {
                 this.connect()
                 // if user is registered, on reconnect wait until login before making a new request
                 delayPromise = rxIsRegistered.value
-                    && maintenanceModeKeys.includes(event)
+                    && maintenanceModeEvents.includes(event)
                     && subjectAsPromise(rxIsLoggedIn, true, timeoutLocal)[0]
             }
             const doWait = rxIsInMaintenanceMode.value
-                && !maintenanceModeKeys.includes(event)
+                && !maintenanceModeEvents.includes(event)
             if (doWait) {
                 console.info('Waiting for maintenance mode to be deactivated...')
                 // const maintenanceModePromise = subjectAsPromise(rxIsInMaintenanceMode, false)[0]
@@ -327,6 +176,12 @@ export class ChatClient {
             }
             return promise
         }
+    }
+
+    awaitReady = async (eventName, requireLogin = false) => {
+        // wait until user is logged in
+        if (requireLogin) await subjectAsPromise(rxIsLoggedIn, true)[0]
+
     }
 
     /**
@@ -466,6 +321,20 @@ export class ChatClient {
             ...args
         ]
     )
+
+    /**
+     * @name    eventsMeta
+     * @summary fetch and cache messaging service events meta data
+     */
+    eventsMeta = async () => {
+        if (this.eventsMetaCache) return await this.eventsMetaCache
+
+        console.log('Updating cache')
+        // cache result for future use
+        const connectedPromise = subjectAsPromise(rxIsConnected, true)[0]
+        this.eventsMetaCache = connectedPromise.then(() => this.emit('events-meta'))
+        return await this.eventsMetaCache
+    }
 
     faucetRequest = async (address, ...args) => await this.emit(
         'faucet-request',
@@ -1014,4 +883,192 @@ export class ChatClient {
         result => new Map(result)
     )
 }
+
+/**
+ * @name    getClient
+ * @summary Returns a singleton instance of the websocket client.
+ * Instantiates the client if not already done.
+ * 
+ * @description when in dev mode with self-signed certificate, if socket connection fails with "ERR_CERT_AUTHORITY_INVALID", simply open the socket url in the browser by replacing "wss" with "https" and click "proceed" to add the certificate.
+ * 
+ * @param   {String|Boolean} url    if Boolean, true => use staging & falsy => use prod
+ * @param   {Number}         disconnectDelayMs (optional) duration in milliseconds to auto-disconnect from 
+ *                                             webwsocket after period of inactivity.
+ *              
+ *                                             Default: `300000` (or `process.env.MESSAGING_SERVER_DISCONNECT_DELAY_MS`)
+ *
+ * @returns {ChatClient}
+ */
+export const getClient = (url, disconnectDelayMs) => {
+    if (instance) return instance
+
+    instance = new ChatClient(url, disconnectDelayMs)
+    const triggerChange = (rx, newValue) => rx.value !== newValue && rx.next(newValue)
+
+    instance.on('events-meta', meta => {
+        instance.eventsMetaCache = meta
+        instance.events = {}
+        Object
+            .keys(meta)
+            .forEach(eventName => {
+                const { requireLogin, params, } = meta[eventName] || {}
+                if (!isArr(params)) return
+
+                const arr = eventName.split('-')
+                const name = arr[0]
+                    + textCapitalize([...arr.slice(1)])
+                        .join('')
+                const paramNames = params
+                    .map((p, i) => p?.label || `param${i}`)
+                    .join()
+                // const validate = args => validateObj
+                instance.events[name] = eval(`(function ${name}(${paramNames}) {
+                    // const instance = this
+                    console.log('I am called', instance.events)
+                })`).bind(instance)
+
+                instance.events[name].meta = meta[eventName] || {}
+            })
+        console.log('events', meta, instance.events)
+    })
+    instance.onConnect(async () => {
+        rxIsConnected.next(true)
+        const active = await instance.maintenanceMode()
+        triggerChange(rxIsInMaintenanceMode, active)
+        if (!rxIsRegistered.value) return
+
+        const {
+            id,
+            roles = [],
+            secret
+        } = getUser() || {}
+        const isAdmin = roles.includes(ROLE_ADMIN)
+        // wait until until maintenance mdoe is disabled and then attempt to login
+        !isAdmin && await subjectAsPromise(rxIsInMaintenanceMode, false)[0]
+        // auto login on connect to messaging service
+        instance
+            .login(id, secret)
+            .then(() => console.log(
+                new Date().toISOString(),
+                'Logged into messaging service'
+            ))
+            .catch(console.error)
+    })
+    instance.on('disconnect', () => {
+        log('disconnected')
+        triggerChange(rxIsConnected, false)
+        triggerChange(rxIsLoggedIn, false)
+    })
+    instance.onConnectError(error => {
+        // log('connectError', error)
+        triggerChange(rxIsConnected, false)
+        triggerChange(rxIsLoggedIn, false)
+    })
+    instance.onMaintenanceMode(active => {
+        console.log(`Maintenance mode ${active ? '' : 'de'}activated`)
+        triggerChange(rxIsInMaintenanceMode, active)
+    })
+    instance.onFaucetStatus(enabled => {
+        console.log(`Faucet ${enabled ? 'enabled' : 'disabled'}`)
+        triggerChange(rxFaucetEnabled, enabled)
+    })
+
+    return instance
+}
+
+// retrieves user credentails from local storage
+/** @name    setUser
+ * @summary retrieves user credentails from local storage
+ * 
+ * @returns {Object} user
+ */
+export function getUser() { return rw().user }
+
+const log = (...args) => console.log(
+    new Date().toLocaleTimeString(),
+    'Totem Messaging Service:',
+    ...args
+)
+
+/**
+ * @name    referralCode
+ * @summary get/set referral code to LocalStorage
+ * 
+ * @param   {String|null} code referral code. Use `null` to remove from storage
+ * 
+ * @returns {String} referral code
+ */
+export const referralCode = code => {
+    const override = code === null
+    const value = isStr(code)
+        ? { referralCode: code }
+        : override
+            // completely remove referral code property from storage
+            ? objWithoutKeys(rw(), ['referralCode'])
+            : undefined
+
+    return (storage.settings.module(MODULE_KEY, value, override) || {})
+        .referralCode
+}
+
+/**
+ * @name    setUser
+ * @summary saves user credentails from local storage
+ * 
+ * @param   {Object}    user
+ * 
+ * @returns {Object} user
+ */
+export const setUser = (user = {}) => rw({ user })
+
+/**
+ * @name    translateError
+ * @summary translate error messages returned from messaging
+ * 
+ * @param {Function} cb 
+ */
+export const translateError = err => {
+    // if no error return as is
+    if (!err) return err
+
+    if (isObj(err)) {
+        const keys = Object.keys(err)
+        // no errors
+        if (keys.length === 0) return null
+        return keys.forEach(key => err[key] = translateError(err[key]))
+    }
+
+    // translate if there is any error message
+    const inputNameSeperator = ' => '
+    const infoSeperator = ': '
+    let inputName = ''
+    let message = err
+    let suffix = ''
+    let arr = err.split(inputNameSeperator)
+    if (arr.length > 1) {
+        inputName = arr[0]
+        message = arr[1]
+    }
+    arr = message.split(infoSeperator)
+    if (arr.length > 1) {
+        message = arr[0]
+        suffix = arr[1]
+    }
+    const texts = translated({
+        inputName,
+        message,
+        suffix,
+    }, true)[1]
+
+    return [
+        texts.inputName,
+        texts.inputName && inputNameSeperator,
+        texts.message,
+        texts.suffix && infoSeperator,
+        texts.suffix
+    ]
+        .filter(Boolean)
+        .join('')
+}
+
 export default getClient()
