@@ -156,7 +156,7 @@ export class ChatClient {
                 async result => {
                     callback?.(null, result)
                     return isFn(resultModifier)
-                        ? resultModifier(result)
+                        ? await resultModifier(result)
                         : result
                 },
                 err => {
@@ -915,8 +915,8 @@ export const getClient = (url, disconnectDelayMs) => {
                 const eventMeta = meta[eventName] || {}
                 let {
                     customMessages,
-                    requireLogin,
                     params: config,
+                    requireLogin,
                     resultType,
                 } = eventMeta
                 if (!isArr(config)) return
@@ -926,7 +926,17 @@ export const getClient = (url, disconnectDelayMs) => {
                     + textCapitalize([...arr.slice(1)])
                         .join('')
                 const paramNames = config
-                    .map((p, i) => p?.label || p?.name || `param${i}`)
+                    .map((p, i) => {
+                        let {
+                            defaultValue,
+                            label,
+                            name
+                        } = p || {}
+                        name = label || name || `param${i}`
+                        if (defaultValue === undefined) return name
+
+                        return `${name} = ${defaultValue}`
+                    })
                     .join(', ')
                 // make sure function name matches whats invoked inside `emitHandler`
                 const emitter = async (...args) => {
@@ -972,10 +982,12 @@ export const getClient = (url, disconnectDelayMs) => {
                     return await instance.emit(
                         eventName,
                         args,
-                        result => {
-                            // reconstruct Map which was converted to 2D Array due to websocket transport
-                            if (resultType === 'Map') result = new Map(result || [])
-                            result = resultModifier(result)
+                        async result => {
+                            try {
+                                // reconstruct Map which was converted to 2D Array due to websocket transport
+                                if (resultType === 'Map') result = new Map(result || [])
+                                if (isFn(resultModifier)) result = await resultModifier(result)
+                            } catch (_) { }
                             return result
                         },
                         onError,
@@ -986,12 +998,21 @@ export const getClient = (url, disconnectDelayMs) => {
                     return await emitter(${paramNames})
                 })`)
                 instance.events[name] = emitHandler
-                instance.events[name].emitter = emitter
+                // add meta data
+                eventMeta.emitter = emitter
                 Object
                     .keys(eventMeta)
-                    .forEach(key => instance.events[name][key] = eventMeta[key])
+                    .forEach(key =>
+                        Object.defineProperty(
+                            instance.events[name],
+                            `meta_${key}`,
+                            { value: eventMeta[key] }
+                        )
+                    )
             })
-        console.log('events', meta, instance.events)
+        window.events = instance.events
+        window.meta = meta
+        console.log('events', { meta, events })
     })
     instance.onConnect(async () => {
         rxIsConnected.next(true)
