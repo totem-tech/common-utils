@@ -16,6 +16,7 @@ import {
     objHasKeys,
     objWithoutKeys,
     isValidURL,
+    isFn,
 } from './utils'
 
 export const messages = {
@@ -27,6 +28,7 @@ export const messages = {
     dateMin: 'value must be greater or equal to',
     decimals: 'value exceeds maximum allowed decimals',
     email: 'valid email address required',
+    function: 'valid function required',
     hash: 'valid cryptographic hash string required',
     hex: 'valid hexadecimal string required',
     identity: 'valid identity required',
@@ -57,6 +59,7 @@ export const TYPES = Object.freeze({
     boolean: 'boolean',
     date: 'date',
     email: 'email',
+    function: 'function',
     hash: 'hash',
     hex: 'hex',
     identity: 'identity',
@@ -181,6 +184,9 @@ export const validate = (value, config, customMessages = {}) => {
                 break
             case 'email':
                 if (!isStr(value) || !EMAIL_REGEX.test(value)) return _msgOrTrue(errorMsgs.email)
+                break
+            case 'function':
+                if (!isFn(value)) return _msgOrTrue(errorMsgs.function)
                 break
             case 'hash':
                 if (!isHash(value)) return _msgOrTrue(errorMsgs.hash)
@@ -331,7 +337,7 @@ export const validate = (value, config, customMessages = {}) => {
 export const validateObj = (obj = {}, config = {}, failFast = true, includeLabel = true, customMessages = {}) => {
     try {
         const errorMsgs = { ...messages, ...customMessages }
-        if (!isObj(obj)) return _msgOrTrue(errorMsgs.object)
+        if (!isObj(obj, false)) return _msgOrTrue(errorMsgs.object)
 
         const keys = Object.keys(config)
         let errors = {}
