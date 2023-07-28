@@ -1,3 +1,4 @@
+import { translated } from './languageHelper'
 import {
     deferred,
     isArr,
@@ -5,11 +6,17 @@ import {
     isFn,
     isInteger,
     isObj,
-    isPositiveInteger,
+    isPositiveNumber,
     isPromise,
-    isValidNumber,
     isValidURL,
 } from './utils'
+
+const textsCap = {
+    invalidUrl: 'invalid URL',
+    timedout: 'request timed out',
+}
+translated(textsCap)
+
 /*
  * List of optional node-modules and the functions required for NodeJS:
  * Module Name     : Substitue For
@@ -38,7 +45,14 @@ import {
  *    PromisE(promiseInstance)
  * ```
  *
- * @returns {PromisE} with 3 accessible boolean properties: pending, rejected, resolved
+ * @returns {{
+ *  catch: Function,
+ *  finally: Function,
+ *  pending: Boolean,
+ *  rejected: Boolean,
+ *  resolved: Boolean,
+ *  then: Function,
+ * }} result promise
  */
 export default function PromisE(promise, ...args) {
     if (!(promise instanceof Promise)) {
@@ -51,20 +65,22 @@ export default function PromisE(promise, ...args) {
                     ? promise.apply(null, args) // pass rest of the arguments to the async function (args[0])
                     : isFn(promise)
                         ? new Promise(promise)
-                        : Promise.resolve(promise)
+                        : Promise.resolve(promise) // anything else resolve as value
         } catch (err) {
             // something unexpected happened!
             promise = Promise.reject(err)
         }
     }
 
+    promise.pending = true
     promise.resolved = false
     promise.rejected = false
-    promise.pending = true
-    promise.then(
-        () => promise.resolved = true,
-        () => promise.rejected = true
-    ).finally(() => promise.pending = false)
+    promise
+        .then(
+            () => promise.resolved = true,
+            () => promise.rejected = true
+        )
+        .finally(() => promise.pending = false)
     return promise
 }
 
@@ -76,7 +92,13 @@ export default function PromisE(promise, ...args) {
  * 
  * @returns {PromisE} 
  */
-PromisE.all = (...promises) => PromisE(Promise.all(promises.flat()))
+PromisE.all = (...promises) => PromisE(
+    Promise.all(
+        promises
+            .flat()
+            .map(p => PromisE(p))
+    )
+)
 
 /** 
  * @name PromisE.deferred
@@ -201,31 +223,10 @@ PromisE.deferred = (
         dp(() => callback.call(thisArg, ...args))
             .then(onResult, onError)
 
-    return isPositiveInteger(defer)
+    return isPositiveNumber(defer)
         ? deferred(cb, defer)
         : cb
 }
-// PromisE.deferredCb = (
-//     callback,
-//     defer,
-//     {
-//         onResult, // result: whatever is returned from the callback on the execution/request that was "handled"
-//         onError = () => { },
-//         strict,
-//         thisArg,
-//         throttle,
-//     } = {}
-// ) => {
-//     if (!isFn(callback)) return
-
-//     const dp = PromisE.deferred(throttle, strict, 'test')
-//     const cb = (...args) => dp(() => callback.call(thisArg, ...args))
-//         .then(onResult, onError)
-
-//     return isPositiveInteger(defer)
-//         ? deferred(cb, defer)
-//         : cb
-// }
 
 /**
  * @name    PromisE.delay
@@ -301,7 +302,7 @@ PromisE.getSocketEmitter = (
         args = !isArr(args)
             ? [args]
             : args
-        const timeout = isPositiveInteger(timeoutLocal)
+        const timeout = isPositiveNumber(timeoutLocal)
             ? timeoutLocal
             : timeoutGlobal
         const getError = err => new Error(
@@ -344,7 +345,7 @@ PromisE.getSocketEmitter = (
             }
         })
 
-        return !isPositiveInteger(timeout)
+        return !isPositiveNumber(timeout)
             ? promise
             : PromisE.timeout(timeout, promise)
     }
@@ -363,16 +364,14 @@ PromisE.getSocketEmitter = (
  * @returns {*} result
  */
 PromisE.fetch = async (url, options, timeout, asJson = true) => {
-    if (!isValidURL(url)) throw new Error('Invalid URL')
-    // url = new URL(url)
+    if (!isValidURL(url)) throw new Error(textsCap.invalidUrl)
+
     options = isObj(options)
         ? options
         : {}
     options.method = options.method || 'get'
     if (options.method === 'post') {
         // set default content type to JSON
-        // options.headers ??= {}
-        // options.headers['Content-Type'] ??= 'application/json'
         options.headers = options.headers || {}
         options.headers['Content-Type'] = options.headers['Content-Type'] || 'application/json'
     }
@@ -382,7 +381,7 @@ PromisE.fetch = async (url, options, timeout, asJson = true) => {
         .catch(err =>
             Promise.reject(
                 err.name === 'AbortError'
-                    ? new Error('Request timed out')
+                    ? new Error(textsCap.timedout)
                     : err
             )
         )
@@ -403,17 +402,22 @@ PromisE.fetch = async (url, options, timeout, asJson = true) => {
  * 
  * @returns {*} result
  */
-PromisE.post = async (url, data, options, timeout, asJson = true) => await PromisE
-    .fetch(
-        url,
-        {
-            ...options,
-            body: JSON.stringify(data),
-            method: 'post',
-        },
-        timeout,
-        asJson
-    )
+PromisE.post = async (
+    url,
+    data,
+    options,
+    timeout,
+    asJson = true
+) => await PromisE.fetch(
+    url,
+    {
+        ...options,
+        body: JSON.stringify(data),
+        method: 'post',
+    },
+    timeout,
+    asJson
+)
 
 /** 
  * @name    PromisE.race
@@ -470,7 +474,7 @@ PromisE.race = (...promises) => PromisE(Promise.race(promises.flat()))
  * @returns {PromisE} resultPromise
  */
 PromisE.timeout = (...args) => {
-    const timeoutIndex = args.findIndex(isValidNumber)
+    const timeoutIndex = args.findIndex(isPositiveNumber)
     const timeout = timeoutIndex >= 0
         && args.splice(timeoutIndex, 1)
         || 10000
@@ -479,39 +483,26 @@ PromisE.timeout = (...args) => {
     const promise = promiseArgs.length === 1
         ? PromisE(promiseArgs[0]) // makes sure single promise resolves to a single result
         : PromisE.all(promiseArgs)
+    let timeoutId
     const timeoutPromise = new PromisE((_, reject) =>
         // only reject if it's still pending
-        setTimeout(() => {
+        timeoutId = setTimeout(() => {
             if (!promise.pending) return
+
             resultPromise.timeout = true
-            reject('Timed out')
+            reject(textsCap.timedout)
         }, timeout)
     )
     const resultPromise = PromisE.race([promise, timeoutPromise])
-    resultPromise.timeoutPromise = timeoutPromise
     resultPromise.promise = promise
+    resultPromise.timeoutId = timeoutId
+    resultPromise.clearTimeout = () => clearTimeout(timeoutId)
+    resultPromise.timeoutPromise = timeoutPromise
     return resultPromise
 }
 
 const getAbortSignal = timeout => {
     let abortCtrl = new AbortController()
-    // try {
-    //     abortCtrl = new AbortController()
-    // } catch (err) {
-    //     abortCtrl = new require('abort-controller')
-    // }
     setTimeout(() => abortCtrl.abort(), timeout)
     return abortCtrl.signal
 }
-// const fetcher = async (url, options) => {
-//     let _fetch
-//     try {
-//         _fetch = fetch
-//     } catch (_) {
-//         // required if nodejs
-//         _fetch = require('node-fetch')
-//     }
-//     _fetch.Promise = PromisE
-
-//     return _fetch(url, options)
-// }

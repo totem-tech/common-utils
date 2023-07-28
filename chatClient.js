@@ -5,6 +5,7 @@ import PromisE from './PromisE'
 import { subjectAsPromise } from './rx'
 import storage from './storageHelper'
 import {
+    arrUnique,
     deferred,
     isArr,
     isArr2D,
@@ -40,9 +41,11 @@ export const rxIsInMaintenanceMode = new BehaviorSubject(false)
 export const rxUserId = new BehaviorSubject((getUser() || {}).id)
 export const rxUserIdentity = new BehaviorSubject((getUser() || {}).address)
 const eventMaintenanceMode = 'maintenance-mode'
+const eventEventsMeta = 'events-meta'
 // events allowed during maintenance mode.
 const maintenanceModeEvents = [
     eventMaintenanceMode,
+    eventEventsMeta,
     'login', // without login admin user won't be able to login and therefore, can't turn off maintenance mode.
     'rewards-get-kapex-payouts', // allow crowdloan rewards data request even when in maintenance mode
 ]
@@ -117,44 +120,60 @@ export class ChatClient {
         this.rxIsLoggedIn = rxIsLoggedIn
         this.rxIsRegistered = rxIsRegistered
 
-
         // converts callback based emission to promise. With 30 seconds timeout.
-        const _emitter = PromisE.getSocketEmitter(socket, 30000, 0, null)
+        this._emitter = PromisE.getSocketEmitter(socket, 30000, 0, null)
+
         /**
          * @name    emit
          * 
-         * @param   {String}    event           name of the Websocket message event
+         * @param   {String}    eventName       name of the Websocket message event
          * @param   {Array}     args            (optional) arguments/data to supplied during event emission
          * @param   {Function}  resultModifier  (optional) modify result before being resolved
          * @param   {Function}  onError         (optional)
-         * @param   {Number}    timeoutLocal    (optional) timeout in milliseconds
+         * @param   {Number}    timeout    (optional) timeout in milliseconds
          * 
          * @returns {Promise}
          */
-        this.emit = (event, args = [], resultModifier, onError, timeoutLocal) => {
-            let delayPromise, callback
-            if (isFn(args.slice(-1)[0])) callback = args.splice(-1)[0]
+        this.emit = async (eventName, args = [], resultModifier, onError, timeout) => {
+            let callback = isFn(args.slice(-1)[0])
+                ? args.splice(-1)[0]
+                : undefined
+            const eventMeta = await this.eventsMeta(eventName) || {}
+            let {
+                customMessages,
+                params,
+                resultType,
+            } = eventMeta
 
-            if (!this.isConnected()) {
-                this.connect()
-                // if user is registered, on reconnect wait until login before making a new request
-                delayPromise = rxIsRegistered.value
-                    && maintenanceModeEvents.includes(event)
-                    && subjectAsPromise(rxIsLoggedIn, true, timeoutLocal)[0]
+            const len = params?.length
+            if (len > 0) {
+                params = params[len - 1]?.type === TYPES.function
+                    ? params.slice(0, -1)
+                    : params
+                // make sure correct number of arguments are supplied
+                args = params.map((param, i) =>
+                    args[i] !== undefined
+                        ? args[i]
+                        : param.defaultValue
+                )
+
+                const err = !!len && validateObj(
+                    args,
+                    params,
+                    true,
+                    true,
+                    customMessages
+                )
+                err && console.log('Validation error ', { eventName, err })
+                if (err) throw new Error(err)
             }
-            const doWait = rxIsInMaintenanceMode.value
-                && !maintenanceModeEvents.includes(event)
-            if (doWait) {
-                console.info('Waiting for maintenance mode to be deactivated...')
-                // const maintenanceModePromise = subjectAsPromise(rxIsInMaintenanceMode, false)[0]
-                // delayPromise = maintenanceModePromise.then(() => maintenanceModePromise)
-                delayPromise = subjectAsPromise(rxIsInMaintenanceMode, false)[0]
-            }
-            const promise = _emitter(
-                event,
+
+            const promise = this._emitter(
+                eventName,
                 args,
                 async result => {
-                    callback?.(null, result)
+                    if (resultType === 'Map') result = new Map(result || [])
+                    isFn(callback) && callback(null, result)
                     return isFn(resultModifier)
                         ? await resultModifier(result)
                         : result
@@ -162,11 +181,11 @@ export class ChatClient {
                 err => {
                     const translatedErr = translateError(err)
                     isFn(onError) && onError(translatedErr, err)
-                    callback?.(err)
+                    isFn(callback) && callback(err)
                     return translatedErr
                 },
-                timeoutLocal,
-                delayPromise, // makes sure user is logged in
+                timeout,
+                this.awaitReady(eventName, timeout),
             )
             // auto disconnect after pre-configured period of inactivity
             if (autoDisconnectMs) {
@@ -175,14 +194,41 @@ export class ChatClient {
                     .catch(() => { })
                     .finally(() => this.disconnectDeferred())
             }
-            return promise
+            return await promise
         }
     }
 
-    awaitReady = async (eventName, requireLogin = false) => {
-        // wait until user is logged in
-        if (requireLogin) await subjectAsPromise(rxIsLoggedIn, true)[0]
+    awaitReady = async (eventName, timeout, log = false) => {
+        let doWait = !rxIsConnected.value
+        // wait until chatClient is connected
+        doWait && await subjectAsPromise(
+            rxIsConnected,
+            true,
+            timeout
+        )[0]
+        const eventMeta = eventName !== eventEventsMeta
+            ? { maintenanceMode: true }
+            : await this.eventsMeta(eventName) || {}
 
+        const { maintenanceMode, requireLogin } = eventMeta
+        doWait = requireLogin && !rxIsLoggedIn.value
+        // wait until user is logged in
+        doWait && await subjectAsPromise(
+            rxIsLoggedIn,
+            true,
+            timeout
+        )[0]
+
+        doWait = rxIsInMaintenanceMode.value && !maintenanceMode
+        // wait until maintenance mode is deactivated
+        if (doWait) {
+            log && console.info('Waiting for maintenance mode to be deactivated...')
+            await subjectAsPromise(
+                rxIsInMaintenanceMode,
+                false,
+                timeout
+            )[0]
+        }
     }
 
     /**
@@ -327,14 +373,16 @@ export class ChatClient {
      * @name    eventsMeta
      * @summary fetch and cache messaging service events meta data
      */
-    eventsMeta = async () => {
-        if (this.eventsMetaCache) return await this.eventsMetaCache
-
-        console.log('Updating cache')
-        // cache result for future use
-        const connectedPromise = subjectAsPromise(rxIsConnected, true)[0]
-        this.eventsMetaCache = connectedPromise.then(() => this.emit('events-meta'))
-        return await this.eventsMetaCache
+    eventsMeta = async (eventName) => {
+        if (!this.eventsMetaCache || this.eventsMetaCache?.rejected) {
+            console.log('Updating events meta cache')
+            // cache result for future use
+            this.eventsMetaCache = this._emitter(eventEventsMeta)
+        }
+        const meta = await this.eventsMetaCache
+        return eventName
+            ? meta[eventName]
+            : meta
     }
 
     faucetRequest = async (address, ...args) => await this.emit(
@@ -905,8 +953,7 @@ export const getClient = (url, disconnectDelayMs) => {
 
     instance = new ChatClient(url, disconnectDelayMs)
     const triggerChange = (rx, newValue) => rx.value !== newValue && rx.next(newValue)
-
-    instance.on('events-meta', meta => {
+    instance.on(eventEventsMeta, meta => {
         instance.eventsMetaCache = meta
         instance.events = {}
         Object
@@ -914,92 +961,45 @@ export const getClient = (url, disconnectDelayMs) => {
             .forEach(eventName => {
                 const eventMeta = meta[eventName] || {}
                 let {
-                    customMessages,
-                    params: config,
-                    requireLogin,
-                    resultType,
+                    name,
+                    params,
+                    // timeout
                 } = eventMeta
-                if (!isArr(config)) return
+                if (!eventName || !isArr(params)) return
 
-                const arr = eventName.split('-')
-                const name = arr[0]
-                    + textCapitalize([...arr.slice(1)])
-                        .join('')
-                const paramNames = config
+                if (!name) {
+                    const arr = eventName.split('-')
+                    name = arr[0] + textCapitalize([...arr.slice(1)]).join('')
+                }
+
+                const suffix = ', resultModifier, onError, timeout'
+                const dupCheck = {}
+                let paramNames = []
+                let funcParams = params
                     .map((p, i) => {
                         let {
                             defaultValue,
                             label,
                             name
                         } = p || {}
-                        name = label || name || `param${i}`
+                        name = name || label
+                        // make sure there's no duplicate name in the function arguments
+                        if (!name || dupCheck[name]) name = `param${i}`
+                        dupCheck[name] = true
+                        paramNames.push(name)
+
                         if (defaultValue === undefined) return name
 
                         return `${name} = ${defaultValue}`
                     })
-                    .join(', ')
-                // make sure function name matches whats invoked inside `emitHandler`
-                const emitter = async (...args) => {
-                    // make sure correct number of arguments are supplied
-                    args = config.map((_, i) => args[i])
-                    // if callback is provided, exclude it from validation
-                    const requireCalblack = config.slice(-1)[0]?.type === TYPES.function
-                    const lastIndex = config.length - 1
-                    const callbackOrg = requireCalblack
-                        && isObj(args[lastIndex], false)
-                        && args[lastIndex]
-                        || {}
-                    const {
-                        onError,
-                        resultModifier,
-                        timeout,
-                    } = callbackOrg
-                    // include an empty callback
-                    if (requireCalblack && !isFn(args[lastIndex])) args[lastIndex] = () => { }
-                    const err = validateObj(
-                        args,
-                        config,
-                        true,
-                        true,
-                        customMessages
-                    )
-                    if (err) throw new Error(err)
-
-                    // make sure events that require user to be logged in are invoked only after user is logged in
-                    requireLogin && await subjectAsPromise(
-                        rxIsLoggedIn,
-                        true,
-                        timeout
-                    )[0]
-
-                    // make sure events that cannot be emitted during maintenance mode are awaited
-                    !maintenanceModeEvents.includes(eventName) && await subjectAsPromise(
-                        rxIsInMaintenanceMode,
-                        false,
-                        timeout
-                    )[0]
-
-                    return await instance.emit(
-                        eventName,
-                        args,
-                        async result => {
-                            try {
-                                // reconstruct Map which was converted to 2D Array due to websocket transport
-                                if (resultType === 'Map') result = new Map(result || [])
-                                if (isFn(resultModifier)) result = await resultModifier(result)
-                            } catch (_) { }
-                            return result
-                        },
-                        onError,
-                        timeout
-                    )
-                }
-                const emitHandler = eval(`(async function ${name}(${paramNames}) {
-                    return await emitter(${paramNames})
-                })`)
+                funcParams = arrUnique(funcParams).join(', ') + suffix// + `= ${timeout}`
+                paramNames = `[${paramNames.join(', ')}]${suffix}`
+                const emitHandler = eval(
+                    `(async function ${name}(${funcParams}) {\nreturn await instance.emit("${eventName}", ${paramNames})\n})`
+                )
                 instance.events[name] = emitHandler
                 // add meta data
-                eventMeta.emitter = emitter
+                eventMeta.eventName = eventName
                 Object
                     .keys(eventMeta)
                     .forEach(key =>

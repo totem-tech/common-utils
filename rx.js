@@ -4,15 +4,21 @@ import {
     Subject,
     Unsubscribable,
 } from 'rxjs'
+import { translated } from './languageHelper'
 import PromisE from './PromisE'
 import {
     deferred,
     hasValue,
     isArr,
     isFn,
+    isPositiveNumber,
     isSubjectLike,
-    isValidNumber
 } from './utils'
+
+const textsCap = {
+    timedout: 'request timed out before an expected value is received.'
+}
+translated(textsCap, true)
 
 export const IGNORE_UPDATE_SYMBOL = Symbol('ignore-rx-subject-update')
 /**
@@ -152,6 +158,8 @@ export const subjectAsPromise = (
 ) => {
     if (!isSubjectLike(subject)) return
 
+    if (modifier) console.log('rx.js subjectAsPromise modifier', modifier)
+
     let subscription, timeoutId, unsubscribed
     const unsubscribe = () => setTimeout(() => {
         !unsubscribed && subscription.unsubscribe()
@@ -170,18 +178,17 @@ export const subjectAsPromise = (
             if (!shouldResolve) return
 
             unsubscribe()
-            resolve(
-                isFn(modifier)
-                    ? modifier(value)
-                    : value
-            )
+            resolve(value)
         })
-        timeoutId = isValidNumber(timeout) && setTimeout(() => {
-            unsubscribe()
-            reject('Timed out before an expected value is received.')
-        }, timeout)
+        timeoutId = isPositiveNumber(timeout) && setTimeout(() => {
+            // prevent rejecting if already unsubscribed
+            if (unsubscribed) return
 
+            unsubscribe()
+            reject(textsCap.timedout)
+        }, timeout)
     })
+
     return [promise, unsubscribe]
 }
 subjectAsPromise.anyValueSymbol = Symbol('any-value')
