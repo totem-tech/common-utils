@@ -147,13 +147,14 @@ export class ChatClient {
             const eventMeta = await this.awaitReady(eventName, timeout) || {}
             let {
                 customMessages,
-                params,
+                params = [],
                 resultType,
             } = eventMeta
 
-            const len = params?.length
+            const len = params.length
             if (len > 0) {
-                params = params[len - 1]?.type === TYPES.function
+                const lastParam = params[len - 1] || {}
+                params = lastParam.type === TYPES.function
                     ? params.slice(0, -1)
                     : params
                 // make sure correct number of arguments are supplied
@@ -380,7 +381,7 @@ export class ChatClient {
      * @summary fetch and cache messaging service events meta data
      */
     eventsMeta = async (eventName) => {
-        if (!this.eventsMetaCache || this.eventsMetaCache?.rejected) {
+        if (!this.eventsMetaCache || this.eventsMetaCache.rejected) {
             console.log('Updating events meta cache')
             // cache result for future use
             this.eventsMetaCache = this._emitter(eventEventsMeta)
