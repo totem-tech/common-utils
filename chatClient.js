@@ -154,7 +154,8 @@ export class ChatClient {
             const len = params.length
             if (len > 0) {
                 const lastParam = params[len - 1] || {}
-                params = lastParam.type === TYPES.function
+                const gotCb = lastParam.type === TYPES.function
+                params = gotCb
                     ? params.slice(0, -1)
                     : params
                 // make sure correct number of arguments are supplied
@@ -171,7 +172,7 @@ export class ChatClient {
                     true,
                     customMessages
                 )
-                err && console.log('Validation error ', { eventName, err })
+                err && console.log('ChatClient: Event validation error ', { eventName, err })
                 if (err) throw new Error(err)
             }
 
@@ -212,10 +213,7 @@ export class ChatClient {
             true,
             timeout
         )[0]
-        const eventMeta = eventName !== eventEventsMeta
-            ? { maintenanceMode: true }
-            : await this.eventsMeta(eventName) || {}
-
+        const eventMeta = await this.eventsMeta(eventName) || {}
         const { maintenanceMode, requireLogin } = eventMeta
         doWait = requireLogin && !rxIsLoggedIn.value
         // wait until user is logged in

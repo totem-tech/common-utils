@@ -290,7 +290,7 @@ PromisE.getSocketEmitter = (
     socket,
     timeoutGlobal,
     errorArgIndex = 0,
-    callbackIndex = null
+    callbackIndex = null,
 ) => (
     eventName,
     args = [],
@@ -311,22 +311,23 @@ PromisE.getSocketEmitter = (
             || err
         )
         const promise = new Promise((resolve, reject) => {
-            try {
-                const interceptor = async (...result) => {
-                    try {
-                        let err = isInteger(errorArgIndex) && result.splice(errorArgIndex, 1)[0]
-                        if (!!err) return reject(getError(err))
+            const interceptor = async (...result) => {
+                try {
+                    let err = isInteger(errorArgIndex) && result.splice(errorArgIndex, 1)[0]
+                    console.warn(eventName, { err, args })
+                    if (!!err) return reject(getError(err))
 
-                        result = result.length > 1
-                            ? result // if multiple values returned from the backend resolve with an array
-                            : result[0] // otherwise resolve with single value
+                    result = result.length > 1
+                        ? result // if multiple values returned from the backend resolve with an array
+                        : result[0] // otherwise resolve with single value
 
-                        if (isFn(resultModifier)) result = await resultModifier(result)
-                    } catch (err) {
-                        console.log('PromisE.getSocketEmitter', { interceptorError: err })
-                    }
-                    resolve(result)
+                    if (isFn(resultModifier)) result = await resultModifier(result)
+                } catch (err) {
+                    console.log('PromisE.getSocketEmitter', { eventName, interceptorError: err })
                 }
+                resolve(result)
+            }
+            try {
                 if (callbackIndex === null) {
                     // last item is the callback 
                     args = [...args, interceptor]

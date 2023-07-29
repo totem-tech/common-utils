@@ -1,4 +1,12 @@
-import { fallbackIfFails, isArr, isArrLike, isHex, isObj, isStr, isUint8Arr } from './utils'
+import {
+    fallbackIfFails,
+    isArr,
+    isArrLike,
+    isHex,
+    isObj,
+    isStr,
+    isUint8Arr
+} from './utils'
 /*
  * List of optional node-modules and the functions used by them:
  * Module Name          : Function Name

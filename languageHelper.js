@@ -10,7 +10,6 @@ import {
     isStr,
     textCapitalize,
 } from './utils'
-import chatClient from './chatClient'
 
 export const translations = new DataStorage('totem_static_translations')
 // language the app texts are written
@@ -108,7 +107,7 @@ export const downloadTextListCSV = !BUILD_MODE ? null : () => {
  * 
  * @returns {Boolean}   true: data freshly updated. Falsy: using cache or update not required
  */
-export const fetchNSaveTexts = async (client = chatClient) => {
+export const fetchNSaveTexts = async (client = require('./chatClient').default) => {
     if (!client) return console.trace('Client not specified')
 
     const selected = getSelected()

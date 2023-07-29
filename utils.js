@@ -1,6 +1,4 @@
 import { v1 as uuidV1 } from 'uuid'
-// import { blake2AsHex, keccakAsHex } from '@polkadot/util-crypto'
-import { ss58Decode } from './convert'
 /*
  * List of optional node-modules and the functions used by them:
  * Module Name          : Function Name
@@ -155,6 +153,7 @@ export const isAddress = (address, type, chainId = 0, ignoreChecksum = false) =>
 			case 'ethereum': return isETHAddress(address, chainId || 0)
 			case 'polkadot':
 			default:
+				const { ss58Decode } = require('./convert')
 				// assume Polkadot/Totem address
 				const account = ss58Decode(address, ignoreChecksum, chainId)
 				// must be 32 bytes length
