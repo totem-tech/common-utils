@@ -148,7 +148,7 @@ export class ChatClient {
             let {
                 customMessages,
                 params = [],
-                resultType,
+                result: resultDef = {},
             } = eventMeta
 
             const len = params.length
@@ -180,11 +180,13 @@ export class ChatClient {
                 eventName,
                 args,
                 async result => {
-                    if (resultType === 'Map') result = new Map(result || [])
-                    isFn(callback) && callback(null, result)
-                    return isFn(resultModifier)
+                    // reconstruct Map from 2D array transported from server
+                    if (resultDef.type === 'map') result = new Map(result || [])
+                    result = isFn(resultModifier)
                         ? await resultModifier(result)
                         : result
+                    isFn(callback) && callback(null, result)
+                    return result
                 },
                 err => {
                     const translatedErr = translateError(err)
@@ -203,6 +205,7 @@ export class ChatClient {
             }
             return await resultPromise
         }
+        socket.on('testmap', map => console.warn('testmap', map))
     }
 
     awaitReady = async (eventName, timeout, log = false) => {
@@ -750,7 +753,7 @@ export class ChatClient {
     projectsByHashes = async (projectIds, ...args) => await this.emit(
         'projects-by-hashes',
         [projectIds, ...args],
-        ([projects, notFoundIds = []]) => [new Map(projects), notFoundIds],
+        // projects => [new Map(projects), notFoundIds],
     )
 
     /**

@@ -337,7 +337,7 @@ export const validate = (value, config, customMessages = {}) => {
 export const validateObj = (obj = {}, config = {}, failFast = true, includeLabel = true, customMessages = {}) => {
     try {
         const errorMsgs = { ...messages, ...customMessages }
-        if (!isObj(obj, false)) return _msgOrTrue(errorMsgs.object)
+        if (!isObj(obj, config.strict || false)) return _msgOrTrue(errorMsgs.object)
 
         const keys = Object.keys(config)
         let errors = {}
@@ -370,30 +370,15 @@ export const validateObj = (obj = {}, config = {}, failFast = true, includeLabel
                     ...keyErrMsgs,
                 },
             )
-            // redundant >> remove. validate() takes care of it
-            // const validateChildProps = !error
-            //     && type === TYPES.object
-            //     && isObj(childConf)
-            //     && isObj(value)
-            // if (validateChildProps) {
-            //     // property is an object type and contains validation confirguration for it's own properties
-            //     error = validateObj(
-            //         value,
-            //         childConf,
-            //         failFast,
-            //         includeLabel,
-            //         keyErrMsgs,
-            //     )
-            //     // error is an object. 
-            //     error && !failFast && Object.keys(error)
-            //         .forEach(propKey =>
-            //             errors[`${key}.${propKey}`] = error[propKey]
-            //         )
-            // }
             if (!error) continue
-            // in case used with FormInput and label an element
-            const errKey = fallbackIfFails(() => `${label}`, [], name || key)
-            if (includeLabel) error = `${errKey} => ${error}`
+
+            if (includeLabel) {
+                const errKey = isStr(label)
+                    && label // In case used with FormInput and label an element
+                    || name
+                    || key
+                error = `${errKey} => ${error}`
+            }
             if (failFast) return error
 
             // combine all errors into a single object

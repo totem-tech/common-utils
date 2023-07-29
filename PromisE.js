@@ -314,7 +314,6 @@ PromisE.getSocketEmitter = (
             const interceptor = async (...result) => {
                 try {
                     let err = isInteger(errorArgIndex) && result.splice(errorArgIndex, 1)[0]
-                    console.warn(eventName, { err, args })
                     if (!!err) return reject(getError(err))
 
                     result = result.length > 1
