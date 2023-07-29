@@ -134,11 +134,17 @@ export class ChatClient {
          * 
          * @returns {Promise}
          */
-        this.emit = async (eventName, args = [], resultModifier, onError, timeout) => {
+        this.emit = async (
+            eventName,
+            args = [],
+            resultModifier,
+            onError,
+            timeout
+        ) => {
             let callback = isFn(args.slice(-1)[0])
                 ? args.splice(-1)[0]
                 : undefined
-            const eventMeta = await this.eventsMeta(eventName) || {}
+            const eventMeta = await this.awaitReady(eventName, timeout) || {}
             let {
                 customMessages,
                 params,
@@ -168,7 +174,7 @@ export class ChatClient {
                 if (err) throw new Error(err)
             }
 
-            const promise = this._emitter(
+            const resultPromise = this._emitter(
                 eventName,
                 args,
                 async result => {
@@ -185,16 +191,15 @@ export class ChatClient {
                     return translatedErr
                 },
                 timeout,
-                this.awaitReady(eventName, timeout),
             )
             // auto disconnect after pre-configured period of inactivity
             if (autoDisconnectMs) {
-                const wsPromise = promise.promise || promise // if no timeout
+                const wsPromise = resultPromise.promise || resultPromise // if no timeout
                 wsPromise
                     .catch(() => { })
                     .finally(() => this.disconnectDeferred())
             }
-            return await promise
+            return await resultPromise
         }
     }
 
@@ -229,6 +234,7 @@ export class ChatClient {
                 timeout
             )[0]
         }
+        return eventMeta
     }
 
     /**
