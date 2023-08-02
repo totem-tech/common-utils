@@ -8,6 +8,7 @@ import {
     isObj,
     isPositiveNumber,
     isPromise,
+    isStr,
     isValidURL,
 } from './utils'
 
@@ -366,17 +367,8 @@ PromisE.getSocketEmitter = (
 PromisE.fetch = async (url, options, timeout, asJson = true) => {
     if (!isValidURL(url, false)) throw new Error(textsCap.invalidUrl)
 
-    options = isObj(options)
-        ? options
-        : {}
-    options.method = (options.method || 'get').toUpperCase()
-    if (options.method === 'POST') {
-        // set default content type to JSON
-        options.headers = options.headers || {}
-        options.headers['Content-Type'] = options.headers['Content-Type'] || 'application/json'
-        options.headers['content-type'] = 'application/json'
-    }
-    // options.redirect = 'follow'
+    options = isObj(options) && options || {}
+    options.method ??= 'get'
     if (isInteger(timeout)) options.signal = getAbortSignal(timeout)
 
     const result = await fetch(url.toString(), options)
@@ -424,7 +416,13 @@ PromisE.post = async (
     url,
     {
         ...options,
-        body: JSON.stringify(data),
+        body: !isStr(data)
+            ? JSON.stringify(data)
+            : data,
+        headers: {
+            'Content-Type': 'application/json',
+            ...options?.headers,
+        },
         method: 'post',
     },
     timeout,
