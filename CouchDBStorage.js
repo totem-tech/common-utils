@@ -21,7 +21,6 @@ const debugTag = '[CouchDBStorage]'
  */
 export const getConnection = async (url, global = true) => {
     if (global && connection) return connection
-
     const con = connections[url] || await nano(url)
     // set as global connection
     if (global) connection = con
@@ -353,7 +352,7 @@ export default class CouchDBStorage {
      */
     async searchMulti(selectors = [], limit, all = true) {
         let result = new Map()
-        for (let i = 0; i < selectors.length; i++) {
+        for (let i = 0;i < selectors.length;i++) {
             if (result.size > 0 && !all) return result
             const selector = selectors[i]
             result = mapJoin(result, await this.search(selector, limit))
@@ -425,7 +424,7 @@ export default class CouchDBStorage {
         if (!docs.length) return
 
         const db = await this.getDB()
-        for (let i = 0; i < docs.length; i++) {
+        for (let i = 0;i < docs.length;i++) {
             const doc = docs[i]
             if (!doc._id || doc._rev) continue
 

@@ -385,7 +385,6 @@ PromisE.fetch = async (url, options, timeout, asJson = true) => {
         const json = await result.json() || {}
         const message = json.message || `Request failed with status code ${status}. ${JSON.stringify(json || '')}`
         const error = new Error(`${message}`.replace('Error: ', ''))
-        console.log({ options, status, isSuccess, result, json })
         throw error
     }
 
@@ -409,21 +408,23 @@ PromisE.fetch = async (url, options, timeout, asJson = true) => {
 PromisE.post = async (
     url,
     data,
-    options,
+    options = {},
     timeout,
     asJson = true
 ) => await PromisE.fetch(
     url,
     {
         ...options,
+        body: data,
         body: !isStr(data)
             ? JSON.stringify(data)
             : data,
         headers: {
             'Content-Type': 'application/json',
-            ...options?.headers,
+            'Content-type': 'application/json',
+            ...options.headers,
         },
-        method: 'post',
+        method: 'POST',
     },
     timeout,
     asJson
