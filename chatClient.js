@@ -42,13 +42,6 @@ export const rxUserId = new BehaviorSubject((getUser() || {}).id)
 export const rxUserIdentity = new BehaviorSubject((getUser() || {}).address)
 const eventMaintenanceMode = 'maintenance-mode'
 const eventEventsMeta = 'events-meta'
-// events allowed during maintenance mode.
-const maintenanceModeEvents = [
-    eventMaintenanceMode,
-    eventEventsMeta,
-    'login', // without login admin user won't be able to login and therefore, can't turn off maintenance mode.
-    'rewards-get-kapex-payouts', // allow crowdloan rewards data request even when in maintenance mode
-]
 //- migrate existing user data
 const deprecatedKey = PREFIX + 'chat-user'
 try {
@@ -172,10 +165,11 @@ export class ChatClient {
                     true,
                     customMessages
                 )
-                err && console.log('ChatClient: Event validation error ', { eventName, err })
+                err && console.warnDebug('ChatClient: Event validation error ', { eventName, err })
                 if (err) throw new Error(err)
             }
 
+            const [onSuccess, onFail] = eventResultHandlers[eventName] || []
             const resultPromise = this._emitter(
                 eventName,
                 args,
@@ -186,12 +180,15 @@ export class ChatClient {
                         ? await resultModifier(result)
                         : result
                     isFn(callback) && callback(null, result)
+
+                    isFn(onSuccess) && onSuccess(result, args)
                     return result
                 },
                 err => {
                     const translatedErr = translateError(err)
                     isFn(onError) && onError(translatedErr, err)
                     isFn(callback) && callback(err)
+                    isFn(onFail) && onFail(err, args)
                     return translatedErr
                 },
                 timeout,
@@ -205,7 +202,6 @@ export class ChatClient {
             }
             return await resultPromise
         }
-        socket.on('testmap', map => console.warn('testmap', map))
     }
 
     awaitReady = async (eventName, timeout, log = false) => {
@@ -216,8 +212,8 @@ export class ChatClient {
             true,
             timeout
         )[0]
-        const eventMeta = await this.eventsMeta(eventName) || {}
-        const { maintenanceMode, requireLogin } = eventMeta
+        const eventMeta = await this.getEventsMeta(eventName)
+        const { maintenanceMode, requireLogin } = eventName && eventMeta || {}
         doWait = requireLogin && !rxIsLoggedIn.value
         // wait until user is logged in
         doWait && await subjectAsPromise(
@@ -276,8 +272,8 @@ export class ChatClient {
             searchParentIdentity,
             ...args
         ],
-        // convert 2D array back to Map
-        ([result, limit]) => new Map(result),
+        // // convert 2D array back to Map
+        // ([result, limit]) => new Map(result),
     )
 
     /**
@@ -381,16 +377,20 @@ export class ChatClient {
      * @name    eventsMeta
      * @summary fetch and cache messaging service events meta data
      */
-    eventsMeta = async (eventName) => {
-        if (!this.eventsMetaCache || this.eventsMetaCache.rejected) {
+    getEventsMeta = async (eventName) => {
+        const cache = this.eventsMetaCache
+        if (cache?.pending) return cache
+        if (!cache || cache.rejected) {
             console.log('Updating events meta cache')
             // cache result for future use
             this.eventsMetaCache = this._emitter(eventEventsMeta)
         }
-        const meta = await this.eventsMetaCache
-        return eventName
-            ? meta[eventName]
-            : meta
+        const eventsMeta = await this.eventsMetaCache
+        if (!eventName) return eventsMeta
+
+        const { emittables, listenables } = eventsMeta
+        return emittables?.[eventName]
+            || listenables?.[eventName]
     }
 
     faucetRequest = async (address, ...args) => await this.emit(
@@ -493,28 +493,28 @@ export class ChatClient {
      *  
      * @returns {Object} data. Eg: roles etc.
      */
-    login = async (id, secret, ...args) => await this.emit(
-        'login',
-        [
-            id,
-            secret,
-            ...args
-        ],
-        async (data) => {
-            const { address, roles = [] } = data || {}
-            rxUserIdentity.next(address)
-            // store user roles etc data sent from server
-            setUser({ ...getUser(), ...data })
-            rxIsLoggedIn.next(true)
-            rxIsAdmin.next(roles.includes(ROLE_ADMIN))
-            rxIsSupport.next(roles.includes(ROLE_SUPPORT))
-            return data
-        },
-        err => {
-            rxIsLoggedIn.next(false)
-            console.log('Login failed', err)
-        }
-    )
+    // login = async (id, secret, ...args) => await this.emit(
+    //     'login',
+    //     [
+    //         id,
+    //         secret,
+    //         ...args
+    //     ],
+    //     async (data) => {
+    //         const { address, roles = [] } = data || {}
+    //         rxUserIdentity.next(address)
+    //         // store user roles etc data sent from server
+    //         setUser({ ...getUser(), ...data })
+    //         rxIsLoggedIn.next(true)
+    //         rxIsAdmin.next(roles.includes(ROLE_ADMIN))
+    //         rxIsSupport.next(roles.includes(ROLE_SUPPORT))
+    //         return data
+    //     },
+    //     err => {
+    //         rxIsLoggedIn.next(false)
+    //         console.log('Login failed', err)
+    //     }
+    // )
 
     /**
      * @name    maintenanceMode
@@ -941,6 +941,45 @@ export class ChatClient {
     )
 }
 
+// do event specific stuff after making a request.
+// key: eventName
+// value: [
+//    onSuccess, // args: result (any), eventArgs (array)
+//    onFail,    // args: error (string), eventArgs (array)
+// ]
+const eventResultHandlers = {
+    login: [
+        async (result = {}) => {
+            const { address, roles = [] } = result || {}
+            const isAdmin = roles.includes(ROLE_ADMIN)
+            const isSupport = roles.includes(ROLE_SUPPORT)
+            // store/update user roles etc data sent from server
+            setUser({
+                ...getUser(),
+                // make sure user ID and secret is never overriden
+                ...objWithoutKeys(result, ['id', 'secret'])
+            })
+            rxUserIdentity.next(address)
+            rxIsLoggedIn.next(true)
+            rxIsAdmin.next(isAdmin)
+            rxIsSupport.next(isSupport)
+            return result
+        },
+        err => {
+            rxIsLoggedIn.next(false)
+            console.log('Login failed', err)
+        }
+    ],
+    register: [
+        (_, [id, secret, address] = []) => {
+            setUser({ id, secret })
+            rxIsLoggedIn.next(true)
+            rxIsRegistered.next(true)
+            rxUserIdentity.next(address)
+        },
+    ],
+}
+
 /**
  * @name    getClient
  * @summary Returns a singleton instance of the websocket client.
@@ -948,7 +987,7 @@ export class ChatClient {
  * 
  * @description when in dev mode with self-signed certificate, if socket connection fails with "ERR_CERT_AUTHORITY_INVALID", simply open the socket url in the browser by replacing "wss" with "https" and click "proceed" to add the certificate.
  * 
- * @param   {String|Boolean} url    if Boolean, true => use staging & falsy => use prod
+ * @param   {String|Boolean} url                if Boolean, true => use staging & falsy => use prod
  * @param   {Number}         disconnectDelayMs (optional) duration in milliseconds to auto-disconnect from 
  *                                             webwsocket after period of inactivity.
  *              
@@ -960,68 +999,9 @@ export const getClient = (url, disconnectDelayMs) => {
     if (instance) return instance
 
     instance = new ChatClient(url, disconnectDelayMs)
+    instance = getSafeClient(instance)
     const triggerChange = (rx, newValue) => rx.value !== newValue && rx.next(newValue)
-    instance.on(eventEventsMeta, meta => {
-        instance.eventsMetaCache = meta
-        instance.events = {}
-        Object
-            .keys(meta)
-            .forEach(eventName => {
-                const eventMeta = meta[eventName] || {}
-                let {
-                    name,
-                    params,
-                    // timeout
-                } = eventMeta
-                if (!eventName || !isArr(params)) return
-
-                if (!name) {
-                    const arr = eventName.split('-')
-                    name = arr[0] + textCapitalize([...arr.slice(1)]).join('')
-                }
-
-                const suffix = ', resultModifier, onError, timeout'
-                const dupCheck = {}
-                let paramNames = []
-                let funcParams = params
-                    .map((p, i) => {
-                        let {
-                            defaultValue,
-                            label,
-                            name
-                        } = p || {}
-                        name = name || label
-                        // make sure there's no duplicate name in the function arguments
-                        if (!name || dupCheck[name]) name = `param${i}`
-                        dupCheck[name] = true
-                        paramNames.push(name)
-
-                        if (defaultValue === undefined) return name
-
-                        return `${name} = ${defaultValue}`
-                    })
-                funcParams = arrUnique(funcParams).join(', ') + suffix// + `= ${timeout}`
-                paramNames = `[${paramNames.join(', ')}]${suffix}`
-                const emitHandler = eval(
-                    `(async function ${name}(${funcParams}) {\nreturn await instance.emit("${eventName}", ${paramNames})\n})`
-                )
-                instance.events[name] = emitHandler
-                // add meta data
-                eventMeta.eventName = eventName
-                Object
-                    .keys(eventMeta)
-                    .forEach(key =>
-                        Object.defineProperty(
-                            instance.events[name],
-                            `meta_${key}`,
-                            { value: eventMeta[key] }
-                        )
-                    )
-            })
-        window.events = instance.events
-        window.meta = meta
-        console.log('events', { meta, events })
-    })
+    instance.on(eventEventsMeta, eventsMeta => generateEventHandlers(instance, eventsMeta))
     instance.onConnect(async () => {
         rxIsConnected.next(true)
         const active = await instance.maintenanceMode()
@@ -1067,13 +1047,128 @@ export const getClient = (url, disconnectDelayMs) => {
     return instance
 }
 
-// retrieves user credentails from local storage
-/** @name    setUser
- * @summary retrieves user credentails from local storage
+/**
+ * @name    getSafeClient
+ * @summary turns an unsafe ChatClient fail-safe.
+ * This is done by dynamically generating emitable and listenable event handlers.
+ * This will ensure that even when events metadata failed to receive due to being offline or some other reason
+ * by making sure events emitted or listend to will:
+ * 
+ * 1. prevent error when invoking functions on non-existent ChatClient properties
+ * 2. ensure events metadata is fetched and event params are pre-validated (when emitting).
+ * 3. Websocket to messaging service is connected
+ * 4. wait until user is logged in, where required
+ * 5. wait until maintenance mode is deactivated (if `maintenanceMode = false` in metadata) and prevents failed request.
+ * 
+ * @param   {ChatClient} chatClient ChatClient instance
+ * 
+ * @returns {ChatClient} safe chat client with Proxy
+ */
+export const getSafeClient = chatClient => new Proxy(chatClient, {
+    get: (client, key) => {
+        if (client.hasOwnProperty(key)) return client[key]
+        const isListenable = /^on[A-Z]+/.test(key)
+        const eventName = (
+            !isListenable
+                ? key
+                : key.substr(2)
+        ).replaceAll(/[A-Z]/g, (char, i) => (i > 0 ? '-' : '') + char.toLowerCase())
+        return isListenable
+            ? (cb, once) => client.on(eventName, cb, once)
+            : (...args) => client.emit(eventName, args)
+    },
+})
+
+/**
+ * @name    getUser
+ * @summary Retrieves user credentails from local storage
  * 
  * @returns {Object} user
  */
 export function getUser() { return rw().user }
+
+const generateEventHandlers = (chatClient, eventsMeta = {}) => {
+    const { emittables = {}, listenables = {} } = eventsMeta
+    chatClient.eventsMetaCache = PromisE(eventsMeta)
+    chatClient.query = {}
+    chatClient.listen = {}
+    const eventName2VarName = eventName => {
+        const arr = eventName.split('-')
+        return arr[0] + textCapitalize([...arr.slice(1)]).join('')
+    }
+    const getStrFunc = (name, paramNames, body) => `(function ${name}(${paramNames}) {\n    ${body}\n})`
+    Object
+        .keys(emittables)
+        .forEach(eventName => {
+            const eventMeta = emittables[eventName] || {}
+            let {
+                name,
+                params,
+                // timeout
+            } = eventMeta
+            if (!eventName || !isArr(params)) return
+
+            name ??= eventName2VarName(eventName)
+
+            const suffix = ', resultModifier, onError, timeout'
+            const dupCheck = {}
+            let paramNames = []
+            let funcParams = params
+                .map((p, i) => {
+                    let {
+                        defaultValue,
+                        label,
+                        name
+                    } = p || {}
+                    name = name || label
+                    // make sure there's no duplicate name in the function arguments
+                    if (!name || dupCheck[name]) name = `param${i}`
+                    dupCheck[name] = true
+                    paramNames.push(name)
+
+                    if (defaultValue === undefined) return name
+
+                    return `${name} = ${defaultValue}`
+                })
+            funcParams = arrUnique(funcParams).join(', ') + suffix// + `= ${timeout}`
+            paramNames = `[${paramNames.join(', ')}]${suffix}`
+            const emitHandler = eval(
+                // `(function ${name}(${funcParams}) {\nreturn instance.emit("${eventName}", ${paramNames})\n})`
+                getStrFunc(
+                    name,
+                    funcParams,
+                    `return instance.emit("${eventName}", ${paramNames})`,
+                )
+            )
+            // add meta data
+            eventMeta.eventName = eventName
+            emitHandler.meta = eventMeta
+
+            chatClient.query[name] = emitHandler
+            chatClient[name] = emitHandler
+        })
+    Object.keys(listenables).forEach(eventName => {
+        const meta = listenables[eventName] || {}
+        meta.eventName = eventName
+        meta.name ??= eventName2VarName('on-' + eventName)
+        const { name } = meta
+        const handler = eval(
+            // `(function ${name}(callback, once) {\nreturn instance.on("${eventName}", callback, once)\n})`
+            getStrFunc(
+                name,
+                'callback, once',
+                `return instance.on("${eventName}", callback, once)`
+            )
+        )
+        handler.meta = meta
+        chatClient[name] = handler
+        chatClient.listen[name] = handler
+    })
+    window.query = chatClient.query
+    window.listen = chatClient.on
+    window.meta = emittables
+    console.log({ emittables, query, listen, listenables })
+}
 
 const log = (...args) => console.log(
     new Date().toLocaleTimeString(),
@@ -1161,5 +1256,4 @@ export const translateError = err => {
         .filter(Boolean)
         .join('')
 }
-
 export default getClient()

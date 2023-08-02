@@ -1,4 +1,4 @@
-import { fallbackIfFails } from './utils'
+import { fallbackIfFails, getUrlParam } from './utils'
 
 export function debug(...args) {
     if (!isDebug) return
@@ -11,7 +11,7 @@ export const isDebug = fallbackIfFails(
         `${process.env.DEBUG || process.env.REACT_APP_DEBUG}`
             .toUpperCase()
     )
-)
+) || fallbackIfFails(() => getUrlParam('debug') === 'true')
 
 // ToDo: add error reporting?
 export const report = (...args) => console.error(...args)

@@ -108,7 +108,7 @@ export const downloadTextListCSV = !BUILD_MODE ? null : () => {
  * @returns {Boolean}   true: data freshly updated. Falsy: using cache or update not required
  */
 export const fetchNSaveTexts = async (client = require('./chatClient').default) => {
-    if (!client) return console.trace('Client not specified')
+    if (!client) return console.trace('ChatClient not specified')
 
     const selected = getSelected()
     if (selected === APP_LANG) {

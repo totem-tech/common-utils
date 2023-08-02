@@ -310,7 +310,7 @@ PromisE.getSocketEmitter = (
             && errorModifier(err)
             || err
         )
-        const promise = new Promise((resolve, reject) => {
+        const promise = new PromisE((resolve, reject) => {
             const interceptor = async (...result) => {
                 try {
                     let err = isInteger(errorArgIndex) && result.splice(errorArgIndex, 1)[0]
@@ -364,17 +364,19 @@ PromisE.getSocketEmitter = (
  * @returns {*} result
  */
 PromisE.fetch = async (url, options, timeout, asJson = true) => {
-    if (!isValidURL(url)) throw new Error(textsCap.invalidUrl)
+    if (!isValidURL(url, false)) throw new Error(textsCap.invalidUrl)
 
     options = isObj(options)
         ? options
         : {}
-    options.method = options.method || 'get'
-    if (options.method === 'post') {
+    options.method = (options.method || 'get').toUpperCase()
+    if (options.method === 'POST') {
         // set default content type to JSON
         options.headers = options.headers || {}
         options.headers['Content-Type'] = options.headers['Content-Type'] || 'application/json'
+        options.headers['content-type'] = 'application/json'
     }
+    // options.redirect = 'follow'
     if (isInteger(timeout)) options.signal = getAbortSignal(timeout)
 
     const result = await fetch(url.toString(), options)
@@ -385,6 +387,16 @@ PromisE.fetch = async (url, options, timeout, asJson = true) => {
                     : err
             )
         )
+    const { status = 0 } = result || {}
+    const isSuccess = status >= 200 && status <= 299
+    if (!isSuccess) {
+        const json = await result.json() || {}
+        const message = json.message || `Request failed with status code ${status}. ${JSON.stringify(json || '')}`
+        const error = new Error(`${message}`.replace('Error: ', ''))
+        console.log({ options, status, isSuccess, result, json })
+        throw error
+    }
+
     return asJson
         ? await result.json()
         : result
