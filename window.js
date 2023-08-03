@@ -157,6 +157,7 @@ toggleFullscreen.lastSelector = null
  * @param   {Boolean|String} reverse whether to reverse the value of inverted
  * 
  * @reutrns {Boolean}
+ * ToDo: move to reactjs/hooks
  */
 export const useInverted = (reverse = false) => {
     const [inverted] = useRxSubject(rxInverted, inverted => {

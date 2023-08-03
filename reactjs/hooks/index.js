@@ -1,5 +1,6 @@
 export * from './useCallbackDeferred'
 export * from './iUseReducer' // ToDo: deprecate
+export { useInverted } from '../../window'
 export * from './useIsMobile'
 export * from './useMount'
 export * from './useMutationObserver'
