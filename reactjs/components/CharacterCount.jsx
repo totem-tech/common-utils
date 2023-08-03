@@ -1,43 +1,46 @@
 import PropTypes from 'prop-types'
 import React, { useCallback } from 'react'
-import { BehaviorSubject } from 'rxjs'
+import { BehaviorSubject, SubjectLike } from 'rxjs'
 import { translated } from '../../languageHelper'
 import {
     hasValue,
     isFn,
     isSubjectLike,
 } from '../../utils'
-import { useRxSubject } from '../hooks'
+import { useRxSubjectOrValue } from '../hooks'
 import RxSubjectView from './RxSubjectView'
 
-const textsCap = translated({
-    title: 'character count'
-}, true)[1]
+const textsCap = {
+    maxLength: 'maximum length',
+    minLength: 'minimum length',
+    title: 'character count',
+}
+translated(textsCap, true)
 
 /**
  * @name    CharacterCount
  * @summary display and auto-update the character count of the (text/string) value of a RxJS subject.
  * 
- * @param   {Object}    props
- * @param   {String}    props.color         (optional) default text color
- *                                          Default: 'grey'
- * @param   {String}    props.colorError    (optional) text color when character count reached maximum or below minimum.
- *                                          Default: 'red'
- * @param   {String}    props.colorWarn     (optional) text color when character count is between warn and max length.
- *                                          Default: 'orange'
- * @param   {Boolean}   props.hideOnEmpty   (optional) whether to hide count if empty value (character count is 0).
- *                                          Default: false
- * @param   {Number}    props.maxLength     (optional) warn when value reaches maximum allowed length.
- *                                          Default: 0
- * @param   {Number}    props.minLength     (optional) warn when value is below minimum required length.
- *                                          Default: 0
- * @param   {Boolean}   props.show          (optional) control (default) visibility of counter externally.
- *                                          Default: true
- * @param   {Object}    props.style         (optional) CSS styles
- * @param   {BehaviorSubject} props.subject RxJS subject containing the value.
- * @param   {Function}  props.valueModifier (optional)
- * @param   {Number}    props.warnLength    (optional) warn when character count reaches certain length but below max.
- *                                          Default: maxLength * 0.9
+ * @param   {Object}      props
+ * @param   {String}      props.color         (optional) default text color
+ *                                            Default: 'grey'
+ * @param   {String}      props.colorError    (optional) text color if character count reached maximum or below minimum.
+ *                                            Default: 'red'
+ * @param   {String}      props.colorWarn     (optional) text color when character count is between warn and max length.
+ *                                            Default: 'orange'
+ * @param   {Boolean}     props.hideOnEmpty   (optional) whether to hide count if empty value (character count is 0).
+ *                                            Default: false
+ * @param   {Number}      props.maxLength     (optional) warn when value reaches maximum allowed length.
+ *                                            Default: 0
+ * @param   {Number}      props.minLength     (optional) warn when value is below minimum required length.
+ *                                            Default: 0
+ * @param   {Boolean}     props.show          (optional) control (default) visibility of counter externally.
+ *                                            Default: true
+ * @param   {Object}      props.style         (optional) CSS styles
+ * @param   {SubjectLike} props.subject       RxJS subject containing the value.
+ * @param   {Function}    props.valueModifier (optional)
+ * @param   {Number}      props.warnLength    (optional) warn when character count reaches certain length but below max.
+ *                                            Default: maxLength * 0.9
  * 
  * @returns {Element}
  */
@@ -51,15 +54,13 @@ export const CharacterCount = React.memo(props => {
         inline,
         maxLength,
         minLength,
-        show: _show,
+        show,
         style,
         subject,
         valueModifier,
         warnLength = parseInt(maxLength * 0.9) || 0,
     } = props
-    const [show] = !isSubjectLike(_show)
-        ? [_show]
-        : useRxSubject(_show)
+    show = useRxSubjectOrValue(show)
 
     const modifier = useCallback(value => {
         let text = isFn(valueModifier)
@@ -106,7 +107,16 @@ export const CharacterCount = React.memo(props => {
                         },
                         ...style,
                     },
-                    title: textsCap.title,
+                    title: isMin
+                        ? `${textsCap.minLength}: ${minLength}`
+                        : textsCap.title,
+                    title: [
+                        textsCap.title,
+                        isMin && `${textsCap.minLength}: ${minLength}`,
+                        isWarn && `${textsCap.maxLength}: ${maxLength}`
+                    ]
+                        .filter(Boolean)
+                        .join('\n')
                 }}>
                     {content}
                 </div>
