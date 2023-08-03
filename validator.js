@@ -184,7 +184,13 @@ export const validate = (value, config, customMessages = {}) => {
                 if (min && new Date(min) > date) return _msgOrTrue(errorMsgs.dateMin, min)
                 break
             case 'email':
-                if (!isStr(value) || !EMAIL_REGEX.test(value)) return _msgOrTrue(errorMsgs.email)
+                if (!isStr(value)) return _msgOrTrue(errorMsgs.email)
+                const x = value.split('@')[0]
+                const allowPlus = !x.startsWith('+')
+                    && !x.endsWith('+')
+                    && (x.match(/\+/g) || []).length === 1
+                if (allowPlus) value = value.replace('+', '')
+                if (!EMAIL_REGEX.test(value)) return _msgOrTrue(errorMsgs.email)
                 break
             case 'function':
                 if (!isFn(value)) return _msgOrTrue(errorMsgs.function)
