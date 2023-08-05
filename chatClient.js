@@ -389,8 +389,7 @@ export class ChatClient {
         if (!eventName) return eventsMeta
 
         const { emittables, listenables } = eventsMeta
-        return emittables?.[eventName]
-            || listenables?.[eventName]
+        return emittables?.[eventName] || listenables?.[eventName]
     }
 
     faucetRequest = async (address, ...args) => await this.emit(
@@ -1091,7 +1090,6 @@ const generateEventHandlers = (chatClient, eventsMeta = {}) => {
     const { emittables = {}, listenables = {} } = eventsMeta
     chatClient.eventsMetaCache = PromisE(eventsMeta)
     chatClient.query = {}
-    chatClient.listen = {}
     const eventName2VarName = eventName => {
         const arr = eventName.split('-')
         return arr[0] + textCapitalize([...arr.slice(1)]).join('')
@@ -1162,12 +1160,18 @@ const generateEventHandlers = (chatClient, eventsMeta = {}) => {
         )
         handler.meta = meta
         chatClient[name] = handler
-        chatClient.listen[name] = handler
+        chatClient.on[name] = handler
     })
     window.query = chatClient.query
     window.listen = chatClient.on
+    window.listenables = listenables
     window.meta = emittables
-    console.log({ emittables, query, listen, listenables })
+    console.log({
+        emittables,
+        query,
+        listen,
+        listenables
+    })
 }
 
 const log = (...args) => console.log(
