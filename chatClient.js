@@ -240,7 +240,7 @@ export class ChatClient {
         doWait = rxIsInMaintenanceMode.value && !maintenanceMode
         // wait until maintenance mode is deactivated
         if (doWait) {
-            log && console.info('Waiting for maintenance mode to be deactivated...')
+            log && log('Waiting for maintenance mode to be deactivated...')
             await subjectAsPromise(
                 rxIsInMaintenanceMode,
                 false,
@@ -396,7 +396,6 @@ export class ChatClient {
         const cache = this.eventsMetaCache
         if (cache?.pending) return cache
         if (!cache || cache.rejected) {
-            console.log('Updating events meta cache')
             // cache result for future use
             this.eventsMetaCache = this._emitter(eventEventsMeta)
         }
@@ -1020,7 +1019,6 @@ export const getClient = (url, disconnectDelayMs) => {
     const triggerChange = (rx, newValue) => rx.value !== newValue && rx.next(newValue)
     instance.on(eventEventsMeta, eventsMeta => generateEventHandlers(instance, eventsMeta))
     instance.onConnect(async () => {
-        console.log('ChatClient: connected')
         rxIsConnected.next(true)
         const active = await instance.maintenanceMode()
         triggerChange(rxIsInMaintenanceMode, active)
@@ -1050,11 +1048,11 @@ export const getClient = (url, disconnectDelayMs) => {
         triggerChange(rxIsLoggedIn, false)
     })
     instance.onMaintenanceMode(active => {
-        console.log(`Maintenance mode ${active ? '' : 'de'}activated`)
+        log(`Maintenance mode ${active ? '' : 'de'}activated`)
         triggerChange(rxIsInMaintenanceMode, active)
     })
     instance.onFaucetStatus(enabled => {
-        console.log(`Faucet ${enabled ? 'enabled' : 'disabled'}`)
+        log(`Faucet ${enabled ? 'enabled' : 'disabled'}`)
         triggerChange(rxFaucetEnabled, enabled)
     })
 
@@ -1180,12 +1178,12 @@ const generateEventHandlers = (chatClient, eventsMeta = {}) => {
     window.query = chatClient.query
     window.listen = chatClient.on
     window.listenables = listenables
-    window.meta = emittables
+    window.emittables = emittables
     console.log({
         emittables,
         query,
+        listenables,
         listen,
-        listenables
     })
 }
 
