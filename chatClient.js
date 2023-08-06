@@ -35,7 +35,7 @@ export const rxFaucetEnabled = new BehaviorSubject(false)
 export const rxIsAdmin = new BehaviorSubject(false)
 export const rxIsSupport = new BehaviorSubject(false)
 export const rxIsConnected = new BehaviorSubject(false)
-export const rxIsLoggedIn = new BehaviorSubject(null)
+export const rxIsLoggedIn = new BehaviorSubject(false)
 export const rxIsRegistered = new BehaviorSubject(!!(rw().user || {}).id)
 export const rxIsInMaintenanceMode = new BehaviorSubject(false)
 export const rxUserId = new BehaviorSubject((getUser() || {}).id)
@@ -134,9 +134,7 @@ export class ChatClient {
             onError,
             timeout
         ) => {
-            let callback = isFn(args.slice(-1)[0])
-                ? args.splice(-1)[0]
-                : undefined
+            let callbackIndex // if undefined will use last argument
             const eventMeta = await this.awaitReady(eventName, timeout) || {}
             let {
                 customMessages,
@@ -144,13 +142,25 @@ export class ChatClient {
                 result: resultDef = {},
             } = eventMeta
 
+            let callback = isFn(args.slice(-1)[0])
+                ? args.splice(-1)[0]
+                : undefined
+
             const len = params.length
             if (len > 0) {
-                const lastParam = params[len - 1] || {}
+                const cbIndex = params.findIndex(x => x.type === TYPES.function)
+                const lastParam = params[cbIndex] || {}
                 const gotCb = lastParam.type === TYPES.function
+                callbackIndex = gotCb
+                    ? cbIndex
+                    : callbackIndex
+                callback = gotCb
+                    ? args[cbIndex]
+                    : callback
                 params = gotCb
                     ? params.slice(0, -1)
                     : params
+
                 // make sure correct number of arguments are supplied
                 args = params.map((param, i) =>
                     args[i] !== undefined
@@ -176,13 +186,18 @@ export class ChatClient {
                 async result => {
                     // reconstruct Map from 2D array transported from server
                     if (resultDef.type === 'map') result = new Map(result || [])
+
                     result = isFn(resultModifier)
                         ? await resultModifier(result)
                         : result
                     isFn(callback) && callback(null, result)
+                    const _result = isFn(onSuccess)
+                        ? await onSuccess(result, args)
+                        : undefined
 
-                    isFn(onSuccess) && onSuccess(result, args)
-                    return result
+                    return _result !== undefined
+                        ? _result
+                        : result
                 },
                 err => {
                     const translatedErr = translateError(err)
@@ -952,29 +967,32 @@ const eventResultHandlers = {
             const { address, roles = [] } = result || {}
             const isAdmin = roles.includes(ROLE_ADMIN)
             const isSupport = roles.includes(ROLE_SUPPORT)
+            setTimeout(() => {
+                log('Logged in to messaging service')
+                rxIsLoggedIn.next(true)
+                rxUserIdentity.next(address)
+                rxIsAdmin.next(isAdmin)
+                rxIsSupport.next(isSupport)
+            }, 10)
             // store/update user roles etc data sent from server
             setUser({
                 ...getUser(),
                 // make sure user ID and secret is never overriden
                 ...objWithoutKeys(result, ['id', 'secret'])
             })
-            rxUserIdentity.next(address)
-            rxIsLoggedIn.next(true)
-            rxIsAdmin.next(isAdmin)
-            rxIsSupport.next(isSupport)
             return result
         },
         err => {
             rxIsLoggedIn.next(false)
-            console.log('Login failed', err)
+            consolelog('Login failed', err)
         }
     ],
     register: [
         (_, [id, secret, address] = []) => {
             setUser({ id, secret })
             rxIsLoggedIn.next(true)
-            rxIsRegistered.next(true)
             rxUserIdentity.next(address)
+            rxIsRegistered.next(true)
         },
     ],
 }
@@ -1002,6 +1020,7 @@ export const getClient = (url, disconnectDelayMs) => {
     const triggerChange = (rx, newValue) => rx.value !== newValue && rx.next(newValue)
     instance.on(eventEventsMeta, eventsMeta => generateEventHandlers(instance, eventsMeta))
     instance.onConnect(async () => {
+        console.log('ChatClient: connected')
         rxIsConnected.next(true)
         const active = await instance.maintenanceMode()
         triggerChange(rxIsInMaintenanceMode, active)
@@ -1018,11 +1037,7 @@ export const getClient = (url, disconnectDelayMs) => {
         // auto login on connect to messaging service
         instance
             .login(id, secret)
-            .then(() => console.log(
-                new Date().toISOString(),
-                'Logged into messaging service'
-            ))
-            .catch(console.error)
+            .catch(() => { })
     })
     instance.on('disconnect', () => {
         log('disconnected')

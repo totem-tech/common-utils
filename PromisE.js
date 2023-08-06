@@ -255,7 +255,7 @@ PromisE.delay = (delay, result = delay) => new PromisE(resolve =>
  *                                  In that case, error should be thrown manually inside the `resultModifier` function.
  *                                  Default: `0` (this assumes that emitted message will resolve)
  *  
- * @param   {Number} callbackIndex  (optional) index of the emitter parameter that is expected to be a callback
+ * @param   {Number} callbackIndexLocal  (optional) index of the emitter parameter that is expected to be a callback
  *                                  Default: `null` (callback will be place at the end of `args` array)
  * 
  * @returns {Function}  callback function when invoked returns a promise
@@ -298,6 +298,7 @@ PromisE.getSocketEmitter = (
     resultModifier,
     errorModifier,
     timeoutLocal,
+    callbackIndexLocal = callbackIndex,
     delayPromise
 ) => {
         args = !isArr(args)
@@ -328,15 +329,15 @@ PromisE.getSocketEmitter = (
                 resolve(result)
             }
             try {
-                if (callbackIndex === null) {
+                if (callbackIndexLocal === null) {
                     // last item is the callback 
                     args = [...args, interceptor]
-                } else if (isFn(args[callbackIndex])) {
+                } else if (isFn(args[callbackIndexLocal])) {
                     // replace exising callback
-                    args[callbackIndex] = interceptor
+                    args[callbackIndexLocal] = interceptor
                 } else {
                     // inject the callback at specific index
-                    args.splice(callbackIndex, 0, interceptor)
+                    args.splice(callbackIndexLocal, 0, interceptor)
                 }
                 // if a promise is supplied wait until it's resolved
                 PromisE(delayPromise)
