@@ -201,6 +201,7 @@ export class ChatClient {
                 },
                 err => {
                     const translatedErr = translateError(err)
+                    console.log('EmitError', eventName, { translatedErr, err })
                     isFn(onError) && onError(translatedErr, err)
                     isFn(callback) && callback(err)
                     isFn(onFail) && onFail(err, args)
@@ -986,6 +987,14 @@ const eventResultHandlers = {
             consolelog('Login failed', err)
         }
     ],
+    notify: [
+        result => {
+            console.log('Notify result', result)
+        },
+        (translatedErr, err) => {
+            console.log('Nofify err', { translatedErr, err })
+        }
+    ],
     register: [
         (_, [id, secret, address] = []) => {
             setUser({ id, secret })
@@ -1241,36 +1250,44 @@ export const translateError = err => {
         return keys.forEach(key => err[key] = translateError(err[key]))
     }
 
+
     // translate if there is any error message
     const inputNameSeperator = ' => '
     const infoSeperator = ': '
-    let inputName = ''
-    let message = err
-    let suffix = ''
-    let arr = err.split(inputNameSeperator)
-    if (arr.length > 1) {
-        inputName = arr[0]
-        message = arr[1]
-    }
-    arr = message.split(infoSeperator)
-    if (arr.length > 1) {
-        message = arr[0]
-        suffix = arr[1]
-    }
-    const texts = translated({
-        inputName,
-        message,
-        suffix,
-    }, true)[1]
+    err = translated(err.split(inputNameSeperator))[0]
+        .join(inputNameSeperator)
+    err = !err.includes(infoSeperator)
+        ? err
+        : translated(err.split(infoSeperator))[0]
+            .join(infoSeperator)
+    return err
+    // let inputName = ''
+    // let message = err
+    // let suffix = ''
+    // let arr = err.split(inputNameSeperator)
+    // if (arr.length > 1) {
+    //     inputName = arr[0]
+    //     message = arr[1]
+    // }
+    // arr = message.split(infoSeperator)
+    // if (arr.length > 1) {
+    //     message = arr[0]
+    //     suffix = arr[1]
+    // }
+    // const texts = translated({
+    //     inputName,
+    //     message,
+    //     suffix,
+    // }, true)[1]
 
-    return [
-        texts.inputName,
-        texts.inputName && inputNameSeperator,
-        texts.message,
-        texts.suffix && infoSeperator,
-        texts.suffix
-    ]
-        .filter(Boolean)
-        .join('')
+    // return [
+    //     texts.inputName,
+    //     texts.inputName && inputNameSeperator,
+    //     texts.message,
+    //     texts.suffix && infoSeperator,
+    //     texts.suffix
+    // ]
+    //     .filter(Boolean)
+    //     .join('')
 }
 export default getClient()
