@@ -36,6 +36,12 @@ import { isArr, isFn } from '../../utils'
  * )
  * 
  * const element = <UseHook {...{ hooks, render }} />
+ * 
+ * // single hook
+ * const hook = useIsMobile
+ * const args = [] // no arguments needed
+ * const render = isMobile => `Layout: ${isMobile ? 'mobile' : 'desktop'}`
+ * const element = <UseHook {...{ args, hook, render }} />
  * `
  */
 export const UseHook = React.memo((props) => {
