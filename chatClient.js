@@ -108,6 +108,7 @@ export class ChatClient {
         this.onConnectError = (cb, once) => this.on('connect_error', cb, once);
         this.onError = (cb, once) => this.on('error', cb, once)
         this.onReconnect = (cb, once) => this.on('reconnect', cb, once)
+        this.rxEventsMeta = new BehaviorSubject()
         this.rxIsConnected = rxIsConnected
         this.rxIsInMaintenanceMode = rxIsInMaintenanceMode
         this.rxIsLoggedIn = rxIsLoggedIn
@@ -149,33 +150,32 @@ export class ChatClient {
             const len = params.length
             if (len > 0) {
                 const cbIndex = params.findIndex(x => x.type === TYPES.function)
-                const lastParam = params[cbIndex] || {}
-                const gotCb = lastParam.type === TYPES.function
+                const gotCb = cbIndex >= 0
                 callbackIndex = gotCb
                     ? cbIndex
                     : callbackIndex
                 callback = gotCb
                     ? args[cbIndex]
                     : callback
-                params = gotCb
+                // remove the callback index
+                const _params = gotCb
                     ? params.slice(0, -1)
                     : params
 
                 // make sure correct number of arguments are supplied
-                args = params.map((param, i) =>
+                args = _params.map((param, i) =>
                     args[i] !== undefined
                         ? args[i]
                         : param.defaultValue
                 )
 
-                const err = !!len && validateObj(
+                const err = validateObj(
                     args,
-                    params,
+                    _params,
                     true,
                     true,
                     customMessages
                 )
-                err && console.warnDebug('ChatClient: Event validation error ', { eventName, err })
                 if (err) throw new Error(err)
             }
 
@@ -208,6 +208,7 @@ export class ChatClient {
                     return translatedErr
                 },
                 timeout,
+                callbackIndex,
             )
             // auto disconnect after pre-configured period of inactivity
             if (autoDisconnectMs) {
@@ -228,7 +229,7 @@ export class ChatClient {
             true,
             timeout
         )[0]
-        const eventMeta = await this.getEventsMeta(eventName)
+        const eventMeta = await this.getEventsMeta(eventName, timeout)
         const { maintenanceMode, requireLogin } = eventName && eventMeta || {}
         doWait = requireLogin && !rxIsLoggedIn.value
         // wait until user is logged in
@@ -248,6 +249,7 @@ export class ChatClient {
                 timeout
             )[0]
         }
+
         return eventMeta
     }
 
@@ -393,14 +395,21 @@ export class ChatClient {
      * @name    eventsMeta
      * @summary fetch and cache messaging service events meta data
      */
-    getEventsMeta = async (eventName) => {
-        const cache = this.eventsMetaCache
-        if (cache?.pending) return cache
-        if (!cache || cache.rejected) {
-            // cache result for future use
-            this.eventsMetaCache = this._emitter(eventEventsMeta)
-        }
-        const eventsMeta = await this.eventsMetaCache
+    getEventsMeta = async (eventName, timeout) => {
+        // const cache = this.eventsMetaCache
+        // console.warn(eventName, cache)
+        // if (cache?.pending) return await cache
+        // if (!cache || cache.rejected) {
+        //     console.log('Updating meta cache', { ...cache }, cache)
+        //     // cache result for future use
+        //     this.eventsMetaCache = this._emitter(eventEventsMeta)
+        // }
+        // const eventsMeta = await this.eventsMetaCache
+        const eventsMeta = await subjectAsPromise(
+            this.rxEventsMeta,
+            isObj,
+            timeout
+        )[0]
         if (!eventName) return eventsMeta
 
         const { emittables, listenables } = eventsMeta
@@ -1026,7 +1035,10 @@ export const getClient = (url, disconnectDelayMs) => {
     instance = new ChatClient(url, disconnectDelayMs)
     instance = getSafeClient(instance)
     const triggerChange = (rx, newValue) => rx.value !== newValue && rx.next(newValue)
-    instance.on(eventEventsMeta, eventsMeta => generateEventHandlers(instance, eventsMeta))
+    instance.on(
+        eventEventsMeta,
+        em => generateEventHandlers(instance, em),
+    )
     instance.onConnect(async () => {
         rxIsConnected.next(true)
         const active = await instance.maintenanceMode()
@@ -1086,8 +1098,9 @@ export const getClient = (url, disconnectDelayMs) => {
  * @returns {ChatClient} safe chat client with Proxy
  */
 export const getSafeClient = chatClient => new Proxy(chatClient, {
-    get: (client, key) => {
-        if (client.hasOwnProperty(key)) return client[key]
+    get: (chatClient, key) => {
+        if (chatClient.hasOwnProperty(key)) return chatClient[key]
+
         const isListenable = /^on[A-Z]+/.test(key)
         const eventName = (
             !isListenable
@@ -1095,8 +1108,8 @@ export const getSafeClient = chatClient => new Proxy(chatClient, {
                 : key.substr(2)
         ).replaceAll(/[A-Z]/g, (char, i) => (i > 0 ? '-' : '') + char.toLowerCase())
         return isListenable
-            ? (cb, once) => client.on(eventName, cb, once)
-            : (...args) => client.emit(eventName, args)
+            ? (cb, once) => chatClient.on(eventName, cb, once)
+            : (...args) => chatClient.emit(eventName, args)
     },
 })
 
@@ -1109,8 +1122,8 @@ export const getSafeClient = chatClient => new Proxy(chatClient, {
 export function getUser() { return rw().user }
 
 const generateEventHandlers = (chatClient, eventsMeta = {}) => {
+    chatClient.rxEventsMeta.next(eventsMeta)
     const { emittables = {}, listenables = {} } = eventsMeta
-    chatClient.eventsMetaCache = PromisE(eventsMeta)
     chatClient.query = {}
     const eventName2VarName = eventName => {
         const arr = eventName.split('-')

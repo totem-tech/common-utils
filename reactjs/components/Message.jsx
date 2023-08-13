@@ -90,7 +90,7 @@ export const Message = React.memo(({
         opacity = dp.style?.opacity
     } = style
     text = !isValidElement(text)
-        ? `${text || ''}`.replace('Error: ', '') // remove "Error: " from error messages
+        ? `${text || ''}`.replace(/^(Error|ReferenceError)\:\ /, '') // remove "Error: " from error messages
         : text
     const isLoading = status === statuses.loading
     status = isLoading
