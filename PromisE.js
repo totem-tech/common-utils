@@ -514,7 +514,11 @@ PromisE.timeout = (...args) => {
 }
 
 const getAbortSignal = timeout => {
-    let abortCtrl = new AbortController()
-    setTimeout(() => abortCtrl.abort(), timeout)
-    return abortCtrl.signal
+    try {
+        let abortCtrl = new AbortController()
+        setTimeout(() => abortCtrl.abort(), timeout)
+        return abortCtrl.signal
+    } catch (err) {
+        console.log('Failed to instantiate AbortController.', err)
+    }
 }
