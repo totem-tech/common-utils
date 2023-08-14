@@ -27,10 +27,9 @@ const MODULE_KEY = 'messaging'
 const PREFIX = 'totem_'
 export const ROLE_ADMIN = 'admin'
 export const ROLE_SUPPORT = 'support'
-// include any ChatClient property that is not a function or event that does not have a callback
-const nonCbs = ['isConnected', 'disconnect']
 // read or write to messaging settings storage
 const rw = value => storage.settings.module(MODULE_KEY, value) || {}
+export const rxEventsMeta = new BehaviorSubject()
 export const rxFaucetEnabled = new BehaviorSubject(false)
 export const rxIsAdmin = new BehaviorSubject(false)
 export const rxIsSupport = new BehaviorSubject(false)
@@ -108,6 +107,8 @@ export class ChatClient {
         this.onConnectError = (cb, once) => this.on('connect_error', cb, once);
         this.onError = (cb, once) => this.on('error', cb, once)
         this.onReconnect = (cb, once) => this.on('reconnect', cb, once)
+        this.rxEventsMeta = rxEventsMeta
+        this.rxFaucetEnabled = rxFaucetEnabled
         this.rxIsConnected = rxIsConnected
         this.rxIsInMaintenanceMode = rxIsInMaintenanceMode
         this.rxIsLoggedIn = rxIsLoggedIn
@@ -149,33 +150,32 @@ export class ChatClient {
             const len = params.length
             if (len > 0) {
                 const cbIndex = params.findIndex(x => x.type === TYPES.function)
-                const lastParam = params[cbIndex] || {}
-                const gotCb = lastParam.type === TYPES.function
+                const gotCb = cbIndex >= 0
                 callbackIndex = gotCb
                     ? cbIndex
                     : callbackIndex
                 callback = gotCb
                     ? args[cbIndex]
                     : callback
-                params = gotCb
+                // remove the callback index
+                const _params = gotCb
                     ? params.slice(0, -1)
                     : params
 
                 // make sure correct number of arguments are supplied
-                args = params.map((param, i) =>
+                args = _params.map((param, i) =>
                     args[i] !== undefined
                         ? args[i]
                         : param.defaultValue
                 )
 
-                const err = !!len && validateObj(
+                const err = validateObj(
                     args,
-                    params,
+                    _params,
                     true,
                     true,
                     customMessages
                 )
-                err && console.warnDebug('ChatClient: Event validation error ', { eventName, err })
                 if (err) throw new Error(err)
             }
 
@@ -201,12 +201,14 @@ export class ChatClient {
                 },
                 err => {
                     const translatedErr = translateError(err)
+                    console.log('EmitError', eventName, { translatedErr, err })
                     isFn(onError) && onError(translatedErr, err)
                     isFn(callback) && callback(err)
                     isFn(onFail) && onFail(err, args)
                     return translatedErr
                 },
                 timeout,
+                callbackIndex,
             )
             // auto disconnect after pre-configured period of inactivity
             if (autoDisconnectMs) {
@@ -227,7 +229,7 @@ export class ChatClient {
             true,
             timeout
         )[0]
-        const eventMeta = await this.getEventsMeta(eventName)
+        const eventMeta = await this.getEventsMeta(eventName, timeout)
         const { maintenanceMode, requireLogin } = eventName && eventMeta || {}
         doWait = requireLogin && !rxIsLoggedIn.value
         // wait until user is logged in
@@ -247,6 +249,7 @@ export class ChatClient {
                 timeout
             )[0]
         }
+
         return eventMeta
     }
 
@@ -391,15 +394,16 @@ export class ChatClient {
     /**
      * @name    eventsMeta
      * @summary fetch and cache messaging service events meta data
+     * 
+     * @param   {String}    eventName   (optional) if unspecified, will return all emittable and listenable events' meta
+     * @param   {Number}    timeout     (optional)
      */
-    getEventsMeta = async (eventName) => {
-        const cache = this.eventsMetaCache
-        if (cache?.pending) return cache
-        if (!cache || cache.rejected) {
-            // cache result for future use
-            this.eventsMetaCache = this._emitter(eventEventsMeta)
-        }
-        const eventsMeta = await this.eventsMetaCache
+    getEventsMeta = async (eventName, timeout) => {
+        const eventsMeta = await subjectAsPromise(
+            this.rxEventsMeta,
+            isObj,
+            timeout
+        )[0]
         if (!eventName) return eventsMeta
 
         const { emittables, listenables } = eventsMeta
@@ -963,16 +967,14 @@ export class ChatClient {
 const eventResultHandlers = {
     login: [
         async (result = {}) => {
+            log('Logged in to messaging service')
             const { address, roles = [] } = result || {}
             const isAdmin = roles.includes(ROLE_ADMIN)
             const isSupport = roles.includes(ROLE_SUPPORT)
-            setTimeout(() => {
-                log('Logged in to messaging service')
-                rxIsLoggedIn.next(true)
-                rxUserIdentity.next(address)
-                rxIsAdmin.next(isAdmin)
-                rxIsSupport.next(isSupport)
-            }, 10)
+            rxIsLoggedIn.next(true)
+            rxUserIdentity.next(address)
+            rxIsAdmin.next(isAdmin)
+            rxIsSupport.next(isSupport)
             // store/update user roles etc data sent from server
             setUser({
                 ...getUser(),
@@ -984,6 +986,14 @@ const eventResultHandlers = {
         err => {
             rxIsLoggedIn.next(false)
             consolelog('Login failed', err)
+        }
+    ],
+    notify: [
+        result => {
+            console.log('Notify result', result)
+        },
+        (translatedErr, err) => {
+            console.log('Nofify err', { translatedErr, err })
         }
     ],
     register: [
@@ -1017,7 +1027,10 @@ export const getClient = (url, disconnectDelayMs) => {
     instance = new ChatClient(url, disconnectDelayMs)
     instance = getSafeClient(instance)
     const triggerChange = (rx, newValue) => rx.value !== newValue && rx.next(newValue)
-    instance.on(eventEventsMeta, eventsMeta => generateEventHandlers(instance, eventsMeta))
+    instance.on(
+        eventEventsMeta,
+        em => generateEventHandlers(instance, em),
+    )
     instance.onConnect(async () => {
         rxIsConnected.next(true)
         const active = await instance.maintenanceMode()
@@ -1047,13 +1060,13 @@ export const getClient = (url, disconnectDelayMs) => {
         triggerChange(rxIsConnected, false)
         triggerChange(rxIsLoggedIn, false)
     })
-    instance.onMaintenanceMode(active => {
+    instance.on(eventMaintenanceMode, active => {
         log(`Maintenance mode ${active ? '' : 'de'}activated`)
         triggerChange(rxIsInMaintenanceMode, active)
     })
     instance.onFaucetStatus(enabled => {
         log(`Faucet ${enabled ? 'enabled' : 'disabled'}`)
-        triggerChange(rxFaucetEnabled, enabled)
+        triggerChange(rxFaucetEnabled, enabled, 'chatClient:faucet')
     })
 
     return instance
@@ -1077,8 +1090,9 @@ export const getClient = (url, disconnectDelayMs) => {
  * @returns {ChatClient} safe chat client with Proxy
  */
 export const getSafeClient = chatClient => new Proxy(chatClient, {
-    get: (client, key) => {
-        if (client.hasOwnProperty(key)) return client[key]
+    get: (chatClient, key) => {
+        if (chatClient.hasOwnProperty(key)) return chatClient[key]
+
         const isListenable = /^on[A-Z]+/.test(key)
         const eventName = (
             !isListenable
@@ -1086,8 +1100,8 @@ export const getSafeClient = chatClient => new Proxy(chatClient, {
                 : key.substr(2)
         ).replaceAll(/[A-Z]/g, (char, i) => (i > 0 ? '-' : '') + char.toLowerCase())
         return isListenable
-            ? (cb, once) => client.on(eventName, cb, once)
-            : (...args) => client.emit(eventName, args)
+            ? (cb, once) => chatClient.on(eventName, cb, once)
+            : (...args) => chatClient.emit(eventName, args)
     },
 })
 
@@ -1100,8 +1114,8 @@ export const getSafeClient = chatClient => new Proxy(chatClient, {
 export function getUser() { return rw().user }
 
 const generateEventHandlers = (chatClient, eventsMeta = {}) => {
+    chatClient.rxEventsMeta.next(eventsMeta)
     const { emittables = {}, listenables = {} } = eventsMeta
-    chatClient.eventsMetaCache = PromisE(eventsMeta)
     chatClient.query = {}
     const eventName2VarName = eventName => {
         const arr = eventName.split('-')
@@ -1189,7 +1203,7 @@ const generateEventHandlers = (chatClient, eventsMeta = {}) => {
 
 const log = (...args) => console.log(
     new Date().toLocaleTimeString(),
-    'Totem Messaging Service:',
+    'ChatClient:',
     ...args
 )
 
@@ -1244,33 +1258,40 @@ export const translateError = err => {
     // translate if there is any error message
     const inputNameSeperator = ' => '
     const infoSeperator = ': '
-    let inputName = ''
-    let message = err
-    let suffix = ''
-    let arr = err.split(inputNameSeperator)
-    if (arr.length > 1) {
-        inputName = arr[0]
-        message = arr[1]
-    }
-    arr = message.split(infoSeperator)
-    if (arr.length > 1) {
-        message = arr[0]
-        suffix = arr[1]
-    }
-    const texts = translated({
-        inputName,
-        message,
-        suffix,
-    }, true)[1]
+    err = translated(err.split(inputNameSeperator))[0]
+        .join(inputNameSeperator)
+    err = !err.includes(infoSeperator)
+        ? err
+        : translated(err.split(infoSeperator))[0]
+            .join(infoSeperator)
+    return err
+    // let inputName = ''
+    // let message = err
+    // let suffix = ''
+    // let arr = err.split(inputNameSeperator)
+    // if (arr.length > 1) {
+    //     inputName = arr[0]
+    //     message = arr[1]
+    // }
+    // arr = message.split(infoSeperator)
+    // if (arr.length > 1) {
+    //     message = arr[0]
+    //     suffix = arr[1]
+    // }
+    // const texts = translated({
+    //     inputName,
+    //     message,
+    //     suffix,
+    // }, true)[1]
 
-    return [
-        texts.inputName,
-        texts.inputName && inputNameSeperator,
-        texts.message,
-        texts.suffix && infoSeperator,
-        texts.suffix
-    ]
-        .filter(Boolean)
-        .join('')
+    // return [
+    //     texts.inputName,
+    //     texts.inputName && inputNameSeperator,
+    //     texts.message,
+    //     texts.suffix && infoSeperator,
+    //     texts.suffix
+    // ]
+    //     .filter(Boolean)
+    //     .join('')
 }
 export default getClient()

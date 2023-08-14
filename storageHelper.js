@@ -109,8 +109,8 @@ export const backup = {
      *     fileName    String:
      * ]
      */
-    download: (filename, dataModifier = null) => {
-        filename = filename || backup.generateFilename()
+    download: (filename, dataModifier = null, encrypted) => {
+        filename ??= backup.generateFilename(encrypted)
         const timestamp = backup.filenameToTS(filename)
         let data = backup.generateData(timestamp)
         // add filename hash to the backup to force user to upload the exact same file
@@ -142,6 +142,7 @@ export const backup = {
      */
     filenameToTS: (filename) => `${filename || ''}`
         .split('backup-')[1]
+        .replace('-encrypted', '') // remove encrypted indicator from filename
         .split('.json')[0],
 
     /**
@@ -185,14 +186,25 @@ export const backup = {
      * @name    backup.generateFileName
      * @summary generates a backup filename using current timestamp and URL hostname
      * 
+     * @param   {Boolean}   encrypted   whether backup is encrypted
+     * @param   {String}    timestamp
+     * 
      * @returns {String}
      */
-    generateFilename: (timestamp = new Date().toISOString()) => {
+    generateFilename: (encrypted = false, timestamp = new Date().toISOString()) => {
         const hostname = window.location.hostname === 'localhost'
             ? 'totem-localhost'
             : window.location.hostname
 
-        const fileName = `${hostname}-backup-${timestamp}.json`
+        const parts = [
+            hostname,
+            'backup',
+            timestamp,
+            encrypted && 'encrypted',
+        ]
+            .filter(Boolean)
+            .join('-')
+        const fileName = `${parts}.json`
         return fileName
     },
 

@@ -34,6 +34,7 @@ import { useUnmount } from './useMount'
  *                                            - oldValue (or initial value when first invoked)
  *                                            - rxSubject
  *                                            - unsubscribe: unsubscribe from all future updates
+ *                                            - oldValueUnmodified: previous value before using `valueModifier()`
  *                                            If function returns a promise, it will be awaited.
  *                                            If function is `async`, `initialValue` will be the first value returned.
  *                                            Whatever result is returned from this will be returned as the final value.
@@ -70,10 +71,11 @@ export const useRxSubject = (
 ) => {
     const _valueModifier = useCallback((
         newValue,
-        oldValue,
+        value, // previous value
         subject,
         unsubscribe,
-        wait = true
+        wait = true,
+        valueUnmodified, // previous value before using `valueModifier()`
     ) => {
         try {
             if (!allowMerge && !isFn(valueModifier)) return newValue
@@ -81,31 +83,31 @@ export const useRxSubject = (
                 ? newValue
                 : valueModifier(
                     newValue,
-                    oldValue,
+                    value,
                     subject,
-                    unsubscribe
+                    unsubscribe,
+                    valueUnmodified
                 )
 
             const isAPromise = isPromise(newValue)
-            if (isAPromise && !wait) return oldValue
+            if (isAPromise && !wait) return value
 
             const merge = newValue => {
-                if (newValue === IGNORE_UPDATE_SYMBOL) return oldValue
+                if (newValue === IGNORE_UPDATE_SYMBOL) return value
                 newValue = allowMerge
                     ? {
-                        ...isObj(oldValue) && oldValue,
+                        ...isObj(value) && value,
                         ...isObj(newValue) && newValue,
                     }
                     : newValue
                 return newValue
             }
-            debugTag && console.log(debugTag, '_valueModifier', { newValue, oldValue, allowMerge })
             return isAPromise
                 ? newValue.then(merge)
                 : merge(newValue)
         } catch (err) {
             isFn(onError) && onError(err)
-            return oldValue
+            return value
         }
     })
     const [
@@ -126,20 +128,21 @@ export const useRxSubject = (
             )
         const setValue = newValue => _subject.next(newValue)
         const isBSub = _subject instanceof BehaviorSubject
-        let firstValue = _subject.value
-        // subject doesn't have an oldValue. Use initial value instead.
-        firstValue ??= initialValue
+        let firstValue = _subject.value === undefined
+            ? initialValue // subject doesn't have any value. Use initial value instead.
+            : _subject.value
         let shouldSubscribe = true
+        const firstValueUnmodified = firstValue
         firstValue = _valueModifier(
             firstValue,
             initialValue,
             _subject,
             () => shouldSubscribe = false,
             false,
+            _subject.value
         )
         allowMerge ??= isObj(firstValue)
 
-        debugTag && console.log(debugTag, 'useMemo', { firstValue, allowMerge })
         if (allowMerge) {
             // make sure value of the subject is always merged 
             const nextOrg = _subject.next.bind(_subject)
@@ -159,8 +162,8 @@ export const useRxSubject = (
                 : setValue,
             {
                 firstValue,
+                firstValueUnmodified,
                 isBSub,
-                oldValue: firstValue,
                 shouldSubscribe,
             },
         ]
@@ -168,36 +171,40 @@ export const useRxSubject = (
 
     const {
         firstValue,
+        firstValueUnmodified,
         isBSub,
         shouldSubscribe
     } = data
-    const [value, _setValue] = useState(firstValue)
+    const [[
+        value,
+        valueUnmodified // unmodified value
+    ], _setValue] = useState([firstValue, firstValueUnmodified])
 
     useEffect(() => {
         let mounted = true
         let ignoreFirst = !isBSub
         const unsubscribe = deferred(() => subscription?.unsubscribe?.(), 1)
         const handleChange = async (newValue) => {
+            const newValueUnmodified = newValue
             if (!mounted) return
             if (!ignoreFirst) {
                 // BehaviorSubject subscription triggers a result immediately with the pre-existing value which is
-                // already captured above and unnecessary to be evaluated again.
+                // already captured above and unnecessary to be evaluated again (unless value has changed).
                 // Ignoring first result reduces one extra state update.
                 ignoreFirst = true
-                return
+                if (valueUnmodified === newValueUnmodified) return
             }
-            const { oldValue } = data
             newValue = await _valueModifier(
                 newValue,
-                oldValue,
+                value,
                 _subject,
                 unsubscribe,
                 true,
+                valueUnmodified
             )
-            // unchanged or `IGNORE_UPDATE_SYMBOL` was used
-            if (!mounted || newValue === oldValue) return
-            _setValue(newValue)
-            data.oldValue = newValue
+
+            if (!mounted || newValueUnmodified === valueUnmodified) return
+            _setValue([newValue, newValueUnmodified])
         }
         const subscription = shouldSubscribe && _subject.subscribe(handleChange)
 

@@ -158,7 +158,7 @@ export const subjectAsPromise = (
 ) => {
     if (!isSubjectLike(subject)) return
 
-    if (modifier) console.log('rx.js subjectAsPromise modifier', modifier)
+    if (modifier) console.warn('utils/rx.js => subjectAsPromise: `modifier` deprecated! Use `promise.then()` instead.')
 
     let subscription, timeoutId, unsubscribed
     const unsubscribe = () => setTimeout(() => {

@@ -153,6 +153,7 @@ export const setSelected = async (selected, client) => {
     rw({ selected })
     _selected = selected
     // retrieve translated texts from server
+    client ??= require('./chatClient').default
     const listUpdated = await fetchNSaveTexts(client)
     return listUpdated
 }
