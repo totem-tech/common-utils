@@ -39,6 +39,7 @@ export const useRxSubjects = (
     valuesModifier,
     confs = [],
     defer,
+    debugTag
 ) => {
     subjects = !isArr(subjects)
         ? [subjects]

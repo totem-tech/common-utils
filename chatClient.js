@@ -27,10 +27,9 @@ const MODULE_KEY = 'messaging'
 const PREFIX = 'totem_'
 export const ROLE_ADMIN = 'admin'
 export const ROLE_SUPPORT = 'support'
-// include any ChatClient property that is not a function or event that does not have a callback
-const nonCbs = ['isConnected', 'disconnect']
 // read or write to messaging settings storage
 const rw = value => storage.settings.module(MODULE_KEY, value) || {}
+export const rxEventsMeta = new BehaviorSubject()
 export const rxFaucetEnabled = new BehaviorSubject(false)
 export const rxIsAdmin = new BehaviorSubject(false)
 export const rxIsSupport = new BehaviorSubject(false)
@@ -108,7 +107,8 @@ export class ChatClient {
         this.onConnectError = (cb, once) => this.on('connect_error', cb, once);
         this.onError = (cb, once) => this.on('error', cb, once)
         this.onReconnect = (cb, once) => this.on('reconnect', cb, once)
-        this.rxEventsMeta = new BehaviorSubject()
+        this.rxEventsMeta = rxEventsMeta
+        this.rxFaucetEnabled = rxFaucetEnabled
         this.rxIsConnected = rxIsConnected
         this.rxIsInMaintenanceMode = rxIsInMaintenanceMode
         this.rxIsLoggedIn = rxIsLoggedIn
@@ -394,17 +394,11 @@ export class ChatClient {
     /**
      * @name    eventsMeta
      * @summary fetch and cache messaging service events meta data
+     * 
+     * @param   {String}    eventName   (optional) if unspecified, will return all emittable and listenable events' meta
+     * @param   {Number}    timeout     (optional)
      */
     getEventsMeta = async (eventName, timeout) => {
-        // const cache = this.eventsMetaCache
-        // console.warn(eventName, cache)
-        // if (cache?.pending) return await cache
-        // if (!cache || cache.rejected) {
-        //     console.log('Updating meta cache', { ...cache }, cache)
-        //     // cache result for future use
-        //     this.eventsMetaCache = this._emitter(eventEventsMeta)
-        // }
-        // const eventsMeta = await this.eventsMetaCache
         const eventsMeta = await subjectAsPromise(
             this.rxEventsMeta,
             isObj,
@@ -973,16 +967,14 @@ export class ChatClient {
 const eventResultHandlers = {
     login: [
         async (result = {}) => {
+            log('Logged in to messaging service')
             const { address, roles = [] } = result || {}
             const isAdmin = roles.includes(ROLE_ADMIN)
             const isSupport = roles.includes(ROLE_SUPPORT)
-            setTimeout(() => {
-                log('Logged in to messaging service')
-                rxIsLoggedIn.next(true)
-                rxUserIdentity.next(address)
-                rxIsAdmin.next(isAdmin)
-                rxIsSupport.next(isSupport)
-            }, 10)
+            rxIsLoggedIn.next(true)
+            rxUserIdentity.next(address)
+            rxIsAdmin.next(isAdmin)
+            rxIsSupport.next(isSupport)
             // store/update user roles etc data sent from server
             setUser({
                 ...getUser(),
@@ -1068,13 +1060,13 @@ export const getClient = (url, disconnectDelayMs) => {
         triggerChange(rxIsConnected, false)
         triggerChange(rxIsLoggedIn, false)
     })
-    instance.onMaintenanceMode(active => {
+    instance.on(eventMaintenanceMode, active => {
         log(`Maintenance mode ${active ? '' : 'de'}activated`)
         triggerChange(rxIsInMaintenanceMode, active)
     })
     instance.onFaucetStatus(enabled => {
         log(`Faucet ${enabled ? 'enabled' : 'disabled'}`)
-        triggerChange(rxFaucetEnabled, enabled)
+        triggerChange(rxFaucetEnabled, enabled, 'chatClient:faucet')
     })
 
     return instance
@@ -1211,7 +1203,7 @@ const generateEventHandlers = (chatClient, eventsMeta = {}) => {
 
 const log = (...args) => console.log(
     new Date().toLocaleTimeString(),
-    'Totem Messaging Service:',
+    'ChatClient:',
     ...args
 )
 
@@ -1262,7 +1254,6 @@ export const translateError = err => {
         if (keys.length === 0) return null
         return keys.forEach(key => err[key] = translateError(err[key]))
     }
-
 
     // translate if there is any error message
     const inputNameSeperator = ' => '

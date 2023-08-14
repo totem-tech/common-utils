@@ -40,7 +40,7 @@ export const RxSubjectView = React.memo(props => {
         subject,
         valueModifier,
         ...multi
-            ? [confs]
+            ? [confs, defer]
             : [
                 initialValue,
                 allowMerge,
