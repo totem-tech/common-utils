@@ -200,11 +200,9 @@ export const useRxSubject = (
                 _subject,
                 unsubscribe,
                 true,
-                valueUnmodified
+                valueUnmodified,
             )
-
-            if (!mounted || newValueUnmodified === valueUnmodified) return
-            _setValue([newValue, newValueUnmodified])
+            mounted && _setValue([newValue, newValueUnmodified])
         }
         const subscription = shouldSubscribe && _subject.subscribe(handleChange)
 

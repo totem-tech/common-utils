@@ -211,6 +211,7 @@ export const Message = React.memo(({
                 : inverted
                     ? 0.75
                     : 1,
+            whiteSpace: 'pre-wrap',
             ...dp.style,
             ...style,
         },
