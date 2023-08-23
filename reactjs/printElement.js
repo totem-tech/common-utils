@@ -142,6 +142,18 @@ const style = `
     .checkbox.editable label span {
         color: white !important;
     }
+
+
+    /* styles applied just before printing */
+    body.printing {
+        padding: 0 !important;
+    }
+    body.printing .content-editable {
+        padding: 0 !important;
+    }
+    body.printing .bottom-bar {
+        display: none !important;
+    }
 `
 const setupPrintWindow = (window, windowTitle = '') => {
     const { document } = window || {}
@@ -274,11 +286,9 @@ const setupPrintWindow = (window, windowTitle = '') => {
 
     // print on print button click
     window.replaceEventListener('click', e => {
-        const el = document.querySelector('.bottom-bar')
-        el.hidden = true
+        document.body.classList.toggle('printing')
         window.print()
-        // window.close()
-        el.hidden = false
+        document.body.classList.toggle('printing')
     }, '.ui.button.print')
 
 
