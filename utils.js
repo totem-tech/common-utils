@@ -506,14 +506,27 @@ export const className = value => {
  * 
  * @returns {Function}
  */
-export const deferred = (callback, delay, thisArg) => {
-	if (!isFn(callback)) return // nothing to do!!
-	let timeoutId
-	return (...args) => {
-		if (timeoutId) clearTimeout(timeoutId)
-		timeoutId = setTimeout(() => callback.apply(thisArg, args), delay || 50)
-		return timeoutId
-	}
+// export const deferred = (callback, delay, thisArg) => {
+// 	if (!isFn(callback)) return // nothing to do!!
+// 	let timeoutId
+// 	return (...args) => {
+// 		if (timeoutId) clearTimeout(timeoutId)
+// 		timeoutId = setTimeout(() => callback.apply(thisArg, args), delay || 50)
+// 		return timeoutId
+// 	}
+// }
+export const deferred = (
+	callback,
+	delay = 50,
+	thisArg,
+	tid
+) => (...args) => {
+	clearTimeout(tid)
+	tid = setTimeout(
+		callback?.bind?.(thisArg),
+		delay,
+		...args //arguments for callback
+	)
 }
 
 /**
