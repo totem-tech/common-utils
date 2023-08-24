@@ -279,7 +279,6 @@ const setupPrintWindow = (window, windowTitle = '') => {
         const undo = e.ctrlKey
             && !window.isEditable
             && [...window.pressedKeys].includes('Z')
-        console.log({ ctrs: e.ctrlKey, z: [...window.pressedKeys].includes('Z'), undo })
         window.handleUndo(undo)
     })
     window.replaceEventListener('keyup', window.setShift)
@@ -372,7 +371,7 @@ const getDocumentHtml = (bodyClass, documentHeader) => `
             <div>
                 <div class='left'>
                     <div class='remove-instructions'>
-                        - Click on any element or table column/row (highlighted in red) to hide.<br />
+                        - Click on any element (<b>SHIFT+click</b> inside table cell) or highlighted table row/column to hide. <br />
                         - Press <b>CTRL+Z</b> or click on "undo" button to unhide.
                     </div>
                     <div class='edit-instructions'>- Click on any texts to make amendments</div>
@@ -386,7 +385,10 @@ const getDocumentHtml = (bodyClass, documentHeader) => `
                         <i class='ui icon undo no-margin'></i>
                         Undo <span class='count'></span>
                     </a>
-                    <a class='ui button print'>Print</a>
+                    <a class='ui button print'>
+                        <i class='ui icon print no-margin'></i>
+                        Print
+                    </a>
                 </div>
             </div>
         </div>
