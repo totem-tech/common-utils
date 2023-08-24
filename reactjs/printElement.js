@@ -54,11 +54,10 @@ export default async function printElement(
         .document
         .querySelector('.content-editable')
         .innerHTML = `
-            ${title && `<h2>${title}</h2>`}
-            
-            <!-- // content from page for printing -->
-            ${contentFromApp}
-        `
+        ${title && `<h2>${title}</h2>`}
+        
+        <!-- // content from page for printing -->
+        ${contentFromApp}`
 
     setupPrintWindow(printWindow, title)
     printWindow.document.close() // necessary for IE >= 10
@@ -90,14 +89,14 @@ const style = `
     }
 
     /* highlight table row to indicate "click to hide" */
-    body:not(.editable):not(.ctrl) :not(thead) > tr:hover *,
-    body:not(.editable):not(.ctrl) .highlight-remove,
-    body:not(.editable):not(.ctrl) .highlight-remove *,
-    body:not(.editable):not(.ctrl) .highlight-remove .ui.input input {
+    body:not(.printing):not(.editable):not(.shift) :not(thead) > tr:hover *,
+    body:not(.printing):not(.editable):not(.shift) .highlight-remove,
+    body:not(.printing):not(.editable):not(.shift) .highlight-remove *,
+    body:not(.printing):not(.editable):not(.shift) .highlight-remove .ui.input input {
         background-color: red !important;
         color: white !important;
     }
-    body:not(.editable) .content-editable * {
+    body:not(.printing):not(.editable) .content-editable * {
         cursor: not-allowed !important;
     }
     /* hide the content removed by user */
@@ -167,10 +166,12 @@ const setupPrintWindow = (window, windowTitle = '') => {
         .head
         .appendChild(title)
 
-    window.isCtrl = false
+    window.isShift = false
     window.isEditable = false
     window.classHightlightRemove = 'highlight-remove'
     window.handlers = new Map()
+    window.undoList = []
+    window.pressedKeys = new Set()
 
     window.replaceEventListener = (
         event,
@@ -191,7 +192,6 @@ const setupPrintWindow = (window, windowTitle = '') => {
     }
 
     // hide on click
-    window.undoList = []
     window.handleUndoListChanged = () => {
         const undoable = window.undoList.length > 0
         const { classList } = document.body
@@ -211,24 +211,34 @@ const setupPrintWindow = (window, windowTitle = '') => {
         const ignore = !e.target.closest('.content-editable')
         if (ignore) return
 
-        // if ctrl key is pressed remove only the clicked element
-        const tr = !window.isCtrl && e.target.closest('tr')
+        // if shift key is pressed remove only the clicked element
+        const tr = !window.isShift && e.target.closest('tr')
         let el = tr || e.target
         const th = !e.target.closest('tfoot') && e.target.closest('th')
+        const isColumn = tr && th
 
-        if (th && tr) {
+        if (isColumn) {
+
             // table column header clicked >> remove entire column
             const index = [...tr.children].indexOf(th)
             const table = th.closest('table')
             if (table && index >= 0) {
-                const cells = [
-                    ...table?.querySelectorAll(
-                        'tbody td:nth-child(' + (index + 1) + ')'
-                    ),
-                    ...table?.querySelectorAll(
-                        'thead th:nth-child(' + (index + 1) + ')'
-                    ),
-                ]
+                const name = table.getAttribute('name')
+                let tables = [table]
+                // if table has a name attribute, select all tables that has the same name
+                if (!!name) tables = [...document.querySelectorAll(`table[name="${name}"`)]
+                const cells = tables
+                    .map(table => [
+                        ...table?.querySelectorAll(
+                            'tbody td:nth-child(' + (index + 1) + ')'
+                        ),
+                        ...table?.querySelectorAll(
+                            'thead th:nth-child(' + (index + 1) + ')'
+                        ),
+                    ])
+                    .flat()
+                    .flat()
+                    .filter(Boolean)
                 if (cells.length) el = cells
             }
         }
@@ -241,12 +251,7 @@ const setupPrintWindow = (window, windowTitle = '') => {
     })
 
     // unhide on CTRL+Z press
-    window.pressedKeys = new Set()
-    window.handleUndo = window.deferred(force => {
-        const undo = force
-            || window.isCtrl
-            && [...window.pressedKeys].includes('Z')
-
+    window.handleUndo = window.deferred((undo = true) => {
         if (undo) {
             let el = window.undoList.pop() || {}
             const arr = Array.isArray(el)
@@ -260,29 +265,32 @@ const setupPrintWindow = (window, windowTitle = '') => {
         window.pressedKeys.clear()
 
     })
-    window.setCtrl = e => {
-        if (window.isCtrl === e.ctrlKey) return
+    window.setShift = e => {
+        if (window.isShift === e.shiftKey) return
 
-        window.isCtrl = e.ctrlKey
-        document.body.classList[e.ctrlKey ? 'add' : 'remove']('ctrl')
+        window.isShift = e.shiftKey
+        document.body.classList[e.shiftKey ? 'add' : 'remove']('shift')
     }
     window.replaceEventListener('keydown', e => {
-        window.setCtrl(e)
+        window.setShift(e)
         window.pressedKeys.add(
             e.code.replace('Key', '')
         )
-        !e.shiftKey
+        const undo = e.ctrlKey
             && !window.isEditable
-            && window.handleUndo()
+            && [...window.pressedKeys].includes('Z')
+        console.log({ ctrs: e.ctrlKey, z: [...window.pressedKeys].includes('Z'), undo })
+        window.handleUndo(undo)
     })
-    window.replaceEventListener('keyup', window.setCtrl)
-    window.replaceEventListener('mouseenter', window.setCtrl)
+    window.replaceEventListener('keyup', window.setShift)
+    window.replaceEventListener('mouseenter', window.setShift)
 
     // unhide on undo button click
-    window.replaceEventListener('click', e => {
-        window.pressedKeys.add('Z')
-        window.handleUndo(true)
-    }, '.ui.button.undo')
+    window.replaceEventListener(
+        'click',
+        () => window.handleUndo(true),
+        '.ui.button.undo'
+    )
 
     // print on print button click
     window.replaceEventListener('click', e => {
@@ -297,31 +305,39 @@ const setupPrintWindow = (window, windowTitle = '') => {
         .querySelectorAll('thead th')
         .forEach(th => {
             const toggleClass = (e, add = true) => {
-                window.setCtrl(e)
+                window.setShift(e)
                 if (window.isEditable) return
-                if (window.isCtrl) add = false
-                const children = th
-                    .closest('tr')
-                    .children
+                if (window.isShift) add = false
+                let tables = [th.closest('table')]
+                const name = tables[0].getAttribute('name')
+                // if table has a name attribute, select all tables that has the same name
+                if (!!name) tables = [...document.querySelectorAll(`table[name="${name}"`)]
 
-                const index = [...children].indexOf(th)
+                const index = [...th.closest('tr').children].indexOf(th)
 
                 if (index < 0) return
-                const cells = [
-                    ...document.querySelectorAll(
-                        'tbody td:nth-child(' + (index + 1) + ')'
-                    ),
-                    ...document.querySelectorAll(
-                        'thead th:nth-child(' + (index + 1) + ')'
-                    ),
-                ]
-                cells.forEach(td => td.classList[add ? 'add' : 'remove'](window.classHightlightRemove))
+                const cells = tables
+                    .map(table => [
+                        ...table.querySelectorAll(
+                            'tbody td:nth-child(' + (index + 1) + ')'
+                        ),
+                        ...table.querySelectorAll(
+                            'thead th:nth-child(' + (index + 1) + ')'
+                        ),
+                    ])
+                    .flat()
+                    .flat()
+                    .filter(Boolean)
+
+                cells.forEach(cell =>
+                    cell.classList[add ? 'add' : 'remove'](window.classHightlightRemove)
+                )
             }
             window.replaceEventListener('mousemove', e => toggleClass(e), th)
             window.replaceEventListener('mouseleave', e => toggleClass(e, false), th)
         })
 
-    // handle editable checkbox click 
+    // handle editable text checkbox click 
     window.replaceEventListener('click', e => {
         const checkbox = e
             .currentTarget
