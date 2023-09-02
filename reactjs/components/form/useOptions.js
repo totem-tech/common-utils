@@ -1,11 +1,12 @@
 import React, { isValidElement } from 'react'
 import { translated } from '../../../languageHelper'
-import { useRxSubject } from '../../hooks'
 import {
     isArr,
     isFn,
+    isObj,
     isStr,
 } from '../../../utils'
+import { useRxSubject } from '../../hooks'
 
 const textsCap = {
     noOptions: 'no options available',
@@ -52,6 +53,7 @@ export const useOptions = (input = {}) => {
         optionsWrapProps,
         rxOptions = options,
         rxOptionsModifier,
+        rxValue,
         type = typeAlt,
     } = input
 
@@ -83,18 +85,20 @@ export const useOptions = (input = {}) => {
         if (!OptionItem && !renderItem) return options
 
         const optionItems = options
-            .map((o, i) => isStr(o)
-                ? {
-                    children: o,
-                    key: o,
+            .map((o, i) => {
+                if (isStr(o)) o = {
+                    label: o,
+                    text: o,
                     value: o,
                 }
-                : {
-                    ...o,
-                    children: o.text || o.label,
+                return {
+                    ...isObj(o) && o,
+                    ...OptionItem === 'option' && {
+                        children: o.text || o.label
+                    },
                     key: o.key || `${o.value}${i}`,
                 }
-            )
+            })
             .map((option, index) => (
                 isFn(renderItem)
                     ? renderItem(
@@ -125,4 +129,5 @@ export const useOptions = (input = {}) => {
             }} />
     ]
 }
+
 export default useOptions

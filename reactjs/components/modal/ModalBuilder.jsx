@@ -8,9 +8,10 @@ import _Button from '../Button'
 import ModalRoot from './ModalBasic'
 import ModalTitle from './ModalTitle'
 
-const textsCap = translated({
+const textsCap = {
     close: 'close',
-}, true)[1]
+}
+translated(textsCap, true)
 const defaultComponents = Object.freeze({
     Actions: 'div',
     Button: _Button,
@@ -31,7 +32,7 @@ export function ModalBuilder({
     header,
     ignore = [],
     onClose,
-    open: _open = false,
+    open: _open,
     prefix,
     subtitle,
     suffix,
@@ -52,7 +53,7 @@ export function ModalBuilder({
         Subtitle,
         Title,
     } = components
-    const [open, setOpen] = useRxSubject(_open)
+    const [open, setOpen] = useRxSubject(_open ?? false)
     const handleClose = () => {
         setOpen(false)
         isFn(onClose) && onClose()

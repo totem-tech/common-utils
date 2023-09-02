@@ -12,7 +12,7 @@ const defaultStyles = {
         left: 0,
         position: 'sticky',
         top: 0,
-        zIndex: 1,
+        // zIndex: 1,
         width: '100%',
     },
     progressBar: {

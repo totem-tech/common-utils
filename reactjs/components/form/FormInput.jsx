@@ -36,6 +36,7 @@ import FormInputGroup from './FormInputGroup'
 import { useOptions as _useOptions } from './useOptions'
 import { addMissingProps } from './utils'
 import validateCriteria from './validateCriteria'
+import CheckboxGroup from './CheckboxGroup'
 
 export const errorMessages = {
     decimals: 'maximum number of decimals allowed',
@@ -55,7 +56,7 @@ export const errorMessages = {
 }
 translated(errorMessages, true)
 const validationTypes = [...Object.values(TYPES), 'text']
-const defaultComponents = {
+const defaultNativeComponents = {
     Container: 'div',
     CriteriaItem: 'div',
     CriteriaList: 'div',
@@ -63,8 +64,9 @@ const defaultComponents = {
     Input: 'input',
     Label: 'label',
     LabelDetails: 'div',
-    Message: Message,
+    Message,
 }
+let defaultUILibComponents
 
 export const FormInput = React.memo(props => {
     const input = !props.addMissingProps
@@ -122,8 +124,9 @@ export const FormInput = React.memo(props => {
     } = input
     components = {
         InputGroup: FormInputGroup,
-        ...defaultComponents,
+        ...defaultNativeComponents,
         ...FormInput.defaultProps?.components,
+        ...defaultUILibComponents?.(type, input),
         ...components,
     }
     let {
@@ -456,7 +459,7 @@ export const FormInput = React.memo(props => {
 FormInput.defaultProps = {
     addMissingProps: true,
     checkedValue: true,
-    components: { ...defaultComponents },
+    components: { ...defaultNativeComponents },
     containerProps: {},
     counter: true, // bool or object { hideOnEmpty, hideOnOk }
     counterHiddenTypes: [
@@ -546,6 +549,22 @@ FormInput.propTypes = {
     // useOptions: _useOptions = useOptions,
     // validate,
 }
+FormInput.setupDefaults = (name, module) => {
+    switch (name) {
+        case '@mui/material':
+            defaultUILibComponents = (type, props) => {
+                const components = {}
+                switch (type) {
+                    case 'checkbox-group':
+                    case 'radio-group':
+                        components.Input = CheckboxGroup
+                        break
+                }
+                return components
+            }
+            break
+    }
+}
 export default FormInput
 
 const handleChangeCb = (
@@ -559,12 +578,13 @@ const handleChangeCb = (
         customMessages,
         inputProps = {},
         integer = false, // number validation
-        validate,
-        validatorConfig = {},
         onChangeSelectValue,
         uncheckedValue = false,
+        validate,
+        validatorConfig = {},
     } = props
     let {
+        multiple,
         onChange,
         requiredAlt,
         type,
@@ -577,9 +597,12 @@ const handleChangeCb = (
             selectionEnd,
             selectionStart,
             setSelectionRange,
-            value,
+            value: eValue,
         } = {},
     } = event || {}
+    let value = isObj(args[0]) && args[0].hasOwnProperty('value')
+        ? args[0].value
+        : eValue
     if (isFn(onChangeSelectValue)) {
         const changedValue = onChangeSelectValue(event, ...args)
         value = changedValue !== undefined
@@ -588,7 +611,8 @@ const handleChangeCb = (
 
     }
     // value unchanged
-    if (isEqual(rxValue.___validated, value)) return
+    const unchanged = isEqual(rxValue.___validated, value)
+    if (unchanged) return
 
     // Forces the synthetic event and it's value to persist
     // Required for use with deferred function
@@ -609,11 +633,7 @@ const handleChangeCb = (
         } catch (_) { } // ignore unsupported
     })
 
-    const data = {
-        ...props,
-        checked,
-        value,
-    }
+    const data = { ...props, value }
     let err, isANum = false
     const isCheck = ['checkbox', 'radio'].includes(type)
     let hasVal = hasValue(
@@ -748,8 +768,8 @@ const handleChangeCb = (
         // prevents re-validation because of the trigger
         rxValue.___validated = data.value
         // trigger value change on the subject
-        !isEqual(rxValue.value, data.value)
-            && rxValue.next(data.value)
+        const unchagned = isEqual(rxValue.value, data.value)
+        !unchagned && rxValue.next(data.value)
     }
 
     if (err || !isFn(validate)) return triggerChange(err)
