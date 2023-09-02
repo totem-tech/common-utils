@@ -22,7 +22,7 @@ import {
 import { TYPES, validateObj } from './validator'
 
 let instance, socket
-const AUTO_DISCONNECT_MS = parseInt(process.env.REACT_APP_CHAT_AUTO_DISCONNECT_MS || 300000)
+const AUTO_DISCONNECT_MS = parseInt(process.env.REACT_APP_CHAT_AUTO_DISCONNECT_MS) || 300_000
 const MODULE_KEY = 'messaging'
 const PREFIX = 'totem_'
 export const ROLE_ADMIN = 'admin'
@@ -137,6 +137,7 @@ export class ChatClient {
         ) => {
             let callbackIndex // if undefined will use last argument
             const eventMeta = await this.awaitReady(eventName, timeout) || {}
+            console.log('Ready')
             let {
                 customMessages,
                 params = [],
@@ -217,18 +218,21 @@ export class ChatClient {
                     .catch(() => { })
                     .finally(() => this.disconnectDeferred())
             }
-            return await resultPromise
+            return resultPromise
         }
     }
 
     awaitReady = async (eventName, timeout, log = false) => {
         let doWait = !rxIsConnected.value
         // wait until chatClient is connected
-        doWait && await subjectAsPromise(
-            rxIsConnected,
-            true,
-            timeout
-        )[0]
+        if (doWait) {
+            this.connect()
+            await subjectAsPromise(
+                rxIsConnected,
+                true,
+                timeout
+            )[0]
+        }
         const eventMeta = await this.getEventsMeta(eventName, timeout)
         const { maintenanceMode, requireLogin } = eventName && eventMeta || {}
         doWait = requireLogin && !rxIsLoggedIn.value
