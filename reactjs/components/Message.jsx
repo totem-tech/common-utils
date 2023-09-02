@@ -266,16 +266,22 @@ Message.propTypes = {
     status: PropTypes.string,
     style: PropTypes.object,
 }
-// Optionally, configure default props based on UI library.
-// If not setup, Message will not display any icons.
-Message.setupDefaults = (name, library) => {
-    if (!name || !library) return
+/**
+ * @name    setupDefaults
+ * @summary configure default props based on UI library.
+ * If not setup, Message will not display any icons.
+ * 
+ * @param {String}  name   name of the UI library
+ * @param {Object}  module imported library. Eg: `require('@mui/material')`
+ */
+Message.setupDefaults = (name, module, _extraModules) => {
+    if (!name || !module) return
 
     const dp = Message.defaultProps
     dp.library = name
     switch (`${name}`.toLowerCase()) {
         case 'semantic-ui-react':
-            dp.components.Container = library.Message
+            dp.components.Container = module.Message
             dp.components.Header = null
             dp.iconMapping = { ...semanticIcons }
             // for legacy status support in the totem-ui repo
@@ -287,7 +293,7 @@ Message.setupDefaults = (name, library) => {
             statuses.WARNING = 'warning'
             break
         case '@mui/material':
-            const { Alert, AlertTitle } = library
+            const { Alert, AlertTitle } = module
             dp.components.Container = Alert
             dp.components.Header = AlertTitle
             // dp.components.Icon = Icon // ToDo: Use custom IconMUI 

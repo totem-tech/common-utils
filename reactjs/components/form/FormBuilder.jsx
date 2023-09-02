@@ -1,10 +1,8 @@
 import PropTypes from 'prop-types'
 import React, {
     isValidElement,
-    useCallback,
     useEffect,
     useMemo,
-    useState,
 } from 'react'
 import { BehaviorSubject } from 'rxjs'
 import { translated } from '../../../languageHelper'
@@ -40,7 +38,8 @@ translated(textsCap, true)
 
 const formIds = new Map()
 const defaultComponents = {
-    Button: 'button',
+    Actions: 'div',
+    Button: _Button,
     Form: 'form',
     FormInput: _FormInput,
     Message: _Message,
@@ -135,19 +134,21 @@ export const FormBuilder = React.memo(propsOrg => {
         ]) => {
             inputsHidden = arrUnique([
                 ...toArray(inputsHidden),
-                ...inputs.filter(({ inputProps = {} }) => {
-                    const { hidden, name } = inputProps
-                    return !inputsHidden.includes(name) && (
-                        isSubjectLike(hidden)
-                            ? hidden.value
-                            : isFn(hidden)
-                                ? !!hidden(values, name)
-                                : hidden
-                    )
-                })
-                    .map(x => x.inputProps.name)
+                ...inputs
+                    ?.filter(({ inputProps = {} }) => {
+                        const { hidden, name } = inputProps
+                        return !inputsHidden.includes(name) && (
+                            isSubjectLike(hidden)
+                                ? hidden.value
+                                : isFn(hidden)
+                                    ? !!hidden(values, name)
+                                    : hidden
+                        )
+                    })
+                    ?.map(x => x.inputProps.name)
+                || []
             ])
-            const inputsInvalid = !!inputs.find(x =>
+            const inputsInvalid = !!inputs?.find?.(x =>
                 checkInputInvalid(x, inputsHidden)
             )
             const valuesChanged = requireChange && checkValuesChanged(
@@ -305,9 +306,9 @@ export const FormBuilder = React.memo(propsOrg => {
     // delay form state update when multiple update is triggered concurrently/too frequently
     const [state] = useRxSubject(rxState)
     let { // default components
-        Actions = 'div',
-        Button = _Button,
-        Form = 'form',
+        Actions,
+        Button,
+        Form,
         FormInput = _FormInput,
         Message = _Message,
     } = { ...defaultComponents, ...components }
@@ -406,7 +407,7 @@ export const FormBuilder = React.memo(propsOrg => {
 })
 FormBuilder.defaultProps = {
     // components used in the 
-    components: { ...defaultComponents },
+    components: defaultComponents,
     formProps: {},
     inputsDisabled: [],
     inputsHidden: [],
@@ -437,7 +438,7 @@ FormBuilder.propTypes = {
     inputs: PropTypes.oneOfType([
         PropTypes.array,
         PropTypes.instanceOf(BehaviorSubject),
-    ]),
+    ]).isRequired,
     // Common props to be supplied to each inputs.
     // Input object props will always override these props.
     // Only `inputProps` and `components` will be merged with relevent input props.
@@ -493,6 +494,16 @@ FormBuilder.propTypes = {
         PropTypes.object,
         PropTypes.instanceOf(BehaviorSubject),
     ]),
+}
+FormBuilder.setupDefaults = (name, module, _extras) => {
+    const dp = FormBuilder.defaultProps
+    switch (name) {
+        case '@mui/material':
+            dp.components.Form = module.Box
+            break
+        case 'semantic-ui-react':
+            break
+    }
 }
 export default FormBuilder
 
