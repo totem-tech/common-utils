@@ -7,6 +7,8 @@ import {
     isFn,
     isMap,
     isNodeJS,
+    isObj,
+    isPositiveInteger,
     isStr,
     isValidNumber,
     mapSearch,
@@ -229,14 +231,14 @@ export default class DataStorage {
      * @name    find
      * @summary find the first item matching criteria. Uniqueness is not guaranteed.
      *
-     * @param   {Object}  keyValues  Object with property names and the the value to match
+     * @param   {Object}  query      Object with property names and the the value to match
      * @param   {Boolean} matchExact (optional) fulltext or partial search. Default: false
-     * @param   {Boolean} matchAll   (optional) AND/OR operation for keys in @keyValues. Default: false
+     * @param   {Boolean} matchAll   (optional) AND/OR operation for keys in @query. Default: false
      * @param   {Boolean} ignoreCase (optional) case-sensitivity of the search. Default: false
      */
-    find(keyValues, matchExact, matchAll, ignoreCase) {
+    find(query, matchExact, matchAll, ignoreCase) {
         const result = this.search(
-            keyValues,
+            query,
             matchExact,
             matchAll,
             ignoreCase,
@@ -304,23 +306,38 @@ export default class DataStorage {
      * @name    search
      * @summary partial or fulltext search on storage data
      * 
-     * @param   {Object}  keyValues  Object with property names and the the value to match
+     * @param   {Object}  query      Object with property names and the the value to match
      * @param   {Boolean} matchExact (optional) fulltext or partial search. Default: false
-     * @param   {Boolean} matchAll   (optional) AND/OR operation for keys in @keyValues. Default: false
+     * @param   {Boolean} matchAll   (optional) AND/OR operation for keys in @query. Default: false
      * @param   {Boolean} ignoreCase (optional) case-sensitivity of the search. Default: false.
      * @param   {Number}  limit      (optional) limits number of results. Default: 0 (no limit)
      * 
      * @returns {Map}     result
      */
-    search(keyValues, matchExact = false, matchAll = false, ignoreCase = false, limit = 0) {
+    search(
+        query,
+        matchExact = false,
+        matchAll = false,
+        ignoreCase = false,
+        limit = 0
+    ) {
+        const allEntries = this.getAll()
+        if (!isObj(query)) {
+            const [_, firstEntry] = [...allEntries][0]
+            const validKeys = Object.keys(firstEntry || {})
+            query = validKeys.reduce((obj, key) => ({
+                ...obj,
+                [key]: query,
+            }), {})
+        }
         const result = mapSearch(
-            this.getAll(),
-            keyValues,
+            allEntries,
+            query,
             matchExact,
             matchAll,
             ignoreCase,
         )
-        const doLimit = isValidNumber(limit) && limit > 0 && result.size > limit
+        const doLimit = isPositiveInteger(limit) && result.size > limit
         return !doLimit
             ? result
             : new Map(

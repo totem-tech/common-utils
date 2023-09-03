@@ -141,10 +141,11 @@ export const validate = (value, config, customMessages = {}) => {
             regex,
             reject,
             required,
-            strict = true, // for url or object types
+            strict, // for url or object types
             type,
             unique = false,
         } = config || {}
+        strict ??= type !== TYPES.email
 
         const gotValue = hasValue(value)
         const typeErrMsg = errorMsgs[type]
@@ -186,7 +187,7 @@ export const validate = (value, config, customMessages = {}) => {
             case 'email':
                 if (!isStr(value)) return _msgOrTrue(errorMsgs.email)
                 const x = value.split('@')[0]
-                const allowPlus = !x.startsWith('+')
+                const allowPlus = !strict && !x.startsWith('+')
                     && !x.endsWith('+')
                     && (x.match(/\+/g) || []).length === 1
                 if (allowPlus) value = value.replace('+', '')
