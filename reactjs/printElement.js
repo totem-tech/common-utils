@@ -1,10 +1,28 @@
 import { BehaviorSubject } from 'rxjs'
 import PromisE from '../PromisE'
+import { arrUnique, deferred, downloadFile, isArr } from '../utils'
 
 export const rxPrint = new BehaviorSubject(null)
 
+/**
+ * 
+ * @param {*} selector 
+ * @param {*} windowTitle 
+ * @param {*} title 
+ * @param {*} stylesStr 
+ * @param {*} hideColumns 
+ * @param {*} width 
+ * @param {*} height 
+ * 
+ * 
+ * @description special classes
+ * .no-print: content to be hidden from printing but may be included when saving as csv
+ * .: 
+ * @returns 
+ */
 export default async function printElement(
-    selector = '.ui.table',
+    selector = 'table',
+    windowTitle = document.title,
     title,
     stylesStr = '',
     hideColumns = [], // table column numbers to exclude from printing
@@ -50,16 +68,17 @@ export default async function printElement(
         || selector?.outerHTML
         || 'No content available'
     // inject content to be printed into the window replacing the loading spinner
+    const titleEl = title && `<h1>${title}</h1>` || ''
     printWindow
         .document
         .querySelector('.content-editable')
         .innerHTML = `
-        ${title && `<h2>${title}</h2>`}
+        ${titleEl}
         
         <!-- // content from page for printing -->
         ${contentFromApp}`
 
-    setupPrintWindow(printWindow, title)
+    setupPrintWindow(printWindow, windowTitle)
     printWindow.document.close() // necessary for IE >= 10
     printWindow.focus() // necessary for IE >= 10*/
     // printWindow.print()
@@ -88,17 +107,6 @@ const style = `
         color: inherit !important;
     }
 
-    /* highlight table row to indicate "click to hide" */
-    body:not(.printing):not(.editable):not(.shift) :not(thead) > tr:hover *,
-    body:not(.printing):not(.editable):not(.shift) .highlight-remove,
-    body:not(.printing):not(.editable):not(.shift) .highlight-remove *,
-    body:not(.printing):not(.editable):not(.shift) .highlight-remove .ui.input input {
-        background-color: red !important;
-        color: white !important;
-    }
-    body:not(.printing):not(.editable) .content-editable * {
-        cursor: not-allowed !important;
-    }
     /* hide the content removed by user */
     body *[hidden] {
         display: none !important;
@@ -110,7 +118,7 @@ const style = `
     }
 
     /* Bottom bar styles */
-    .bottom-bar > div {
+    .print-bottom-bar > div {
         background: #333333;
         bottom: 0;
         color: white;
@@ -121,19 +129,19 @@ const style = `
         text-align: center;
         width: 100%;
     }
-    .bottom-bar .left { 
+    .print-bottom-bar .left { 
         float: left;
         text-align: left;
     }
-    body.editable .bottom-bar .remove-instructions,
-    body:not(.editable) .bottom-bar .edit-instructions {
+    body.editable .print-bottom-bar .remove-instructions,
+    body:not(.editable) .print-bottom-bar .edit-instructions {
         display: none
     }
-    .bottom-bar .right { 
+    .print-bottom-bar .right { 
         float: right;
         padding: 3px 0 3px;
     }
-    .bottom-bar .right .button { 
+    .print-bottom-bar .right .button { 
         display: inline-block;
         height: 36px;
         margin-left: 3px;
@@ -142,17 +150,32 @@ const style = `
         color: white !important;
     }
 
+    @media not print {
+        /* highlight table row to indicate "click to hide" */
+        body:not(.editable):not(.shift) :not(thead) > tr:hover *,
+        body:not(.editable):not(.shift) .highlight-remove,
+        body:not(.editable):not(.shift) .highlight-remove *,
+        body:not(.editable):not(.shift) .highlight-remove .ui.input input {
+            background-color: red !important;
+            color: white !important;
+        }
+        body:not(.editable) .content-editable * {
+            cursor: not-allowed !important;
+        }
+    }
+    @media print {
+        .print-bottom-bar {
+            display: none !important;
+        }
+        body {
+            padding: 0 !important;
+        }
+        body .content-editable {
+            padding: 0 !important;
+        }
+    }
 
-    /* styles applied just before printing */
-    body.printing {
-        padding: 0 !important;
-    }
-    body.printing .content-editable {
-        padding: 0 !important;
-    }
-    body.printing .bottom-bar {
-        display: none !important;
-    }
+    body .no-print { display: none !important; }
 `
 const setupPrintWindow = (window, windowTitle = '') => {
     const { document } = window || {}
@@ -186,20 +209,16 @@ const setupPrintWindow = (window, windowTitle = '') => {
         window.handlers.set(el, callback, true)
         el.addEventListener(event, callback)
     }
-    window.deferred = (callback, tid) => (...args) => {
-        clearTimeout(tid)
-        tid = setTimeout(callback, 200, ...args)
-    }
 
     // hide on click
     window.handleUndoListChanged = () => {
         const undoable = window.undoList.length > 0
         const { classList } = document.body
         classList[undoable ? 'add' : 'remove']('undoable')
-        const undo = document.querySelector('.bottom-bar .undo')
+        const undo = document.querySelector('.print-bottom-bar .undo')
         undo.classList[!undoable ? 'add' : 'remove']('disabled')
 
-        const count = document.querySelector('.bottom-bar .undo .count')
+        const count = document.querySelector('.print-bottom-bar .undo .count')
         count.innerHTML = window.undoList.length
             ? '(' + window.undoList.length + ')'
             : ''
@@ -218,7 +237,6 @@ const setupPrintWindow = (window, windowTitle = '') => {
         const isColumn = tr && th
 
         if (isColumn) {
-
             // table column header clicked >> remove entire column
             const index = [...tr.children].indexOf(th)
             const table = th.closest('table')
@@ -243,18 +261,20 @@ const setupPrintWindow = (window, windowTitle = '') => {
             }
         }
 
-        (Array.isArray(el) ? el : [el])
-            .forEach(el => el.hidden = true)
+        (isArr(el) ? el : [el]).forEach(el =>
+            el.hidden = true
+        )
 
         window.undoList.push(el)
         window.handleUndoListChanged()
     })
 
     // unhide on CTRL+Z press
-    window.handleUndo = window.deferred((undo = true) => {
+    window.handleUndo = deferred((undo = true) => {
         if (undo) {
+
             let el = window.undoList.pop() || {}
-            const arr = Array.isArray(el)
+            const arr = isArr(el)
                 ? el
                 : [el]
             arr.forEach(el =>
@@ -292,11 +312,11 @@ const setupPrintWindow = (window, windowTitle = '') => {
     )
 
     // print on print button click
-    window.replaceEventListener('click', e => {
-        document.body.classList.toggle('printing')
-        window.print()
-        document.body.classList.toggle('printing')
-    }, '.ui.button.print')
+    window.replaceEventListener(
+        'click',
+        () => window.print(),
+        '.ui.button.print'
+    )
 
 
     // highlight column on table header cell hover
@@ -353,8 +373,109 @@ const setupPrintWindow = (window, windowTitle = '') => {
             .querySelector('.content-editable')
             .setAttribute('contenteditable', !!checked)
     }, '.checkbox.editable')
+
+    setupSaveTableAsCsv(window, document)
 }
 
+const setupSaveTableAsCsv = (window, document) => {
+    const table = document.querySelector('table')
+    if (!table) return
+
+    const csvButton = document.querySelector('.ui.button.csv')
+    csvButton.hidden = false
+    const handleSaveAsCSV = async e => {
+        e.preventDefault()
+        const table = document.querySelector('table')
+        if (!table) return
+
+        let filenameSuffix = ''
+        let filename = table.getAttribute('filename') || ''
+        const getRows = () => {
+            const name = table.getAttribute('name')
+            const tables = !name
+                ? [table]
+                : [...document.querySelectorAll(`table[name="${name}"]`)]
+            filenameSuffix = arrUnique(
+                tables
+                    .map(table => table.getAttribute('filename-suffix'))
+                    .filter(Boolean)
+            ).join('_')
+
+            return [...tables]
+                .map(table => [...table.querySelectorAll('tbody tr')])
+                .flat()
+        }
+        const placeholderTag = 'TEMP_PLACEHOLDER'
+        const removed = [
+            ...document.querySelectorAll('body style'),
+            ...document.querySelectorAll('body [hidden]'),
+        ].map((el, i) => {
+            const replacement = document.createElement(placeholderTag)
+            replacement.setAttribute('index', i)
+            el.replaceWith(replacement)
+            return el
+        })
+        const headers = [...table.querySelectorAll('thead th')]
+            .map(th => `"${th.textContent.trim()}"`)
+        const rows = getRows('tbody tr')
+            .map(tr => {
+                const row = [...tr.querySelectorAll('td')]
+                    .map(td => `"${td.textContent.trim()}"`)
+                return row
+            })
+
+        // find and remove empty columns
+        const excludeColIndexes = headers
+            .map((_, i) => {
+                const col = rows.map(row => row[i])
+                const exclude = col.every(x => x === '""')
+                return exclude
+                    ? i
+                    : null
+            })
+            .filter(x => x !== null)
+
+        const lines = [
+            headers
+                .filter((_, i) => !excludeColIndexes.includes(i))
+                .join(),
+            ...rows.map(row =>
+                row.filter((_, i) => !excludeColIndexes.includes(i))
+                    .join()
+            )
+        ]
+        filename = [
+            filename
+            || table
+                .closest('.content-segment')
+                ?.querySelector('h3.header')
+                ?.textContent
+            || document.querySelector('h2')?.textContent
+            || document.querySelector('h1')?.textContent
+            || 'table',
+            filenameSuffix
+        ]
+            .filter(Boolean)
+            .join(' - ')
+
+        downloadFile(
+            lines.join('\n'),
+            `${filename}.csv`,
+            'text/csv'
+        )
+        document
+            .querySelectorAll(placeholderTag)
+            .forEach(x => {
+                const index = parseInt(x.getAttribute('index'))
+                x.replaceWith(removed[index])
+            })
+    }
+    window.replaceEventListener(
+        'click',
+        handleSaveAsCSV,
+        '.ui.button.csv'
+    )
+}
 const getDocumentHtml = (bodyClass, documentHeader) => `
 <html>
     <head>
@@ -367,7 +488,7 @@ const getDocumentHtml = (bodyClass, documentHeader) => `
                 <center><i class='ui icon spinner loading massive'></i></center>
             </div>
         </div>
-        <div class='bottom-bar' contenteditable='false'>
+        <div class='print-bottom-bar' contenteditable='false'>
             <div>
                 <div class='left'>
                     <div class='remove-instructions'>
@@ -386,8 +507,12 @@ const getDocumentHtml = (bodyClass, documentHeader) => `
                         Undo <span class='count'></span>
                     </a>
                     <a class='ui button print'>
-                        <i class='ui icon print no-margin'></i>
+                        <i class='ui icon no-margin print'></i>
                         Print
+                    </a>
+                    <a class='ui button csv' hidden>
+                        <i class='ui icon no-margin file excel outline'></i>
+                        Save table a CSV
                     </a>
                 </div>
             </div>

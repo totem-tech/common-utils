@@ -1,3 +1,4 @@
+export * from './CheckboxGroup'
 export * from './FormBuilder'
 export * from './FormInput'
 export * from './FormInputGroup'

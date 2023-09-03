@@ -12,6 +12,7 @@ import {
     isSubjectLike,
     isValidNumber,
     isAsyncFn,
+    arrReverse,
 } from '../utils'
 import PromisE from '../PromisE'
 import getKeyringHelper, { KeyringHelper } from './keyringHelper'
@@ -78,14 +79,19 @@ export default class BlockchainHelper {
         this.connection = {}
         this.disconnectDelay = this.autoDisconnect && disconnectDelay
         this.keyringHelper = keyringHelper1
-        this.nodeUrls = hasValue(nodeUrls)
+        const usePolkadot = !hasValue(nodeUrls)
+        this.nodeUrls = !usePolkadot
             ? nodeUrls
             : ['wss://rpc.polkadot.io']
         this.texts = {
             ...texts,
             ...textOverrides,
         }
-        this.title = title || 'Polkadot Blockchain Network'
+        this.title = title || (
+            usePolkadot
+                ? 'Polkadot Relaychain'
+                : 'Substrate Blockchain'
+        )
         this.unit = { amount, decimals, name }
     }
 
@@ -170,29 +176,36 @@ export default class BlockchainHelper {
      * 
      * @returns {Number|Array|Function}
      */
-    getBalance = async (addresses, callback, apiFunc = 'api.query.system.account') => {
+    getBalance = async (
+        addresses,
+        callback,
+        apiFunc = 'api.query.system.account'
+    ) => {
         addresses = isArr(addresses)
             ? addresses
             : [addresses]
         const doSubscribe = isFn(callback)
 
-        const handleResult = (result) => {
+        const handleResult = result => {
             if (isArr(result)) return result.map(handleResult)
 
             const { data } = result
-            // data.free = isStr(data.free)
-            //     ? eval(data.free)
-            //     : data.free
-            data.free = Number(data.free)
-            data.feeFrozen = Number(data.feeFrozen)
-            data.miscFrozen = Number(data.miscFrozen)
+            data.free = Number(data.free || 0)
+            // deprecated
+            data.feeFrozen = Number(data.feeFrozen || 0)
+            // deprecated
+            data.miscFrozen = Number(data.miscFrozen || 0)
             doSubscribe && callback(data)
             return data
         }
 
         const isMulti = addresses.length > 1
         if (doSubscribe) addresses.push(handleResult)
-        const result = await this.query(apiFunc, addresses, isMulti)
+        const result = await this.query(
+            apiFunc,
+            addresses,
+            isMulti
+        )
         return doSubscribe
             ? result
             : handleResult(result)
@@ -288,25 +301,51 @@ export default class BlockchainHelper {
      * @param   {Boolean}     multi   (optional) Whether to construct a multi-query.
      *                                Only used if `func` is a string and does not end with '.multi'.
      * @param   {Boolean}     print   (optional) If true, will print the sanitised result of the query
+     * @param   {Boolean}     sanitise (optional) Default: `true`
      *
      * @returns {Function|*}  If function is supplied in as the last item in `args`, will subscribe to the query.
      *                        For a subscription, will return the `unsubscribe` function.
      *                        Otherwise, sanitised value of the query result will be returned.
      */
-    query = async (func, args = [], multi, print) => {
+    query = async (
+        func,
+        args = [],
+        multi,
+        print,
+        sanitised = true,
+    ) => {
         const connection = await this.getConnection()
         const { api, provider } = connection
-        if (!api || !provider?.isConnected) throw new Error(this.texts.errConnectionFailed)
-
+        if (!api || !provider?.isConnected) {
+            console.log('Connection failed?', { api, provider, isConnected: provider?.isConnected })
+            throw new Error(this.texts.errConnectionFailed)
+        }
+        const logResult = (
+            result,
+            sanitisedResult = sanitised && this.sanitise(result),
+        ) => print && this.log(
+            isFn(func)
+                ? func.name
+                : func,
+            !sanitised
+                ? result
+                : sanitisedResult
+        )
         // if function is not supplied, simply return the api instance
         if (!func) return api
         // add .multi if required
         if (isStr(func) && multi && !func.endsWith('.multi')) func += '.multi'
 
         const fn = eval(func)
-        if (!fn) throw new Error(this.texts.errInvalidApiFunc)
+        if (!fn) {
+            const msg = this.texts.errInvalidApiFunc
+                + isStr(func) && `(${func})` || ''
+            throw new Error(msg)
+        }
 
-        args = isArr(args) || !isDefined(args) ? args : [args]
+        args = isArr(args) || !isDefined(args)
+            ? args || []
+            : [args]
         multi = isFn(fn) && !!multi
         const cb = args[args.length - 1]
         const isSubscribe = isFn(cb) && isFn(fn)
@@ -315,8 +354,8 @@ export default class BlockchainHelper {
             // only add interceptor to process result
             args[args.length - 1] = result => {
                 const sanitised = this.sanitise(result)
-                print && this.log(func, sanitised)
-                cb(sanitised, result)
+                logResult(result, sanitised)
+                cb(...arrReverse([sanitised, result], !sanitised))
             }
         }
 
@@ -335,11 +374,13 @@ export default class BlockchainHelper {
                     args = args.slice(0, -1)
                 }
                 // construct a 2D array
-                args = !isArr2D(args) ? [args] : [
-                    args[0].map((_, i) =>
-                        args.map(ar => ar[i])
-                    )
-                ]
+                args = !isArr2D(args)
+                    ? [args]
+                    : [
+                        args[0].map((_, i) =>
+                            args.map(ar => ar[i])
+                        )
+                    ]
                 // re-add subscription callback
                 if (isSubscribe) args.push(interceptor)
 
@@ -350,14 +391,18 @@ export default class BlockchainHelper {
         const result = isFn(fn)
             ? await fn.apply(null, args)
             : fn
-        !isSubscribe && print && this.log(this.sanitise(result))
+        !isSubscribe
+            && print
+            && logResult(result)
 
         // auto disconnect, only if delay duration is specified
         this.disconnectDeferred()
 
         return isSubscribe
             ? result
-            : this.sanitise(result)
+            : !sanitised
+                ? result
+                : this.sanitise(result)
     }
 
     /**
