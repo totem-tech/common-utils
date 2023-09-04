@@ -153,7 +153,13 @@ export default class DataStorage {
      *                                  See Subject/BehaviorSubject.subscribe for more details.
      * @param {Map}       initialValue  (optional) Default: new Map()
      */
-    constructor(name, disableCache = false, initialValue, onChange, storage = _storage) {
+    constructor(
+        name,
+        disableCache = false,
+        initialValue,
+        onChange,
+        storage = _storage,
+    ) {
         let data = (name && read(name, true, storage)) || initialValue
         data = !isMap(data)
             ? new Map(
@@ -236,17 +242,20 @@ export default class DataStorage {
      * @param   {Boolean} matchAll   (optional) AND/OR operation for keys in @query. Default: false
      * @param   {Boolean} ignoreCase (optional) case-sensitivity of the search. Default: false
      */
-    find(query, matchExact, matchAll, ignoreCase) {
+    find(query, matchExact, matchAll, ignoreCase, searchKeys, includeId = false) {
         const result = this.search(
             query,
             matchExact,
             matchAll,
             ignoreCase,
             1,
+            searchKeys,
         )
         return result.size === 0
             ? null
-            : Array.from(result)[0][1]
+            : !includeId
+                ? Array.from(result)[0][1]
+                : Array.from(result)[0]
     }
 
     /**
@@ -306,11 +315,14 @@ export default class DataStorage {
      * @name    search
      * @summary partial or fulltext search on storage data
      * 
-     * @param   {Object}  query      Object with property names and the the value to match
-     * @param   {Boolean} matchExact (optional) fulltext or partial search. Default: false
-     * @param   {Boolean} matchAll   (optional) AND/OR operation for keys in @query. Default: false
-     * @param   {Boolean} ignoreCase (optional) case-sensitivity of the search. Default: false.
-     * @param   {Number}  limit      (optional) limits number of results. Default: 0 (no limit)
+     * @param   {Object|String} query   Object with property names and the the value to match.
+     *                                  Alternatively, do fuzzy search by supplying `String/Number`.
+     * @param   {Boolean} matchExact    (optional) fulltext or partial search. Default: false
+     * @param   {Boolean} matchAll      (optional) AND/OR operation for keys in `@query`. Default: false
+     * @param   {Boolean} ignoreCase    (optional) case-sensitivity of the search. Default: false.
+     * @param   {Number}  limit         (optional) limits number of results. Default: 0 (no limit)
+     * @param   {Array}   searchKeys    (optional) if `@query` is string, search by specific properties.
+     *                                  Default: `undefined` (all properties/keys from the first available entry)
      * 
      * @returns {Map}     result
      */
@@ -319,13 +331,14 @@ export default class DataStorage {
         matchExact = false,
         matchAll = false,
         ignoreCase = false,
-        limit = 0
+        limit = 0,
+        searchKeys
     ) {
         const allEntries = this.getAll()
         if (!isObj(query)) {
             const [_, firstEntry] = [...allEntries][0]
-            const validKeys = Object.keys(firstEntry || {})
-            query = validKeys.reduce((obj, key) => ({
+            searchKeys ??= Object.keys(firstEntry || {})
+            query = searchKeys.reduce((obj, key) => ({
                 ...obj,
                 [key]: query,
             }), {})

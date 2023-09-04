@@ -290,8 +290,8 @@ PromisE.delay = (delay, result = delay) => new PromisE(resolve =>
 PromisE.getSocketEmitter = (
     socket,
     timeoutGlobal,
-    errorArgIndex = 0,
-    callbackIndex = null,
+    errorArgIndex = 0, // first argument in the call
+    callbackIndex = null, // null = last argument
 ) => (
     eventName,
     args = [],

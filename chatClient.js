@@ -22,7 +22,7 @@ import {
 import { TYPES, validateObj } from './validator'
 
 let instance, socket
-const AUTO_DISCONNECT_MS = parseInt(process.env.REACT_APP_CHAT_AUTO_DISCONNECT_MS) || 300_000
+const AUTO_DISCONNECT_MS = parseInt(process.env.REACT_APP_CHAT_AUTO_DISCONNECT_MS || 300_000)
 const MODULE_KEY = 'messaging'
 const PREFIX = 'totem_'
 export const ROLE_ADMIN = 'admin'
@@ -137,7 +137,6 @@ export class ChatClient {
         ) => {
             let callbackIndex // if undefined will use last argument
             const eventMeta = await this.awaitReady(eventName, timeout) || {}
-            console.log('Ready')
             let {
                 customMessages,
                 params = [],
@@ -202,7 +201,7 @@ export class ChatClient {
                 },
                 err => {
                     const translatedErr = translateError(err)
-                    console.log('EmitError', eventName, { translatedErr, err })
+                    log('EmitError', eventName, { translatedErr, err })
                     isFn(onError) && onError(translatedErr, err)
                     isFn(callback) && callback(err)
                     isFn(onFail) && onFail(err, args)
@@ -533,7 +532,7 @@ export class ChatClient {
     //     },
     //     err => {
     //         rxIsLoggedIn.next(false)
-    //         console.log('Login failed', err)
+    //         log('Login failed', err)
     //     }
     // )
 
@@ -989,15 +988,15 @@ const eventResultHandlers = {
         },
         err => {
             rxIsLoggedIn.next(false)
-            consolelog('Login failed', err)
+            log('Login failed', err)
         }
     ],
     notify: [
         result => {
-            console.log('Notify result', result)
+            log('Notify result', result)
         },
         (translatedErr, err) => {
-            console.log('Nofify err', { translatedErr, err })
+            log('Nofify err', { translatedErr, err })
         }
     ],
     register: [
@@ -1119,7 +1118,11 @@ export function getUser() { return rw().user }
 
 const generateEventHandlers = (chatClient, eventsMeta = {}) => {
     chatClient.rxEventsMeta.next(eventsMeta)
-    const { emittables = {}, listenables = {} } = eventsMeta
+    const {
+        dataTypes = {},
+        emittables = {},
+        listenables = {},
+    } = eventsMeta
     chatClient.query = {}
     const eventName2VarName = eventName => {
         const arr = eventName.split('-')
@@ -1129,83 +1132,89 @@ const generateEventHandlers = (chatClient, eventsMeta = {}) => {
     Object
         .keys(emittables)
         .forEach(eventName => {
-            const eventMeta = emittables[eventName] || {}
-            let {
-                name,
-                params,
-                // timeout
-            } = eventMeta
-            if (!eventName || !isArr(params)) return
+            try {
+                const eventMeta = emittables[eventName] || {}
+                let {
+                    name,
+                    params,
+                    // timeout
+                } = eventMeta
+                if (!eventName || !isArr(params)) return
 
-            name ??= eventName2VarName(eventName)
+                name ??= eventName2VarName(eventName)
 
-            const suffix = ', resultModifier, onError, timeout'
-            const dupCheck = {}
-            let paramNames = []
-            let funcParams = params
-                .map((p, i) => {
-                    let {
-                        defaultValue,
-                        label,
-                        name
-                    } = p || {}
-                    name = name || label
-                    // make sure there's no duplicate name in the function arguments
-                    if (!name || dupCheck[name]) name = `param${i}`
-                    dupCheck[name] = true
-                    paramNames.push(name)
+                const suffix = ', resultModifier, onError, timeout'
+                const dupCheck = {}
+                let paramNames = []
+                let funcParams = params
+                    .map((p, i) => {
+                        let {
+                            defaultValue,
+                            label,
+                            name
+                        } = p || {}
+                        name = (name || label || '').replaceAll(' ', '')
+                        // make sure there's no duplicate name in the function arguments
+                        if (!name || dupCheck[name]) name = `param${i}`
+                        dupCheck[name] = true
+                        paramNames.push(name)
 
-                    if (defaultValue === undefined) return name
+                        if (defaultValue === undefined) return name
 
-                    return `${name} = ${defaultValue}`
-                })
-            funcParams = arrUnique(funcParams).join(', ') + suffix// + `= ${timeout}`
-            paramNames = `[${paramNames.join(', ')}]${suffix}`
-            const emitHandler = eval(
-                // `(function ${name}(${funcParams}) {\nreturn instance.emit("${eventName}", ${paramNames})\n})`
+                        return `${name} = ${JSON.stringify(defaultValue)}`
+                    })
+                funcParams = arrUnique(funcParams).join(', ') + suffix// + `= ${timeout}`
+                paramNames = `[${paramNames.join(', ')}]${suffix}`
+                const emitHandler = eval(
+                    getStrFunc(
+                        name,
+                        funcParams,
+                        `return instance.emit("${eventName}", ${paramNames})`,
+                    )
+                )
+                // add meta data
+                eventMeta.eventName = eventName
+                emitHandler.meta = eventMeta
+
+                chatClient.query[name] = emitHandler
+                chatClient[name] = emitHandler
+            } catch (err) {
+                console.log('ChatClient: failed to generate event handler!', err)
+            }
+        })
+    Object
+        .keys(listenables)
+        .forEach(eventName => {
+            const meta = listenables[eventName] || {}
+            meta.eventName = eventName
+            meta.name ??= eventName2VarName('on-' + eventName)
+            const { name } = meta
+            const handler = eval(
+                // `(function ${name}(callback, once) {\nreturn instance.on("${eventName}", callback, once)\n})`
                 getStrFunc(
                     name,
-                    funcParams,
-                    `return instance.emit("${eventName}", ${paramNames})`,
+                    'callback, once',
+                    `return instance.on("${eventName}", callback, once)`
                 )
             )
-            // add meta data
-            eventMeta.eventName = eventName
-            emitHandler.meta = eventMeta
-
-            chatClient.query[name] = emitHandler
-            chatClient[name] = emitHandler
+            handler.meta = meta
+            chatClient[name] = handler
+            chatClient.on[name] = handler
         })
-    Object.keys(listenables).forEach(eventName => {
-        const meta = listenables[eventName] || {}
-        meta.eventName = eventName
-        meta.name ??= eventName2VarName('on-' + eventName)
-        const { name } = meta
-        const handler = eval(
-            // `(function ${name}(callback, once) {\nreturn instance.on("${eventName}", callback, once)\n})`
-            getStrFunc(
-                name,
-                'callback, once',
-                `return instance.on("${eventName}", callback, once)`
-            )
-        )
-        handler.meta = meta
-        chatClient[name] = handler
-        chatClient.on[name] = handler
-    })
     window.query = chatClient.query
     window.listen = chatClient.on
     window.listenables = listenables
     window.emittables = emittables
-    console.log({
+    log({
         emittables,
         query,
         listenables,
         listen,
+        types: dataTypes,
     })
 }
 
-const log = (...args) => console.log(
+const log = (...args) => true || console.log(
     new Date().toLocaleTimeString(),
     'ChatClient:',
     ...args
