@@ -213,6 +213,15 @@ export const Message = React.memo(({
                     : 1,
             whiteSpace: 'pre-wrap',
             ...dp.style,
+            // if there is an icon text must be aligned left
+            ...isSemantic && {
+                display: !!icon
+                    ? 'flex'
+                    : undefined,
+                textAlign: !!icon
+                    ? 'left'
+                    : 'center',
+            },
             ...style,
         },
     }
