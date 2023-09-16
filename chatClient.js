@@ -22,7 +22,7 @@ import {
 import { TYPES, validateObj } from './validator'
 
 let instance, socket
-const AUTO_DISCONNECT_MS = parseInt(process.env.REACT_APP_CHAT_AUTO_DISCONNECT_MS || 300_000)
+const AUTO_DISCONNECT_MS = parseInt(process.env.REACT_APP_CHAT_AUTO_DISCONNECT_MS) || 0
 const MODULE_KEY = 'messaging'
 const PREFIX = 'totem_'
 export const ROLE_ADMIN = 'admin'
@@ -54,9 +54,8 @@ try {
 if (rw().history) rw({ history: null })
 //- migrate end
 
-
 export class ChatClient {
-    constructor(url, autoDisconnectMs = AUTO_DISCONNECT_MS) {
+    constructor(url, namespace, autoDisconnectMs = AUTO_DISCONNECT_MS) {
         if (!isStr(url)) {
             const hostProd = 'totem.live'
             const hostStaging = 'dev.totem.live'
@@ -74,7 +73,7 @@ export class ChatClient {
                 : 3001
             url = `wss://${hostname}:${port}`
         }
-        this.url = url
+        this.url = `${url}${namespace || ''}`
         socket = ioClient(this.url, {
             transports: ['websocket'],
             secure: true,
@@ -135,6 +134,7 @@ export class ChatClient {
             onError,
             timeout
         ) => {
+            if (!eventName) throw new Error('Event name required!')
             let callbackIndex // if undefined will use last argument
             const eventMeta = await this.awaitReady(eventName, timeout) || {}
             let {
@@ -142,12 +142,11 @@ export class ChatClient {
                 params = [],
                 result: resultDef = {},
             } = eventMeta
-
             let callback = isFn(args.slice(-1)[0])
                 ? args.splice(-1)[0]
                 : undefined
-
             const len = params.length
+
             if (len > 0) {
                 const cbIndex = params.findIndex(x => x.type === TYPES.function)
                 const gotCb = cbIndex >= 0
@@ -592,14 +591,24 @@ export class ChatClient {
      * @returns {Function}  unsubscribe
      */
     on = (eventName, cb, once = false) => {
-        if (!isFn(cb)) return () => { }
+        if (!eventName) throw new Error('Event name required!')
+        if (!isFn(cb)) throw new Error('Callback required!')
 
-        const fn = once
-            ? this.socket.once
-            : this.socket.on
-        fn.call(this.socket, eventName, cb)
+        const interceptor = eventName === eventEventsMeta
+            ? cb
+            : async (result, ...rest) => {
+                const eventMeta = await this.getEventsMeta(eventName)
+                const {
+                    result: {
+                        type
+                    } = {}
+                } = eventMeta || {}
+                if (type === 'map') result = new Map(result || [])
+                cb(result, ...rest)
+            }
+        this.socket[once ? 'once' : 'on'](eventName, interceptor)
 
-        return () => this.socket.off(eventName, cb)
+        return () => this.socket.off(eventName, interceptor)
     }
 
     /**
@@ -776,31 +785,31 @@ export class ChatClient {
         // projects => [new Map(projects), notFoundIds],
     )
 
-    /**
-     * @name    register
-     * @summary register new user
-     * 
-     * @param   {String}    id          new user ID
-     * @param   {String}    secret
-     * @param   {String}    address     Blockchain identity
-     * @param   {String}    referredBy  (optional) referrer user ID
-     */
-    register = async (id, secret, address, referredBy, ...args) => await this.emit(
-        'register',
-        [
-            id,
-            secret,
-            address,
-            referredBy,
-            ...args
-        ],
-        () => {
-            setUser({ id, secret })
-            rxIsLoggedIn.next(true)
-            rxIsRegistered.next(true)
-            rxUserIdentity.next(address)
-        },
-    )
+    // /**
+    //  * @name    register
+    //  * @summary register new user
+    //  * 
+    //  * @param   {String}    id          new user ID
+    //  * @param   {String}    secret
+    //  * @param   {String}    address     Blockchain identity
+    //  * @param   {String}    referredBy  (optional) referrer user ID
+    //  */
+    // register = async (id, secret, address, referredBy, ...args) => await this.emit(
+    //     'register',
+    //     [
+    //         id,
+    //         secret,
+    //         address,
+    //         referredBy,
+    //         ...args
+    //     ],
+    //     () => {
+    //         setUser({ id, secret })
+    //         rxIsLoggedIn.next(true)
+    //         rxIsRegistered.next(true)
+    //         rxUserIdentity.next(address)
+    //     },
+    // )
 
     /**
      * @name    rewardsClaim
@@ -970,7 +979,7 @@ export class ChatClient {
 const eventResultHandlers = {
     login: [
         async (result = {}) => {
-            log('Logged in to messaging service')
+            log('Logged in')
             const { address, roles = [] } = result || {}
             const isAdmin = roles.includes(ROLE_ADMIN)
             const isSupport = roles.includes(ROLE_SUPPORT)
@@ -1011,12 +1020,32 @@ const eventResultHandlers = {
 
 /**
  * @name    getClient
+ * @description
+ * Proxy that can both be used as:
+ * 1. an object (proxy for the ChatClient instance)
+ * 2. or, as a function (`getClientOrg()`) to instantiate and/or get the ChatClient instance.
+ * Whichever way it is used, only one singleton instance of ChatClient is allowed to be instantiated.
+ * If used as an object, an instance will be created first.
+ */
+export const getClient = new Proxy(getClientOrg, {
+    // Use as a function.
+    // if ChatClient instance has not be instantiated, arguments supplied will be passed on
+    // to `getClient()` to instantiate ChatClient.
+    apply: (func, _thisArg, args) => func(...args),
+    // Use as an object (ChatClient instance).
+    // if instance has not been instantiated, it will be instantiated with default values by invoking `getClient()`.
+    get: (func, propKey) => func()[propKey],
+})
+
+/**
+ * @name    getClientOrg
  * @summary Returns a singleton instance of the websocket client.
  * Instantiates the client if not already done.
  * 
  * @description when in dev mode with self-signed certificate, if socket connection fails with "ERR_CERT_AUTHORITY_INVALID", simply open the socket url in the browser by replacing "wss" with "https" and click "proceed" to add the certificate.
  * 
- * @param   {String|Boolean} url                if Boolean, true => use staging & falsy => use prod
+ * @param   {String|Boolean} url               (optional) if Boolean, true => use staging & falsy => use prod
+ * @param   {String}         namespace         (optional)
  * @param   {Number}         disconnectDelayMs (optional) duration in milliseconds to auto-disconnect from 
  *                                             webwsocket after period of inactivity.
  *              
@@ -1024,32 +1053,33 @@ const eventResultHandlers = {
  *
  * @returns {ChatClient}
  */
-export const getClient = (url, disconnectDelayMs) => {
+export function getClientOrg(url, namespace, disconnectDelayMs) {
     if (instance) return instance
 
-    instance = new ChatClient(url, disconnectDelayMs)
-    instance = getSafeClient(instance)
-    const triggerChange = (rx, newValue) => rx.value !== newValue && rx.next(newValue)
-    instance.on(
+    const chatClient = new ChatClient(
+        url,
+        namespace,
+        disconnectDelayMs
+    )
+    instance = getSafeClient(
+        chatClient
+    )
+
+    const triggerChange = (rx, value) => rx.value !== value && rx.next(value)
+    chatClient.on(
         eventEventsMeta,
-        em => generateEventHandlers(instance, em),
+        em => generateEventHandlers(chatClient, em),
     )
     instance.onConnect(async () => {
+        log('connected')
         rxIsConnected.next(true)
         const active = await instance.maintenanceMode()
         triggerChange(rxIsInMaintenanceMode, active)
         if (!rxIsRegistered.value) return
 
-        const {
-            id,
-            roles = [],
-            secret
-        } = getUser() || {}
-        const isAdmin = roles.includes(ROLE_ADMIN)
-        // wait until until maintenance mdoe is disabled and then attempt to login
-        !isAdmin && await subjectAsPromise(rxIsInMaintenanceMode, false)[0]
+        const { id, secret } = getUser() || {}
         // auto login on connect to messaging service
-        instance
+        id && secret && instance
             .login(id, secret)
             .catch(() => { })
     })
@@ -1093,7 +1123,7 @@ export const getClient = (url, disconnectDelayMs) => {
  * @returns {ChatClient} safe chat client with Proxy
  */
 export const getSafeClient = chatClient => new Proxy(chatClient, {
-    get: (chatClient, key) => {
+    get: (_, key) => {
         if (chatClient.hasOwnProperty(key)) return chatClient[key]
 
         const isListenable = /^on[A-Z]+/.test(key)
@@ -1142,7 +1172,6 @@ const generateEventHandlers = (chatClient, eventsMeta = {}) => {
                 if (!eventName || !isArr(params)) return
 
                 name ??= eventName2VarName(eventName)
-
                 const suffix = ', resultModifier, onError, timeout'
                 const dupCheck = {}
                 let paramNames = []
@@ -1214,7 +1243,7 @@ const generateEventHandlers = (chatClient, eventsMeta = {}) => {
     })
 }
 
-const log = (...args) => true || console.log(
+const log = (...args) => console.log(
     new Date().toLocaleTimeString(),
     'ChatClient:',
     ...args
@@ -1307,4 +1336,5 @@ export const translateError = err => {
     //     .filter(Boolean)
     //     .join('')
 }
-export default getClient()
+
+export default getClient
