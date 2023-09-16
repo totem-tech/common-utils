@@ -158,7 +158,9 @@ export const validate = (value, config, customMessages = {}) => {
             return validate(value, or, errorMsgs)
         }
         // if doesn't have any value (undefined/null) and not `required`, assume valid
-        if (!gotValue) return required ? _msgOrTrue(errorMsgs.required) : null
+        if (!gotValue) return required
+            ? _msgOrTrue(errorMsgs.required)
+            : null
 
         let valueIsArr = false
         // validate value type
