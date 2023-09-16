@@ -60,6 +60,7 @@ export const sendMessage = async (
     avatar_url = process.env.DISCORD_WEBHOOK_AVATAR_URL,
     timeout = 60000,
 ) => {
+    content = `${content || ''}`
     if (!content) throw new Error('Empty content')
     const contentRedacted = sendMessage.redactRegex
         ? content.replace(sendMessage.redactRegex, '')
