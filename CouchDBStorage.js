@@ -1,63 +1,23 @@
 import nano from 'nano'
 import uuid from 'uuid'
 import PromisE from './PromisE'
-import { isObj, isStr, isArr, arrUnique, isMap, isValidNumber, mapJoin } from './utils'
+import {
+    isObj,
+    isStr,
+    isArr,
+    arrUnique,
+    isMap,
+    isValidNumber,
+    mapJoin,
+    fallbackIfFails
+} from './utils'
 
 // globab connection for use with multiple databases
 let connection
 // all individual connections
 const connections = {}
 const debugTag = '[CouchDBStorage]'
-
-/**
- * @name    getConnection
- * @summary getConnection returns existing connection, if available.
- *          Otherwise, creates a new connection using the supplied URL.
- * 
- * @param   {String}    url 
- * @param   {Boolean}   global whether to use global connection
- * 
- * @returns {Objecct}   CouchDB connection
- */
-export const getConnection = async (url, global = true) => {
-    if (global && connection) return connection
-    const con = connections[url] || await nano(url)
-    // set as global connection
-    if (global) connection = con
-    connections[url] = con
-    return con
-}
-
-/**
- * @name    isCouchDBStorage
- * @summary checks if all arguments are instance of CouchDBStorage class
- * 
- * @param   {...} args  values to check
- * 
- * @returns {Boolean} 
- */
-export const isCouchDBStorage = (...args) => args
-    .flat()
-    .flat()
-    .every(instance => instance instanceof CouchDBStorage)
-
-/**
- * @name    setTs
- * @summary set created and updated timestamps to document
- * 
- * @param   {Object}    doc 
- * @param   {Object}    existingDoc (optional)
- * 
- * @returns {Object}    doc
- */
-const setTs = (doc, existingDoc) => {
-    // add/update creation and update time
-    doc.tsCreated = (existingDoc || doc).tsCreated || new Date()
-    if (!!existingDoc || doc.tsUpdated) {
-        doc.tsUpdated = new Date()
-    }
-    return doc
-}
+let defaultUrl = fallbackIfFails(() => process.env.CouchDB_URL)
 
 export default class CouchDBStorage {
     /**
@@ -109,7 +69,7 @@ export default class CouchDBStorage {
 
         // Forces the application to immediately attempt to connect.
         // This is required because "nano" (CouchDB's official NPM module) does not handle connection error properly 
-        // and the entire application crashes. Neither try-catch nor async - await can catch this freakish error!
+        // and the entire application crashes. Neither try-catch nor async-await can catch this freakish error!
         // Doing this will make sure database connection error is thrown on application startup and not later.
         if (!this.useGlobalCon) this.getDB()
     }
@@ -510,4 +470,58 @@ export default class CouchDBStorage {
         console.log(`${debugTag} ${action} design document: ${this.dbName}/${designName}`)
         return await this.set(designName, designDoc)
     }
+}
+
+/**
+ * @name    getConnection
+ * @summary getConnection returns existing connection, if available.
+ *          Otherwise, creates a new connection using the supplied URL.
+ * 
+ * @param   {String}    url     (optional) Couch DB connetion URL. Default: `process.env.CouchDB_URL`
+ * @param   {Boolean}   global  (optional) Whether to use global connection. Default: `true`
+ * 
+ * @returns {Objecct}   CouchDB connection
+ */
+export const getConnection = async (url, global = true) => {
+    url ??= defaultUrl
+
+    if (global && connection) return connection
+    const con = connections[url] || await nano(url)
+    // set as global connection
+    if (global) connection = con
+    connections[url] = con
+    return con
+}
+
+/**
+ * @name    isCouchDBStorage
+ * @summary checks if all arguments are instance of CouchDBStorage class
+ * 
+ * @param   {...} args  values to check
+ * 
+ * @returns {Boolean} 
+ */
+export const isCouchDBStorage = (...args) => args
+    .flat()
+    .flat()
+    .every(x => x instanceof CouchDBStorage)
+
+export const setDefaultUrl = url => defaultUrl = url
+
+/**
+ * @name    setTs
+ * @summary set created and updated timestamps to document
+ * 
+ * @param   {Object}    doc 
+ * @param   {Object}    existingDoc (optional)
+ * 
+ * @returns {Object}    doc
+ */
+const setTs = (doc, existingDoc) => {
+    // add/update creation and update time
+    doc.tsCreated = (existingDoc || doc).tsCreated || new Date()
+    if (!!existingDoc || doc.tsUpdated) {
+        doc.tsUpdated = new Date()
+    }
+    return doc
 }

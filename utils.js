@@ -451,6 +451,31 @@ export const arrSort = (
 }
 
 /**
+ * @name	arrToMap
+ * @summary generate a Map from one or more arrays
+ * 
+ * @param {Array|Array[]}	arr 
+ * @param {*}				key (optional) Array item property name to be uses as Map key.
+ * 
+ * @returns {Map}
+ */
+export const arrToMap = (arr, key, algo = 'blake2', bitLength = 64) => new Map(
+	(arr || [])
+		.flat()
+		.filter(Boolean)
+		.map(item => [
+			key
+			&& item?.[key]
+			|| generateHash(
+				item,
+				algo,
+				bitLength
+			),
+			item
+		])
+)
+
+/**
  * @name	arrUnique
  * @summary constructs a new array of unique values
  * 
