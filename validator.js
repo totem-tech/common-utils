@@ -18,6 +18,7 @@ import {
     isValidURL,
     isFn,
     fallbackIfFails,
+    isMap,
 } from './utils'
 
 export const messages = {
@@ -65,6 +66,7 @@ export const TYPES = Object.freeze({
     hex: 'hex',
     identity: 'identity',
     integer: 'integer',
+    map: 'map',
     number: 'number',
     object: 'object',
     string: 'string',
@@ -165,15 +167,15 @@ export const validate = (value, config, customMessages = {}) => {
         let valueIsArr = false
         // validate value type
         switch (type) {
-            case 'array':
+            case TYPES.array:
                 if (!isArr(value)) return _msgOrTrue(errorMsgs.array)
                 if (unique && arrUnique(value).length < value.length) return _msgOrTrue(errorMsgs.unique)
                 valueIsArr = true
                 break
-            case 'boolean':
+            case TYPES.boolean:
                 if (!isBool(value)) return _msgOrTrue(errorMsgs.boolean)
                 break
-            case 'date':
+            case TYPES.date:
                 // validates both  string and Date object
                 const date = new Date(value)
                 // const isValidDate = isDate(date)
@@ -186,7 +188,7 @@ export const validate = (value, config, customMessages = {}) => {
                 if (max && new Date(max) < date) return _msgOrTrue(errorMsgs.dateMax, max)
                 if (min && new Date(min) > date) return _msgOrTrue(errorMsgs.dateMin, min)
                 break
-            case 'email':
+            case TYPES.email:
                 if (!isStr(value)) return _msgOrTrue(errorMsgs.email)
                 const x = value.split('@')[0]
                 const allowPlus = !strict && !x.startsWith('+')
@@ -195,16 +197,16 @@ export const validate = (value, config, customMessages = {}) => {
                 if (allowPlus) value = value.replace('+', '')
                 if (!EMAIL_REGEX.test(value)) return _msgOrTrue(errorMsgs.email)
                 break
-            case 'function':
+            case TYPES.function:
                 if (!isFn(value)) return _msgOrTrue(errorMsgs.function)
                 break
             case 'hash':
                 if (!isHash(value)) return _msgOrTrue(errorMsgs.hash)
                 break
-            case 'hex':
+            case TYPES.hex:
                 if (!isHex(value)) return _msgOrTrue(errorMsgs.hex)
                 break
-            case 'identity':
+            case TYPES.identity:
                 const { chainType, chainId, ignoreChecksum } = config || {}
                 const isIdentityValid = isAddress(
                     value,
@@ -214,10 +216,13 @@ export const validate = (value, config, customMessages = {}) => {
                 )
                 if (!isIdentityValid) return _msgOrTrue(errorMsgs.identity)
                 break
-            case 'integer':
+            case TYPES.integer:
                 if (!isInteger(value)) return _msgOrTrue(errorMsgs.integer)
                 break
-            case 'number':
+            case TYPES.map:
+                if (!isMap(value)) return _msgOrTrue(errorMsgs.map)
+                break
+            case TYPES.number:
                 if (!isValidNumber(value)) return _msgOrTrue(errorMsgs.number)
                 if (isValidNumber(min) && value < min) return _msgOrTrue(errorMsgs.numberMin)
                 if (isValidNumber(max) && value > max) return _msgOrTrue(errorMsgs.numberMax)
@@ -230,7 +235,7 @@ export const validate = (value, config, customMessages = {}) => {
                     if (len > decimals) return _msgOrTrue(errorMsgs.decimals, decimals)
                 }
                 break
-            case 'object':
+            case TYPES.object:
                 if (!isObj(value)) return _msgOrTrue(errorMsgs.object)
                 if (
                     isArr(requiredKeys)
@@ -247,10 +252,10 @@ export const validate = (value, config, customMessages = {}) => {
                 )
                 if (err) return err
                 break
-            case 'string':
+            case TYPES.string:
                 if (!isStr(value)) return _msgOrTrue(errorMsgs.string)
                 break
-            case 'url':
+            case TYPES.url:
                 try {
                     if (!isStr(value)) return _msgOrTrue(errorMsgs.url)
 
