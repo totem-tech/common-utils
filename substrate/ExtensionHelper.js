@@ -1,5 +1,4 @@
-import { bytesToHex, hexToBytes, ss58Decode, strToHex } from '../convert'
-import { isFn, isHex, isNodeJS, isStr, isUint8Arr } from '../utils'
+import { isFn, isNodeJS } from '../utils'
 
 /**
  * @name    ExtensionHelper

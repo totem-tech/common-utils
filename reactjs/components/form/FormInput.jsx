@@ -66,13 +66,26 @@ const defaultNativeComponents = {
     LabelDetails: 'div',
     Message,
 }
-let defaultUILibComponents
+let defaultUILibProps
 
 export const FormInput = React.memo(props => {
-    const input = !props.addMissingProps
+    let input = !props.addMissingProps
         ? props
         // makes sure required variables are set
         : useMemo(() => addMissingProps(props), [props])
+
+    const uiLibProps = defaultUILibProps?.(
+        input.type || input.inputProps?.type || 'text',
+        input
+    )
+    input = {
+        ...input,
+        ...uiLibProps,
+        inputProps: {
+            ...input?.inputProps,
+            ...uiLibProps?.inputProps,
+        },
+    }
     let {
         checkedValue = true,
         components,
@@ -103,6 +116,12 @@ export const FormInput = React.memo(props => {
         labelBeforeInput = true,
         labelProps,
         labelDetails,
+        labelDetailsProps = {
+            style: {
+                color: 'grey',
+                fontSize: '85%'
+            },
+        },
         labelInline,
         message,
         messageDefer = 500,
@@ -126,7 +145,7 @@ export const FormInput = React.memo(props => {
         InputGroup: FormInputGroup,
         ...defaultNativeComponents,
         ...FormInput.defaultProps?.components,
-        ...defaultUILibComponents?.(type, input),
+        ...uiLibProps?.components,
         ...components,
     }
     let {
@@ -176,7 +195,7 @@ export const FormInput = React.memo(props => {
     const isHidden = hidden || isTypeHidden
 
     // internal validation error status
-    const [error, setError] = useState(false)
+    const [error, setError] = useState()
     const [
         rxMessageExt, // used to keep track of and update any external message (props.message)
         rxIsFocused,  // keeps track of whether input field is focused
@@ -288,7 +307,7 @@ export const FormInput = React.memo(props => {
     !rxValueIsSubject && useEffect(() => rxValue.deferred(_value), [_value])
 
     // options for dropdown/selection type fields
-    const [replaceOptionsProp, optionItems] = isOptionsType && useOptions(input) || []
+    const [optionsReplaceProp, optionItems] = isOptionsType && useOptions(input) || []
     // Use `select` tag for Dropdown if no tag or element specified externally
     Input = optionItems && Input === 'input'
         ? 'select'
@@ -394,7 +413,7 @@ export const FormInput = React.memo(props => {
                     }} />
                 )}
                 {labelDetails && (
-                    <LabelDetails>
+                    <LabelDetails {...labelDetailsProps}>
                         {labelDetails}
                     </LabelDetails>
                 )}
@@ -408,6 +427,9 @@ export const FormInput = React.memo(props => {
     const isCheckRadio = type.startsWith('checkbox')
         || type.startsWith('radio')
 
+    inputChildren = !optionsReplaceProp
+        && optionItems
+        || inputChildren
     return getContainer(
         <Input {...objWithoutKeys(
             {
@@ -415,9 +437,9 @@ export const FormInput = React.memo(props => {
                 checked: isCheckRadio
                     ? value === checkedValue
                     : checked,
-                children: !replaceOptionsProp
-                    && optionItems
-                    || inputChildren,
+                ...inputChildren && {
+                    children: inputChildren
+                },
                 className: className([
                     'FormInput-Input',
                     inputProps.className,
@@ -443,9 +465,9 @@ export const FormInput = React.memo(props => {
                     rxIsFocused.next(true)
                     isFn(onFocus) && onFocus(...args)
                 },
-                options: replaceOptionsProp
+                options: optionsReplaceProp
                     ? optionItems
-                    : options,
+                    : undefined,
                 style: {
                     ...inputProps.style,
                     ...labelInline && { display: 'table-cell' },
@@ -552,16 +574,38 @@ FormInput.propTypes = {
 FormInput.setupDefaults = (name, module) => {
     switch (name) {
         case '@mui/material':
-            defaultUILibComponents = (type, props) => {
-                const components = {}
-                switch (type) {
-                    case 'checkbox-group':
-                    case 'radio-group':
-                        components.Input = CheckboxGroup
-                        break
-                }
-                return components
-            }
+            // const {
+            //     Box,
+            //     MenuItem,
+            //     Select,
+            //     TextField
+            // } = module || {}
+            // defaultUILibProps = (type, props) => {
+            //     const defaultProps = {
+            //         inputProps: {}
+            //     }
+            //     const components = {}
+            //     console.log({ type })
+            //     switch (type) {
+            //         case 'checkbox-group':
+            //         case 'radio-group':
+            //             components.Input = CheckboxGroup
+            //             break
+            //         case 'dropdown':
+            //             //     components.Container = Box
+            //             //     components.Input = Select
+            //             //     components.OptionItem = MenuItem
+            //             //     defaultProps.inputPropsIgnored = ['error']
+            //             break
+            //         case 'text':
+            //         case 'number':
+            //         default:
+            //             components.Container = Box
+            //             components.Input = TextField
+            //             break
+            //     }
+            //     return { ...defaultProps, components }
+            // }
             break
     }
 }

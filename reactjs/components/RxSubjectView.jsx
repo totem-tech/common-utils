@@ -12,6 +12,7 @@ import { useRxSubject, useRxSubjects } from '../hooks'
  * @param   {Boolean}   props.allowSubjectUpdate (optional)
  * @param   {Boolean}   props.confs              (optional) if `subject` is an Array.
  * @param   {*}         props.initialValue       (optional)
+ * @param   {Function}  props.render             (optional) sugar for "valueModifier" prop
  * @param   {Array|*}   props.subject            One or more RxJS subjects. 
  *                                               If array of subjects supplied, will use `useRxSubjects`
  * @param   {Function}  props.valueModifier      (optional)
@@ -28,8 +29,9 @@ export const RxSubjectView = React.memo(props => {
         initialValue,
         onUnmount,
         onError,
+        render,
         subject,
-        valueModifier,
+        valueModifier = render,
     } = props
     const [hook, multi] = useMemo(() =>
         isArr(subject) && subject.some(isSubjectLike)

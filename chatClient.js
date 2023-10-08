@@ -7,6 +7,7 @@ import storage from './storageHelper'
 import {
     arrUnique,
     deferred,
+    fallbackIfFails,
     isArr,
     isArr2D,
     isAsyncFn,
@@ -54,7 +55,7 @@ try {
 if (rw().history) rw({ history: null })
 //- migrate end
 
-export class ChatClient {
+class ChatClient {
     constructor(url, namespace, autoDisconnectMs = AUTO_DISCONNECT_MS) {
         if (!isStr(url)) {
             const hostProd = 'totem.live'
@@ -400,16 +401,18 @@ export class ChatClient {
      * @param   {String}    eventName   (optional) if unspecified, will return all emittable and listenable events' meta
      * @param   {Number}    timeout     (optional)
      */
-    getEventsMeta = async (eventName, timeout) => {
-        const eventsMeta = await subjectAsPromise(
+    getEventsMeta = async (eventName, timeout, listenable = false) => {
+        const result = await subjectAsPromise(
             this.rxEventsMeta,
             isObj,
             timeout
         )[0]
-        if (!eventName) return eventsMeta
+        if (!eventName) return result
 
-        const { emittables, listenables } = eventsMeta
-        return emittables?.[eventName] || listenables?.[eventName]
+        const eventsMeta = listenable
+            ? result?.listenables
+            : result?.emittables
+        return eventsMeta?.[eventName]
     }
 
     faucetRequest = async (address, ...args) => await this.emit(
@@ -596,15 +599,24 @@ export class ChatClient {
 
         const interceptor = eventName === eventEventsMeta
             ? cb
-            : async (result, ...rest) => {
-                const eventMeta = await this.getEventsMeta(eventName)
+            : async (...args) => {
+                const eventMeta = await this.getEventsMeta(eventName, 2000, true)
+                    .catch(() => { }) // ignore error
                 const {
-                    result: {
-                        type
-                    } = {}
+                    params = []
                 } = eventMeta || {}
-                if (type === 'map') result = new Map(result || [])
-                cb(result, ...rest)
+
+                params?.forEach?.(({ type } = {}, i) => {
+                    if (type !== TYPES.map) return
+
+                    args[i] = fallbackIfFails(
+                        () => new Map(args[i] || []),
+                        [],
+                        args[i]
+                    )
+                })
+
+                cb(...args)
             }
         this.socket[once ? 'once' : 'on'](eventName, interceptor)
 
@@ -970,6 +982,16 @@ export class ChatClient {
     )
 }
 
+export const chatClient = new Proxy(getClientOrg, {
+    // Use as a function.
+    // if ChatClient instance has not be instantiated, arguments supplied will be passed on
+    // to `getClient()` to instantiate ChatClient.
+    apply: (func, _thisArg, args) => func(...args),
+    // Use as an object (ChatClient instance).
+    // if instance has not been instantiated, it will be instantiated with default values by invoking `getClient()`.
+    get: (func, propKey) => func()[propKey],
+})
+
 // do event specific stuff after making a request.
 // key: eventName
 // value: [
@@ -1027,15 +1049,7 @@ const eventResultHandlers = {
  * Whichever way it is used, only one singleton instance of ChatClient is allowed to be instantiated.
  * If used as an object, an instance will be created first.
  */
-export const getClient = new Proxy(getClientOrg, {
-    // Use as a function.
-    // if ChatClient instance has not be instantiated, arguments supplied will be passed on
-    // to `getClient()` to instantiate ChatClient.
-    apply: (func, _thisArg, args) => func(...args),
-    // Use as an object (ChatClient instance).
-    // if instance has not been instantiated, it will be instantiated with default values by invoking `getClient()`.
-    get: (func, propKey) => func()[propKey],
-})
+export const getClient = chatClient
 
 /**
  * @name    getClientOrg
@@ -1337,4 +1351,4 @@ export const translateError = err => {
     //     .join('')
 }
 
-export default getClient
+export default chatClient

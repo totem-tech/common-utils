@@ -124,7 +124,7 @@ export const FormBuilder = React.memo(propsOrg => {
         const rxValues = props.values
         const stateModifier = ([
             inputs,
-            inputsHidden,
+            inputsHidden = [],
             inputsDisabled,
             inputsReadOnly,
             loading,
@@ -353,6 +353,7 @@ export const FormBuilder = React.memo(propsOrg => {
             {init && inputs
                 .map(addInterceptorCb(
                     { ...props, ...state },
+                    rxState.value.inputsHidden,
                     handleChangeCb,
                     formId,
                 ))
@@ -509,6 +510,7 @@ export default FormBuilder
 
 const addInterceptorCb = (
     props = {},
+    inputsHidden = [],
     handleChange,
     formId,
     parentIndex = null,
@@ -517,7 +519,6 @@ const addInterceptorCb = (
         inputs,
         inputsCommonProps,
         inputsDisabled = [],
-        inputsHidden = [],
         inputsReadOnly = [],
         values,
     } = props
@@ -578,6 +579,7 @@ const addInterceptorCb = (
             ? childInputs.map(
                 addInterceptorCb(
                     props,
+                    inputsHidden,
                     handleChange,
                     formId,
                     parentIndex || index,

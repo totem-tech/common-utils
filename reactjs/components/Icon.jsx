@@ -65,14 +65,26 @@ Icon.setupDefaults = (name, module, extraModules = {}) => {
     dp.library = name
     switch (name) {
         case '@mui/material':
-            const icons = extraModules['@mui/icons-material']
-            icons.CircularProgress = module.CircularProgress
-            if (!icons || !icons.Info) return
+            const icons = extraModules['@mui/icons-material'] || {}
+            icons.CircularProgress = module?.CircularProgress
+            Icon.icons = icons
+
+            Object
+                .keys(icons)
+                .forEach(name =>
+                    icons[`${name}`.toLowerCase()] = icons[name]
+                )
 
             dp.Component = props => {
                 const { name } = props
-                const IconComponent = icons[name] || icons.Info
-                return <IconComponent {...props} />
+                const IconComponent = icons[`${name}`.toLowerCase()] || icons.Info
+                return !!IconComponent && <IconComponent {...{
+                    ...props,
+                    style: {
+                        verticalAlign: 'middle',
+                        ...props?.style
+                    }
+                }} />
             }
             break
         case 'semantic-ui-react':
