@@ -1,3 +1,4 @@
+import { translated } from './languageHelper'
 import {
     arrUnique,
     EMAIL_REGEX,
@@ -54,6 +55,7 @@ export const messages = {
     // non-TYPE specific
     unexpectedError: 'unexpected validation error occured',
 }
+translated(messages, true)
 // Accepted validation types.
 // Any type not listed here will be ignored.
 export const TYPES = Object.freeze({
@@ -224,8 +226,8 @@ export const validate = (value, config, customMessages = {}) => {
                 break
             case TYPES.number:
                 if (!isValidNumber(value)) return _msgOrTrue(errorMsgs.number)
-                if (isValidNumber(min) && value < min) return _msgOrTrue(errorMsgs.numberMin)
-                if (isValidNumber(max) && value > max) return _msgOrTrue(errorMsgs.numberMax)
+                if (isValidNumber(min) && value < min) return _msgOrTrue(errorMsgs.numberMin, min)
+                if (isValidNumber(max) && value > max) return _msgOrTrue(errorMsgs.numberMax, max)
                 if (isValidNumber(decimals) && decimals >= 0) {
                     if (decimals === 0) {
                         if (!isInteger(value)) return _msgOrTrue(errorMsgs.integer)

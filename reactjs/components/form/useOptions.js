@@ -48,6 +48,7 @@ export const useOptions = (input = {}) => {
             type: typeAlt,
         } = {},
         optionsEmptyText,
+        optionsContentkey = 'children',
         optionsReplaceProp,
         optionsRenderItem: renderItem,
         optionsWrapProps,
@@ -76,8 +77,8 @@ export const useOptions = (input = {}) => {
         const addEmptyItem = isEmpty
             && emptyText
         if (addEmptyItem) options = [{
-            label: emptyText,
-            text: emptyText,
+            disabled: true,
+            [optionsContentkey]: emptyText,
             value: '',
         }]
 
@@ -86,16 +87,12 @@ export const useOptions = (input = {}) => {
 
         const optionItems = options
             .map((o, i) => {
-                if (isStr(o)) o = {
-                    label: o,
-                    text: o,
+                if (!isObj(o)) o = {
+                    [optionsContentkey]: o,
                     value: o,
                 }
                 return {
                     ...isObj(o) && o,
-                    ...OptionItem === 'option' && {
-                        children: o.text || o.label
-                    },
                     key: o.key || `${o.value}${i}`,
                 }
             })
@@ -105,19 +102,22 @@ export const useOptions = (input = {}) => {
                         option,
                         index,
                         options,
-                        input
+                        input,
+                        optionsContentkey
                     )
                     : !OptionItem
                         ? option
                         : <OptionItem {...option} />
             ))
+
         return optionItems
     })
 
     // whether to replace inputProps.options
     // or place the optionItems directly into the DOM
     optionsReplaceProp ??= !!OptionsWrap
-        || !OptionItem && !renderItem
+        && !OptionItem
+        && !renderItem
 
     return [
         optionsReplaceProp,
