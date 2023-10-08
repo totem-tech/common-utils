@@ -140,7 +140,7 @@ export default class SubscanHelper {
      * @param   {Number|String} referendaOrId 
      * @param   {Object}        payload         (optional)
      * 
-     * @returns {Array}
+     * @returns {Array|Map}
      */
     referendaGetVotes = async (referendaOrId, payload = {}, asMap = false) => {
         const query = isAddress(referendaOrId)
@@ -159,7 +159,16 @@ export default class SubscanHelper {
             : arrToMap(data?.list || [])
     }
 
-    referendaGetVotesBatch = async (arrReferendaOrId = [], asMap = true) => {
+    /**
+     * @name    referendaGetVotes
+     * @summary get list of votes by referenda index or user identity.
+     * 
+     * @param   {Array<Number|String>} arrReferendaOrId 
+     * @param   {Boolean}        asMap         (optional) Default: true
+     * 
+     * @returns {Array|Map}
+     */
+    referendaGetVotesBatch = async (arrReferendaOrId, asMap = true) => {
         const results = await Promise.all(
             arrReferendaOrId.map(x =>
                 this.referendaGetVotes(x)
