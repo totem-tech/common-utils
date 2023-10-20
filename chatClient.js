@@ -91,7 +91,10 @@ class ChatClient {
                 func.promise = async (...args) => await func(...args)
             })
 
-        this.connect = () => this.socket.connect()
+        this.connect = () => {
+            this.autoDisconneted = false
+            this.socket.connect()
+        }
         this.disconnect = () => {
             log('Manual disconnect')
             this.socket.disconnect()
@@ -100,6 +103,7 @@ class ChatClient {
             if (!isPositiveInteger(autoDisconnectMs)) return
             log('Disconnecting due to inactivity')
             this.socket.disconnect()
+            this.autoDisconneted = true
         }, autoDisconnectMs)
         this.isConnected = () => this.socket.connected
         this.onConnect = cb => this.on('connect', cb)
