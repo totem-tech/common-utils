@@ -370,7 +370,8 @@ PromisE.fetch = async (url, options, timeout, asJson = true) => {
 
     options = isObj(options) && options || {}
     options.method ??= 'get'
-    if (isInteger(timeout)) options.signal = getAbortSignal(timeout)
+    const signal = isInteger(timeout) && getAbortSignal(timeout)
+    if (signal) options.signal = signal
 
     const result = await fetch(url.toString(), options)
         .catch(err =>
@@ -519,6 +520,6 @@ const getAbortSignal = timeout => {
         setTimeout(() => abortCtrl.abort(), timeout)
         return abortCtrl.signal
     } catch (err) {
-        console.log('Failed to instantiate AbortController.', err)
+        console.log(`Failed to instantiate AbortController. ${err}`)
     }
 }

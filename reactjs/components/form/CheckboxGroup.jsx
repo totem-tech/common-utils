@@ -2,16 +2,19 @@ import PropTypes from 'prop-types'
 import React, { useCallback } from 'react'
 import {
     arrUnique,
+    className,
     isArr,
-    isObj
+    isObj,
 } from '../../../utils'
 
-export const CheckboxGroup = props => {
+export const CheckboxGroup = (props) => {
     let {
         components: {
             Option,
             Options,
         },
+        error,
+        inline,
         multiple,
         name,
         onChange,
@@ -27,22 +30,21 @@ export const CheckboxGroup = props => {
     const handleChangeCb = useCallback((props, option) => (e = {}, data) => {
         if (!isObj(option)) return
 
-        // console.log({ e, data })
         // make sure event persists even when deferred callbacks are used externally
         e?.persist?.()
         e.target ??= {}
-        const { checked } = e.target
-        // let { options = [], value, } = props
+        const { checked = !!data?.checked } = e.target
+        let { options = [], value } = props
         if (multiple && !isArr(value)) value = []
 
         value = !multiple
-            ? checked
+            ? checked && value !== option.value
                 ? option.value
                 : undefined
             : arrUnique(
-                checked
-                    ? [...value, option.value]
-                    : value.filter(x => x !== option.value)
+                !checked || value.includes(option.value)
+                    ? value.filter(x => x !== option.value)
+                    : [...value, option.value]
             )
 
         // exclude any value that's not in the options
@@ -51,33 +53,49 @@ export const CheckboxGroup = props => {
             value = !multiple
                 ? exists(value)
                     ? value
-                    : undefined
+                    : ''
                 : value.filter(exists)
         }
 
+        e.target.value = value
         option.onChange?.(
             e,
             data,
             value
         )
-
         onChange?.(
             e,
             { ...props, value },
             option,
         )
     })
-    const isCheckbox = !radio || `${type}`
+    const isCheckbox = !radio && `${type}`
         .toLowerCase()
         .includes('checkbox')
+
     return (
-        <Options {...optionsWrapProps}>
-            {options.map((option, i) => (
-                <Option {...{
+        <Options {...{
+            ...optionsWrapProps,
+            className: className([
+                'CheckboxGroup',
+                optionsWrapProps?.className,
+                'utils'
+            ])
+        }}>
+            {options.map((option, i) => {
+                const oProps = {
                     ...option,
                     key: `${i}-${option.value}`,
+                    label: (
+                        <label className='CheckboxGroupLabel'>
+                            {option.label ?? option.text}
+                        </label>
+                    ),
                     name,
-                    onChange: handleChangeCb(props, option),
+                    onChange: undefined,
+                    // using onClick allows to uncheck radio.
+                    onClick: handleChangeCb(props, option),
+                    value: `${option.value}`,
                     ...[optionCommonProps, optionProps]
                         .filter(Boolean)
                         .map(itemProps => isObj(itemProps)
@@ -92,8 +110,9 @@ export const CheckboxGroup = props => {
                             ...obj,
                             ...next,
                         }), {}),
-                }} />
-            ))}
+                }
+                return <Option {...oProps} />
+            })}
         </Options>
     )
 }
@@ -128,7 +147,6 @@ CheckboxGroup.propTypes = {
     ]),
     radio: PropTypes.bool,
     toggle: PropTypes.bool, // semantic ui only
-
 }
 let optionProps = (
     option,
@@ -199,13 +217,45 @@ CheckboxGroup.setupDefaults = (name, module = {}, _extraModules) => {
             const { Checkbox: SUI_Checkbox } = module
             components.Option = SUI_Checkbox
             optionProps = (
-                option,
+                option = {},
                 isCheckbox,
-                props
-            ) => ({
-                radio: !isCheckbox,
-                toggle: option.toggle ?? props.toggle,
-            })
+                props = {}
+            ) => {
+                let {
+                    inline,
+                    multiple,
+                    value,
+                } = props
+                value = multiple
+                    ? isArr(value)
+                        ? value
+                        : []
+                    : value
+                const {
+                    radio = props.radio,
+                    style,
+                    toggle = props.toggle,
+                    value: optionValue,
+                } = option
+                const checked = multiple
+                    ? value.includes(optionValue)
+                    : value === optionValue
+
+                return {
+                    checked,
+                    radio: isCheckbox
+                        ? undefined
+                        : radio,
+                    style: {
+                        display: inline
+                            ? 'inline-block'
+                            : 'block',
+                        margin: 5,
+                        ...style,
+                    },
+                    toggle,
+                }
+            }
             break
     }
 }

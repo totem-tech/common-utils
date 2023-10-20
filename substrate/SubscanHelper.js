@@ -169,11 +169,18 @@ export default class SubscanHelper {
      * @returns {Array|Map}
      */
     referendaGetVotesBatch = async (arrReferendaOrId, asMap = true) => {
-        const results = await Promise.all(
-            arrReferendaOrId.map(x =>
-                this.referendaGetVotes(x)
+        const results = []
+
+        for (let i = 0;i < arrReferendaOrId.length;i++) {
+            if (arrReferendaOrId.length > 1) console.log(
+                'SubscanHelper: fetching votes for ', arrReferendaOrId[i]
             )
-        )
+            results.push(
+                await this.referendaGetVotes(
+                    arrReferendaOrId[i]
+                )
+            )
+        }
         return !asMap
             ? results
             : arrToMap(results)
