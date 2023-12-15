@@ -130,6 +130,7 @@ export const FormInput = React.memo(props => {
         idPrefix = '',
         onMount,
         onUnmount,
+        placeholder: _placeholder,
         prefix,
         required, // only use if inputProps.required should be different
         rxOptions,
@@ -182,6 +183,7 @@ export const FormInput = React.memo(props => {
         onChange,
         onFocus,
         options,
+        placeholder = _placeholder,
         required: requiredAlt,
         type: typeAlt,
         value: _value = '',
@@ -334,6 +336,7 @@ export const FormInput = React.memo(props => {
             className: className([
                 'FormInput-Container',
                 containerProps?.className,
+                { error }
             ]),
             style: {
                 ...containerProps?.style,
@@ -381,7 +384,7 @@ export const FormInput = React.memo(props => {
                     'FormInput-Label',
                     labelProps?.className,
                 ]),
-                htmlFor: id,
+                htmlFor: `${idPrefix}${id}`,
                 style: {
                     cursor: 'pointer',
                     fontWeight: 'bold',
@@ -468,6 +471,7 @@ export const FormInput = React.memo(props => {
                 options: optionsReplaceProp
                     ? optionItems
                     : undefined,
+                placeholder,
                 style: {
                     ...inputProps.style,
                     ...labelInline && { display: 'table-cell' },
@@ -612,7 +616,7 @@ FormInput.setupDefaults = (name, module) => {
 export default FormInput
 
 const handleChangeCb = (
-    props,
+    input,
     rxValue,
     rxMessage,
     setError,
@@ -626,14 +630,15 @@ const handleChangeCb = (
         uncheckedValue = false,
         validate,
         validatorConfig = {},
-    } = props
+    } = input
     let {
         multiple,
         onChange,
         requiredAlt,
         type,
     } = inputProps
-    const { required = requiredAlt } = props
+
+    const { required = requiredAlt } = input
     let {
         persist,
         target: {
@@ -677,7 +682,7 @@ const handleChangeCb = (
         } catch (_) { } // ignore unsupported
     })
 
-    const data = { ...props, value }
+    const data = { ...input, value }
     let err, isANum = false
     const isCheck = ['checkbox', 'radio'].includes(type)
     let hasVal = hasValue(
@@ -750,7 +755,7 @@ const handleChangeCb = (
         && hasVal
         && validationTypes.includes(type)
     if (!!requireValidator) {
-        // set min & max length error messages if set defined by external error messages
+        // hide min & max length error messages if not defined by external error messages
         objSetPropUndefined(
             customMsgs,
             'lengthMax',
@@ -779,7 +784,7 @@ const handleChangeCb = (
     }
 
     let [criteriaMsg, crInvalid] = (!err || err === true)
-        && validateCriteria(value, props, hasVal)
+        && validateCriteria(value, input, hasVal)
         || []
     if (crInvalid && !hasVal) crInvalid = false
 

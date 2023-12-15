@@ -66,7 +66,7 @@ RxSubjectView.propTypes = {
     confs: PropTypes.array,
     debug: PropTypes.bool,
     initialValue: PropTypes.any,
-    subject: PropTypes.any.isRequired,
+    subject: PropTypes.any,
     valueModifier: PropTypes.func,
 }
 export default RxSubjectView

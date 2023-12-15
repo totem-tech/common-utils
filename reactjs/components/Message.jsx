@@ -182,7 +182,7 @@ export const Message = React.memo(({
         header: !useChildren && header || undefined,
         icon: !isContainerStr
             && !useChildren
-            && icon,
+            && icon || undefined,
         // for compatibility with MUI <Alert/>
         ...isMui && {
             severity: severity

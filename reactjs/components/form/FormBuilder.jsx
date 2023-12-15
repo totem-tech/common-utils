@@ -47,6 +47,7 @@ const defaultComponents = {
 export const FormBuilder = React.memo(propsOrg => {
     const props = { ...propsOrg }
     let {
+        actions = [],
         actionsPrefix,
         actionsSuffix,
         components,
@@ -168,6 +169,7 @@ export const FormBuilder = React.memo(propsOrg => {
                 || loading
                 || !!inputsInvalid
                 || valuesChanged
+
             return {
                 inputs,
                 inputsHidden,
@@ -189,16 +191,20 @@ export const FormBuilder = React.memo(propsOrg => {
         )
 
         const handleSubmit = async (event) => {
-            event.preventDefault()
-            if (submitDisabled || loading) return
             try {
+                event?.preventDefault?.()
+                const {
+                    inputsHidden,
+                    loading,
+                    submitDisabled,
+                } = rxState.value
+                if (submitDisabled || loading) return
+
                 const inputs = rxInputs.value || []
                 const values = getValues(inputs)
                 const allOk = !loading
                     && !submitDisabled
-                    && !inputs.find(x =>
-                        checkInputInvalid(x, rxState.value.inputsHidden)
-                    )
+                    && !inputs.find(x => checkInputInvalid(x, inputsHidden))
                 isFn(onSubmit) && await onSubmit(
                     allOk,
                     values,
@@ -224,12 +230,7 @@ export const FormBuilder = React.memo(propsOrg => {
             inputProps.value = value
             input.valid = error !== true
 
-            const {
-                inputProps: {
-                    onChange,
-                } = {},
-            } = input
-            const triggerChange = (values) => {
+            const triggerChange = values => {
                 values = values || getValues(inputs)
                 rxInputs.next([...inputs])
                 rxValues.next({ ...values })
@@ -239,11 +240,13 @@ export const FormBuilder = React.memo(propsOrg => {
             if (rxMessage.value) setTimeout(() => rxMessage.next(null))
 
             let values = getValues(inputs)
-            let doTrigger = await onChange?.(
-                values,
-                inputs,
-                event,
-            )
+            let doTrigger = await input
+                ?.inputProps
+                ?.onChange?.(
+                    values,
+                    inputs,
+                    event,
+                )
 
             if (!isFn(formOnChange)) return doTrigger !== false && triggerChange()
 
@@ -374,6 +377,7 @@ export const FormBuilder = React.memo(propsOrg => {
                         status: 'success',
                         style: { marginLeft: 5 },
                     })}
+                    {actions.map((action, i) => getButton(action, { key: i }))}
                     {getButton(submitText, {
                         disabled: submitDisabled,
                         onClick: handleSubmit,
@@ -548,6 +552,7 @@ const addInterceptorCb = (
             input,
             values,
             props,
+            index
         )
     idPrefix ??= commonProps.idPrefix
 
@@ -558,6 +563,10 @@ const addInterceptorCb = (
         components: {
             ...commonProps?.components,
             ...input?.components,
+        },
+        containerProps: {
+            ...commonProps?.containerProps,
+            ...input?.containerProps,
         },
         content: isFn(content)
             ? content(values, name)
@@ -587,7 +596,7 @@ const addInterceptorCb = (
             )
             : undefined,
         inputProps: {
-            ...inputsCommonProps?.inputProps,
+            ...commonProps?.inputProps,
             ...inputProps,
             name,
             onChange: isGroup

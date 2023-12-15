@@ -142,6 +142,7 @@ export const useRxSubject = (
             _subject.value
         )
         allowMerge ??= isObj(firstValue)
+            && firstValue?.$$typeof?.toString?.() !== 'Symbol(react.element)'
 
         if (allowMerge) {
             // make sure value of the subject is always merged 
