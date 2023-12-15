@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react'
-import PropTypes from 'prop-types'
+import PropTypes, { element } from 'prop-types'
 import { translated } from '../../../languageHelper'
-import { isFn, objWithoutKeys } from '../../../utils'
+import { className, isFn, objWithoutKeys } from '../../../utils'
 import { useRxSubject } from '../../hooks'
 import toProps from '../../toProps'
 import _Button from '../Button'
@@ -12,14 +12,37 @@ const textsCap = {
     close: 'close',
 }
 translated(textsCap, true)
+
+const withClass = (
+    Component,
+    theClass,
+    defaultProps = {}
+) => {
+    const ComponentWithClass = ({
+        className: cls,
+        ...props
+    }) => (
+        <Component {...{
+            ...props,
+            className: className([
+                cls,
+                theClass,
+            ])
+        }} />
+    )
+    ComponentWithClass.defaultProps = defaultProps
+
+    return ComponentWithClass
+}
+
 const defaultComponents = Object.freeze({
-    Actions: 'div',
+    Actions: withClass('div', 'ModalActions'),
     Button: _Button,
-    Content: 'div',
-    ContentInner: 'div',
+    Content: withClass('div', 'ModalContent'),
+    ContentInner: withClass('div', 'ModalContentInner'),
     Modal: ModalRoot,
     ModalInner: props => <div {...props} />,
-    Subtitle: 'div',
+    Subtitle: withClass('div', 'ModalSubtitle'),
     Title: ModalTitle,
 })
 

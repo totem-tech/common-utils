@@ -1,34 +1,25 @@
 import React from 'react'
-import { fallbackIfFails } from '../../utils'
+import { className } from '../../utils'
+import './button-styles.css'
 
-export const BasicButton = fallbackIfFails(() => {
-    const { styled } = require('styled-components')
-
-    const getProps = props => `
-        background: ${props.style?.background
-        || {
-            info: 'grey',
-            error: 'rgb(243 74 74)',
-            success: 'rgb(72 184 72)',
-            warn: 'orange',
-        }[props.status]
-        || 'grey'};
-        border: none;
-        border-radius: 3px;
-        color: white;
-        margin: 3px;
-        padding: 10px 20px;
-
-        &:not(:hover):not(:focus) {
-            opacity: 0.9;
-        }
-        &[disabled] {
-            background: #a1a1a1;
-        }
-    `
-    return styled.button`${getProps}`
-}, [], 'button')
-
+export const BasicButton = ({
+    buttonClass,
+    className: cls,
+    status,
+    ...props
+}) => (
+    <button {...{
+        ...props,
+        className: className([
+            cls,
+            buttonClass,
+            status,
+        ]),
+    }} />
+)
+BasicButton.defaultProps = {
+    buttonClass: 'BasicButton',
+}
 
 export const Button = React.memo(({ Component, ...props }) => <Component {...props} />)
 Button.defaultProps = {
@@ -54,5 +45,10 @@ Button.setupDefaults = (name, module, _extraModules) => {
             dp.Component = module.Button
             break
     }
+}
+
+export const ModalCloseIcon = props => <div {...props} />
+ModalCloseIcon.defaultProps = {
+    className: 'ModalCloseIcon',
 }
 export default Button

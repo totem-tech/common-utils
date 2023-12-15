@@ -1,5 +1,4 @@
 import React from 'react'
-import styled from 'styled-components'
 import { translated } from '../../../languageHelper'
 import { className } from '../../../utils'
 import {
@@ -9,6 +8,7 @@ import {
 } from '../../../window'
 import { useRxSubject } from '../../hooks'
 import ScrollbarStyled from '../ScrollbarStyled'
+import { ModalCloseIcon } from '../Button'
 
 const textsCap = {
     close: 'close'
@@ -18,15 +18,16 @@ translated(textsCap, true)
 export function ModalBasic({
     children,
     onClose,
-    closeButton,
+    closeButton, //ToDo: remove
+    closeIcon = closeButton,
     closeOnBackdropClick = true,
     isMobile,
     style,
     ...props
 }) {
     isMobile ??= useRxSubject(rxLayout, l => l === MOBILE)[0]
-    closeButton ??= (
-        <CloseButton {...{
+    closeIcon ??= (
+        <ModalCloseIcon {...{
             style: !isMobile
                 ? undefined
                 : {
@@ -73,7 +74,7 @@ export function ModalBasic({
                 width: '100%',
             },
         }}>
-            {closeButton}
+            {closeIcon}
             <div {...{
                 className: 'ModalBasicInner',
                 onClick: e => e.stopPropagation(),
@@ -95,36 +96,3 @@ export function ModalBasic({
     )
 }
 export default ModalBasic
-
-const CloseButton = styled.div`
-border: 1px solid white;
-border-radius: 100%;
-cursor: pointer;
-height: 28px;
-opacity: 0.3;
-padding: 6px 0 0 0;
-position: fixed;
-right: 20px;
-top: 20px;
-width: 30px;
-
-&:hover {
-    opacity: 1;
-}
-
-&:before, &:after {
-    background-color: white;
-    content: ' ';
-    height: 15px;
-    left: 13px;
-    position: absolute;
-    width: 2px;
-}
-
-&:before {
-    transform: rotate(45deg);
-}
-
-&:after {
-    transform: rotate(-45deg);
-}`

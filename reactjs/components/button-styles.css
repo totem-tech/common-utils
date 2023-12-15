@@ -1,0 +1,69 @@
+.BasicButton {
+    background: grey;
+    border: none;
+    border-radius: 3px;
+    color: white;
+    cursor: pointer;
+    margin: 3px;
+    padding: 10px 20px;
+}
+
+.BasicButton:not(:hover):not(:focus) {
+    opacity: 0.9;
+}
+
+.BasicButton[disabled] {
+    background: #a1a1a1;
+}
+
+.BasicButton.info {
+    background: grey;
+}
+
+.BasicButton.error {
+    background: rgb(243 74 74);
+}
+
+.BasicButton.success {
+    background: rgb(72 184 72);
+}
+
+.BasicButton.warn {
+    background: orange;
+}
+
+
+.ModalCloseIcon {
+    border: 1px solid white;
+    border-radius: 100%;
+    cursor: pointer;
+    height: 28px;
+    opacity: 0.3;
+    padding: 6px 0 0 0;
+    position: fixed;
+    right: 20px;
+    top: 20px;
+    width: 30px;
+}
+
+.ModalCloseIcon:hover {
+    opacity: 1;
+}
+
+.ModalCloseIcon:before,
+.ModalCloseIcon:after {
+    background-color: white;
+    content: ' ';
+    height: 15px;
+    left: 13px;
+    position: absolute;
+    width: 2px;
+}
+
+.ModalCloseIcon:before {
+    transform: rotate(45deg);
+}
+
+.ModalCloseIcon:after {
+    transform: rotate(-45deg);
+}
