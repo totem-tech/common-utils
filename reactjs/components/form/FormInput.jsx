@@ -55,6 +55,10 @@ export const errorMessages = {
     url: 'invalid URL',
 }
 translated(errorMessages, true)
+const textsCap = {
+    requiredField: 'required field'
+}
+translated(textsCap, true)
 const validationTypes = [...Object.values(TYPES), 'text']
 const defaultNativeComponents = {
     Container: 'div',
@@ -227,6 +231,7 @@ export const FormInput = React.memo(props => {
         const msgExtIsSubject = isSubjectLike(message)
         const rxIsFocused = new BehaviorSubject(false)
         const rxMessage = new BehaviorSubject(null)
+
         addDeferred(rxMessage, messageDefer)
         const rxMessageExt = msgExtIsSubject
             ? message
@@ -236,7 +241,7 @@ export const FormInput = React.memo(props => {
             ? _rxValue
             : new BehaviorSubject(_value)
 
-        addDeferred(rxValue, 100)
+        // addDeferred(rxValue, 100)
         const getMessageEl = ([message, messageExt, focused]) => {
             message = message || messageExt
             message = !isStr(message) && !isValidElement(message)
@@ -306,7 +311,7 @@ export const FormInput = React.memo(props => {
     // synchronise rxMessageExt with external message if necessary
     !msgExtIsSubject && useEffect(() => rxMessageExt.next(message), [message])
     // synchronise rxValue with external value if necessary
-    !rxValueIsSubject && useEffect(() => rxValue.deferred(_value), [_value])
+    // !rxValueIsSubject && useEffect(() => rxValue.deferred(_value), [_value])
 
     // options for dropdown/selection type fields
     const [optionsReplaceProp, optionItems] = isOptionsType && useOptions(input) || []
@@ -399,7 +404,11 @@ export const FormInput = React.memo(props => {
             }}>
                 {label}
                 {required && (
-                    <span style={{ color: 'red' }}> *</span>
+                    <span {...{
+                        children: ' *',
+                        style: { color: 'red' },
+                        title: textsCap.requiredField,
+                    }} />
                 )}
                 {showCount && (
                     <CharacterCount {...{
@@ -416,9 +425,10 @@ export const FormInput = React.memo(props => {
                     }} />
                 )}
                 {labelDetails && (
-                    <LabelDetails {...labelDetailsProps}>
-                        {labelDetails}
-                    </LabelDetails>
+                    <LabelDetails {...{
+                        ...labelDetailsProps,
+                        children: labelDetails,
+                    }} />
                 )}
             </Label>
         )
@@ -433,13 +443,12 @@ export const FormInput = React.memo(props => {
     inputChildren = !optionsReplaceProp
         && optionItems
         || inputChildren
+
     return getContainer(
         <Input {...objWithoutKeys(
             {
                 ...inputProps,
-                checked: isCheckRadio
-                    ? value === checkedValue
-                    : checked,
+                checked: undefined,
                 ...inputChildren && {
                     children: inputChildren
                 },
@@ -509,7 +518,7 @@ FormInput.propTypes = {
         id: PropTypes.string,
         name: PropTypes.string,
         onChange: PropTypes.func,
-    }).isRequired,
+    }),
     message: PropTypes.object,
     rxValue: PropTypes.instanceOf(BehaviorSubject),
 
@@ -630,13 +639,15 @@ const handleChangeCb = (
         uncheckedValue = false,
         validate,
         validatorConfig = {},
+        type: _type,
     } = input
     let {
         multiple,
         onChange,
         requiredAlt,
-        type,
+        type = _type,
     } = inputProps
+    const isCheck = ['checkbox', 'radio'].includes(type)
 
     const { required = requiredAlt } = input
     let {
@@ -660,8 +671,8 @@ const handleChangeCb = (
 
     }
     // value unchanged
-    const unchanged = isEqual(rxValue.___validated, value)
-    if (unchanged) return
+    const unchanged = !isCheck && isEqual(rxValue.___validated, value)
+    if (unchanged) return console.log('unchanged')
 
     // Forces the synthetic event and it's value to persist
     // Required for use with deferred function
@@ -684,7 +695,6 @@ const handleChangeCb = (
 
     const data = { ...input, value }
     let err, isANum = false
-    const isCheck = ['checkbox', 'radio'].includes(type)
     let hasVal = hasValue(
         isCheck
             ? required
@@ -708,6 +718,7 @@ const handleChangeCb = (
             break
         case 'checkbox':
         case 'radio':
+            console.log({ checked: event.target.checked })
             data.checked = !!checked
             data.value = !!checked
                 ? checkedValue
@@ -797,15 +808,7 @@ const handleChangeCb = (
             }
             : criteriaMsg
 
-        if (message) {
-            // delay displaying the mssage and store the timeout ID
-            rxMessage._timeoutId = rxMessage.deferred(message)
-        } else {
-            // remove any pending deffered message
-            rxMessage._timeoutId && clearTimeout(rxMessage._timeoutId)
-            rxMessage._timeoutId = null
-            rxMessage.next(message)
-        }
+        rxMessage.deferred(message)
         setError(error)
         isFn(onChange) && onChange(
             event,

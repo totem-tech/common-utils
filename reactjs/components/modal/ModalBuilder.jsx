@@ -130,7 +130,7 @@ export function ModalBuilder({
         }}>
             <ModalInner {...{ open, onClose: handleClose }}>
                 {prefix}
-                {titleProps && (
+                {(titleProps.children || subtitle) && (
                     <Title {...titleProps}>
                         {titleProps.children}
 

@@ -238,5 +238,5 @@ export class ModalService {
     }
 }
 
-const modalService = new ModalService()
+export const modalService = new ModalService()
 export default modalService
