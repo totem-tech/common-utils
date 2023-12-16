@@ -89,7 +89,7 @@ export function ModalBuilder({
             : setOpen(_open)
     }, [_open])
 
-    if (!Modal) return
+    if (!Modal) return ''
 
     const closeBtnProps = toProps(closeButton)
     if (closeBtnProps) {

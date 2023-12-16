@@ -22,6 +22,7 @@ export function ModalBasic({
     closeIcon = closeButton,
     closeOnBackdropClick = true,
     isMobile,
+    ignore,
     style,
     ...props
 }) {

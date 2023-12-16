@@ -6,13 +6,15 @@ import { isFn, isObj } from '../../../utils'
 import isMemo from '../../isMemo'
 import toProps from '../../toProps'
 import _Button from '../Button'
+import PromisE from '../../../PromisE'
 
-const textsCap = translated({
+const textsCap = {
     cancel: 'cancel',
     close: 'close',
     confirm: 'confirm',
     ruSure: 'are you sure?',
-}, true)[1]
+}
+translated(textsCap, true)
 /**
  * @name    ModalService
  * @summary modal sevice provides a simple way to add, update and remove modals when used with the ModalsContainer
@@ -132,6 +134,25 @@ export class ModalService {
             component,
         )
     }
+
+    confirmAsPromise = async (
+        confirmProps = {},
+        id = v1(),
+        component,
+    ) => PromisE(resolve => {
+        this.confirm(
+            {
+                ...confirmProps,
+                onConfirm: accepted => {
+                    confirmProps?.onConfirm?.(accepted)
+                    resolve(accepted)
+                },
+                ignore: ['onConfirm'],
+            },
+            id,
+            component
+        )
+    })
 
     /**
      * @name    delete
