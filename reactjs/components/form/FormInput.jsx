@@ -672,7 +672,7 @@ const handleChangeCb = (
     }
     // value unchanged
     const unchanged = !isCheck && isEqual(rxValue.___validated, value)
-    if (unchanged) return console.log('unchanged')
+    if (unchanged) return
 
     // Forces the synthetic event and it's value to persist
     // Required for use with deferred function
