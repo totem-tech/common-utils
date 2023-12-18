@@ -9,6 +9,7 @@ import { translated } from '../../../languageHelper'
 import { copyRxSubject } from '../../../rx'
 import {
     arrUnique,
+    className,
     isArr,
     isFn,
     isStr,
@@ -47,6 +48,7 @@ const defaultComponents = {
 export const FormBuilder = React.memo(propsOrg => {
     const props = { ...propsOrg }
     let {
+        actions = [],
         actionsPrefix,
         actionsSuffix,
         components,
@@ -85,6 +87,7 @@ export const FormBuilder = React.memo(propsOrg => {
         rxMessage,
         rxState,
         toUpdate,
+        rxValues,
     } = useMemo(() => {
         // setup form ID
         window.___formCount ??= 1000
@@ -168,6 +171,7 @@ export const FormBuilder = React.memo(propsOrg => {
                 || loading
                 || !!inputsInvalid
                 || valuesChanged
+
             return {
                 inputs,
                 inputsHidden,
@@ -189,16 +193,20 @@ export const FormBuilder = React.memo(propsOrg => {
         )
 
         const handleSubmit = async (event) => {
-            event.preventDefault()
-            if (submitDisabled || loading) return
             try {
+                event?.preventDefault?.()
+                const {
+                    inputsHidden,
+                    loading,
+                    submitDisabled,
+                } = rxState.value
+                if (submitDisabled || loading) return
+
                 const inputs = rxInputs.value || []
                 const values = getValues(inputs)
                 const allOk = !loading
                     && !submitDisabled
-                    && !inputs.find(x =>
-                        checkInputInvalid(x, rxState.value.inputsHidden)
-                    )
+                    && !inputs.find(x => checkInputInvalid(x, inputsHidden))
                 isFn(onSubmit) && await onSubmit(
                     allOk,
                     values,
@@ -209,6 +217,7 @@ export const FormBuilder = React.memo(propsOrg => {
             } catch (err) {
                 rxMessage.next({
                     header: textsCap.submitError,
+                    status: 'error',
                     text: `${err}`.replace('Error: ', ''),
                 })
             }
@@ -224,12 +233,7 @@ export const FormBuilder = React.memo(propsOrg => {
             inputProps.value = value
             input.valid = error !== true
 
-            const {
-                inputProps: {
-                    onChange,
-                } = {},
-            } = input
-            const triggerChange = (values) => {
+            const triggerChange = values => {
                 values = values || getValues(inputs)
                 rxInputs.next([...inputs])
                 rxValues.next({ ...values })
@@ -239,11 +243,13 @@ export const FormBuilder = React.memo(propsOrg => {
             if (rxMessage.value) setTimeout(() => rxMessage.next(null))
 
             let values = getValues(inputs)
-            let doTrigger = await onChange?.(
-                values,
-                inputs,
-                event,
-            )
+            let doTrigger = await input
+                ?.inputProps
+                ?.onChange?.(
+                    values,
+                    inputs,
+                    event,
+                )
 
             if (!isFn(formOnChange)) return doTrigger !== false && triggerChange()
 
@@ -294,6 +300,7 @@ export const FormBuilder = React.memo(propsOrg => {
             rxMessage,
             rxState,
             toUpdate,
+            rxValues,
         }
     }, [])
 
@@ -343,7 +350,7 @@ export const FormBuilder = React.memo(propsOrg => {
     return (
         <Form {...{
             autoComplete: 'off',
-            className: 'form-builder',
+            className: 'FormBuilder',
             noValidate: true,
             ...formProps,
         }}>
@@ -354,6 +361,7 @@ export const FormBuilder = React.memo(propsOrg => {
                 .map(addInterceptorCb(
                     { ...props, ...state },
                     rxState.value.inputsHidden,
+                    rxValues,
                     handleChangeCb,
                     formId,
                 ))
@@ -374,6 +382,7 @@ export const FormBuilder = React.memo(propsOrg => {
                         status: 'success',
                         style: { marginLeft: 5 },
                     })}
+                    {actions.map((action, i) => getButton(action, { key: i }))}
                     {getButton(submitText, {
                         disabled: submitDisabled,
                         onClick: handleSubmit,
@@ -397,7 +406,15 @@ export const FormBuilder = React.memo(propsOrg => {
                         const props = isStr(message) || isValidElement(message)
                             ? { content: message }
                             : message
-                        return !!message && <Message {...props} />
+                        return !!message && (
+                            <Message {...{
+                                ...props,
+                                className: className([
+                                    props.className,
+                                    'FormMessage'
+                                ]),
+                            }} />
+                        )
                     }
                 }} />
             )}
@@ -511,6 +528,7 @@ export default FormBuilder
 const addInterceptorCb = (
     props = {},
     inputsHidden = [],
+    rxValues,
     handleChange,
     formId,
     parentIndex = null,
@@ -520,8 +538,8 @@ const addInterceptorCb = (
         inputsCommonProps,
         inputsDisabled = [],
         inputsReadOnly = [],
-        values,
     } = props
+    const values = rxValues.value || {}
     let {
         content,
         hidden = false,
@@ -548,6 +566,7 @@ const addInterceptorCb = (
             input,
             values,
             props,
+            index
         )
     idPrefix ??= commonProps.idPrefix
 
@@ -558,6 +577,10 @@ const addInterceptorCb = (
         components: {
             ...commonProps?.components,
             ...input?.components,
+        },
+        containerProps: {
+            ...commonProps?.containerProps,
+            ...input?.containerProps,
         },
         content: isFn(content)
             ? content(values, name)
@@ -580,6 +603,7 @@ const addInterceptorCb = (
                 addInterceptorCb(
                     props,
                     inputsHidden,
+                    rxValues,
                     handleChange,
                     formId,
                     parentIndex || index,
@@ -587,7 +611,7 @@ const addInterceptorCb = (
             )
             : undefined,
         inputProps: {
-            ...inputsCommonProps?.inputProps,
+            ...commonProps?.inputProps,
             ...inputProps,
             name,
             onChange: isGroup
@@ -608,7 +632,7 @@ const addInterceptorCb = (
                 event,
                 data,
                 {
-                    ...values,
+                    ...rxValues.value,
                     // this is required because onChange() is trigger after validate().
                     // otherwise, current input will have the old value or last character missing for text/number inputs
                     [name]: data.value,

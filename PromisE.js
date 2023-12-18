@@ -155,7 +155,7 @@ PromisE.all = (...promises) => PromisE(
  * 
  * // with throttle
  * example(true)
- * // `5000` and `2000` will be printed in the console
+ * // `5000` and `200` will be printed in the console
  * 
  * // with throttle with strict mode
  * example(true)
@@ -220,9 +220,16 @@ PromisE.deferred = (
     })
     if (!isFn(callback)) return dp
 
-    const cb = (...args) =>
-        dp(() => callback.call(thisArg, ...args))
-            .then(onResult, onError)
+    const cb = async (...args) => {
+        const result = await dp(() => callback.call(thisArg, ...args))
+            .catch(err => {
+                onError?.(err)
+                return Promise.reject(err)
+            })
+        // .then(onResult, onError)
+        onResult?.(result)
+        return result
+    }
 
     return isPositiveNumber(defer)
         ? deferred(cb, defer)

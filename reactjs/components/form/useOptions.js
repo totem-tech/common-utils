@@ -59,7 +59,7 @@ export const useOptions = (input = {}) => {
     } = input
 
     const [optionItems] = useRxSubject(rxOptions, options => {
-        options = rxOptionsModifier?.(options) || options
+        options = rxOptionsModifier?.(options, input) || options
         // element or element array received
         const ignore = !isArr(options) //
             || isValidElement(options) // element supplied

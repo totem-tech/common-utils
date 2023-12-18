@@ -46,7 +46,6 @@ const _ScrollbarStyled = ({
         className: className([
             idClass,
             props.className,
-            'teststyled'
         ]),
     }
     if (indicator) {

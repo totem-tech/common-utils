@@ -1,3 +1,4 @@
+import { BehaviorSubject } from 'rxjs'
 import {
     hasValue,
     isArr,
@@ -47,6 +48,7 @@ export const addMissingProps = (input, keyPrefix = randomInt(99, 9999)) => {
 export const checkInputInvalid = (input, inputsHidden = []) => {
     let {
         inputProps = {},
+        required: _required,
         rxValue,
         valid,
         type = typeAlt
@@ -55,7 +57,7 @@ export const checkInputInvalid = (input, inputsHidden = []) => {
         error,
         loading,
         name,
-        required,
+        required = _required,
         type: typeAlt,
         value,
     } = inputProps
@@ -103,14 +105,25 @@ export const checkValuesChanged = (
  * 
  * @param   {Array}     inputs 
  * @param   {Object}    values 
+ * @param   {Boolean}   addRxValue populate `rxValue` property with `new BehaviorSubject()` if required.
  * 
  * @returns {Array} inputs
  */
-export const fillInputs = (inputs = [], values = []) => {
+export const fillInputs = (
+    inputs = [],
+    values = [],
+    addRxValue = false
+) => {
     inputs.forEach(input => {
+        if (addRxValue) input.rxValue ??= new BehaviorSubject('')
+        input.inputProps ??= {}
         const {
             inputs: childInputs,
-            name,
+            inputProps: {
+                name: _name,
+            },
+            name = _name,
+            rxValue,
         } = input
         if (isArr(childInputs)) return fillInputs(childInputs, values)
 
@@ -118,9 +131,9 @@ export const fillInputs = (inputs = [], values = []) => {
 
         const value = values[name]
         // if value is RxJS subject trigger a value change
-        if (isSubjectLike(input.value)) return input.value.next(value)
+        if (isSubjectLike(rxValue)) return rxValue.next(value)
 
-        input.value = value
+        input.inputProps.value = value
     })
     return inputs
 }

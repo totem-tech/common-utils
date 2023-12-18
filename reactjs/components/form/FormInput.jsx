@@ -55,6 +55,10 @@ export const errorMessages = {
     url: 'invalid URL',
 }
 translated(errorMessages, true)
+const textsCap = {
+    requiredField: 'required field'
+}
+translated(textsCap, true)
 const validationTypes = [...Object.values(TYPES), 'text']
 const defaultNativeComponents = {
     Container: 'div',
@@ -128,8 +132,10 @@ export const FormInput = React.memo(props => {
         messageHideOnBlur = true,
         name: _name,
         idPrefix = '',
+        onInvalid,
         onMount,
         onUnmount,
+        placeholder: _placeholder,
         prefix,
         required, // only use if inputProps.required should be different
         rxOptions,
@@ -140,7 +146,11 @@ export const FormInput = React.memo(props => {
         uncheckedValue = false,
         useOptions = _useOptions,
         validate,
+        inputPropsToWatch = [],
     } = input
+    inputPropsToWatch.forEach(key => {
+        input.inputProps[key] = useRxSubjectOrValue(inputProps[key])
+    })
     components = {
         InputGroup: FormInputGroup,
         ...defaultNativeComponents,
@@ -182,6 +192,7 @@ export const FormInput = React.memo(props => {
         onChange,
         onFocus,
         options,
+        placeholder = _placeholder,
         required: requiredAlt,
         type: typeAlt,
         value: _value = '',
@@ -200,12 +211,13 @@ export const FormInput = React.memo(props => {
         rxMessageExt, // used to keep track of and update any external message (props.message)
         rxIsFocused,  // keeps track of whether input field is focused
         msgEl, // message element
-        rxValueModifier,
+        __rxValueModifier,
         rxValue,
         rxValueIsSubject,
         msgExtIsSubject,
         isOptionsType,
-        handleChange,
+        __handleChange,
+        rxMessage
     ] = useMemo(() => {
         const addDeferred = (subject, defer = 0) => {
             const nextOrg = subject.next.bind(subject)
@@ -225,6 +237,7 @@ export const FormInput = React.memo(props => {
         const msgExtIsSubject = isSubjectLike(message)
         const rxIsFocused = new BehaviorSubject(false)
         const rxMessage = new BehaviorSubject(null)
+
         addDeferred(rxMessage, messageDefer)
         const rxMessageExt = msgExtIsSubject
             ? message
@@ -234,7 +247,7 @@ export const FormInput = React.memo(props => {
             ? _rxValue
             : new BehaviorSubject(_value)
 
-        addDeferred(rxValue, 100)
+        // addDeferred(rxValue, 100)
         const getMessageEl = ([message, messageExt, focused]) => {
             message = message || messageExt
             message = !isStr(message) && !isValidElement(message)
@@ -266,7 +279,7 @@ export const FormInput = React.memo(props => {
             }} />
         )
         const handleChange = handleChangeCb(
-            input,
+            { ...input, inputProps },
             rxValue,
             rxMessage,
             setError,
@@ -299,12 +312,13 @@ export const FormInput = React.memo(props => {
             msgExtIsSubject,
             isOptionsType,
             handleChange,
+            rxMessage
         ]
     }, [])
     // synchronise rxMessageExt with external message if necessary
     !msgExtIsSubject && useEffect(() => rxMessageExt.next(message), [message])
     // synchronise rxValue with external value if necessary
-    !rxValueIsSubject && useEffect(() => rxValue.deferred(_value), [_value])
+    // !rxValueIsSubject && useEffect(() => rxValue.deferred(_value), [_value])
 
     // options for dropdown/selection type fields
     const [optionsReplaceProp, optionItems] = isOptionsType && useOptions(input) || []
@@ -313,7 +327,30 @@ export const FormInput = React.memo(props => {
         ? 'select'
         : Input
 
+    const handleChange = handleChangeCb(
+        { ...input, inputProps },
+        rxValue,
+        rxMessage,
+        setError,
+    )
     // re-render on value change regardless of direction
+    const rxValueModifier = useCallback((newValue, oldValue) => {
+        if (isFn(_rxValueModifier)) newValue = _rxValueModifier(
+            newValue,
+            oldValue,
+            rxValue,
+        )
+        !isEqual(rxValue.___validated, newValue) && setTimeout(() => {
+            handleChange({
+                preventDefault: () => { },
+                target: {
+                    value: newValue,
+                },
+                stopPropagation: () => { },
+            })
+        }, 100)
+        return newValue
+    })
     const [value] = useRxSubject(rxValue, rxValueModifier)
 
     if (hidden) return ''
@@ -334,6 +371,7 @@ export const FormInput = React.memo(props => {
             className: className([
                 'FormInput-Container',
                 containerProps?.className,
+                { error }
             ]),
             style: {
                 ...containerProps?.style,
@@ -381,7 +419,7 @@ export const FormInput = React.memo(props => {
                     'FormInput-Label',
                     labelProps?.className,
                 ]),
-                htmlFor: id,
+                htmlFor: `${idPrefix}${id}`,
                 style: {
                     cursor: 'pointer',
                     fontWeight: 'bold',
@@ -396,7 +434,12 @@ export const FormInput = React.memo(props => {
             }}>
                 {label}
                 {required && (
-                    <span style={{ color: 'red' }}> *</span>
+                    <span {...{
+                        children: ' *',
+                        className: 'InputRequiredIndicator',
+                        style: { color: 'red' },
+                        title: textsCap.requiredField,
+                    }} />
                 )}
                 {showCount && (
                     <CharacterCount {...{
@@ -406,16 +449,21 @@ export const FormInput = React.memo(props => {
                         inline: inlineCounter,
                         maxLength,
                         minLength,
+                        rxValueModifier,
                         show: rxIsFocused,
                         subject: rxValue,
-                        rxValueModifier,
                         warnLength: counterWarnLength,
                     }} />
                 )}
                 {labelDetails && (
-                    <LabelDetails {...labelDetailsProps}>
-                        {labelDetails}
-                    </LabelDetails>
+                    <LabelDetails {...{
+                        ...labelDetailsProps,
+                        children: labelDetails,
+                        className: className([
+                            labelDetailsProps?.className,
+                            'FormInput-LabelDetails',
+                        ])
+                    }} />
                 )}
             </Label>
         )
@@ -430,13 +478,12 @@ export const FormInput = React.memo(props => {
     inputChildren = !optionsReplaceProp
         && optionItems
         || inputChildren
+
     return getContainer(
         <Input {...objWithoutKeys(
             {
                 ...inputProps,
-                checked: isCheckRadio
-                    ? value === checkedValue
-                    : checked,
+                checked: undefined,
                 ...inputChildren && {
                     children: inputChildren
                 },
@@ -468,6 +515,7 @@ export const FormInput = React.memo(props => {
                 options: optionsReplaceProp
                     ? optionItems
                     : undefined,
+                placeholder,
                 style: {
                     ...inputProps.style,
                     ...labelInline && { display: 'table-cell' },
@@ -505,7 +553,7 @@ FormInput.propTypes = {
         id: PropTypes.string,
         name: PropTypes.string,
         onChange: PropTypes.func,
-    }).isRequired,
+    }),
     message: PropTypes.object,
     rxValue: PropTypes.instanceOf(BehaviorSubject),
 
@@ -559,6 +607,7 @@ FormInput.propTypes = {
     // Set a prefix for input element IDs to be passed down to the DOM to prevent duplicate IDs in case multiple instances of the same form is created
     // Using 'null' prevents adding any prefix.
     // idPrefix
+    // onError
     // onMount,
     // onUnmount,
     // prefix,
@@ -612,7 +661,7 @@ FormInput.setupDefaults = (name, module) => {
 export default FormInput
 
 const handleChangeCb = (
-    props,
+    input,
     rxValue,
     rxMessage,
     setError,
@@ -622,18 +671,24 @@ const handleChangeCb = (
         customMessages,
         inputProps = {},
         integer = false, // number validation
+        onError,
         onChangeSelectValue,
         uncheckedValue = false,
         validate,
         validatorConfig = {},
-    } = props
+        type: _type,
+    } = input
     let {
         multiple,
         onChange,
         requiredAlt,
-        type,
+        type = _type,
     } = inputProps
-    const { required = requiredAlt } = props
+
+    if (input.name.includes('share')) console.warn({ inputProps })
+    const isCheck = ['checkbox', 'radio'].includes(type)
+
+    const { required = requiredAlt } = input
     let {
         persist,
         target: {
@@ -655,7 +710,7 @@ const handleChangeCb = (
 
     }
     // value unchanged
-    const unchanged = isEqual(rxValue.___validated, value)
+    const unchanged = !isCheck && isEqual(rxValue.___validated, value)
     if (unchanged) return
 
     // Forces the synthetic event and it's value to persist
@@ -677,9 +732,8 @@ const handleChangeCb = (
         } catch (_) { } // ignore unsupported
     })
 
-    const data = { ...props, value }
+    const data = { ...input, value, checked }
     let err, isANum = false
-    const isCheck = ['checkbox', 'radio'].includes(type)
     let hasVal = hasValue(
         isCheck
             ? required
@@ -750,7 +804,7 @@ const handleChangeCb = (
         && hasVal
         && validationTypes.includes(type)
     if (!!requireValidator) {
-        // set min & max length error messages if set defined by external error messages
+        // hide min & max length error messages if not defined by external error messages
         objSetPropUndefined(
             customMsgs,
             'lengthMax',
@@ -779,7 +833,7 @@ const handleChangeCb = (
     }
 
     let [criteriaMsg, crInvalid] = (!err || err === true)
-        && validateCriteria(value, props, hasVal)
+        && validateCriteria(value, input, hasVal)
         || []
     if (crInvalid && !hasVal) crInvalid = false
 
@@ -792,15 +846,7 @@ const handleChangeCb = (
             }
             : criteriaMsg
 
-        if (message) {
-            // delay displaying the mssage and store the timeout ID
-            rxMessage._timeoutId = rxMessage.deferred(message)
-        } else {
-            // remove any pending deffered message
-            rxMessage._timeoutId && clearTimeout(rxMessage._timeoutId)
-            rxMessage._timeoutId = null
-            rxMessage.next(message)
-        }
+        rxMessage.deferred(message)
         setError(error)
         isFn(onChange) && onChange(
             event,
@@ -808,6 +854,8 @@ const handleChangeCb = (
             ...args
         )
         setCursor()
+
+        !!error && onError?.(message, value)
 
         // prevents re-validation because of the trigger
         rxValue.___validated = data.value
