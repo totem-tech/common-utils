@@ -9,7 +9,8 @@ import {
     isMap,
     isValidNumber,
     mapJoin,
-    fallbackIfFails
+    fallbackIfFails,
+    isPositiveInteger
 } from './utils'
 
 // globab connection for use with multiple databases
@@ -193,7 +194,7 @@ export default class CouchDBStorage {
         // if ids supplied only retrieve only those otherwise, retrieve all (paginated)
         const paginate = !ids || ids.length === 0
         const rows = paginate
-            ? (await this.searchRaw({}, limit, skip, extraProps)).docs
+            ? (await this.searchRaw({}, limit, skip, extraProps, timeout)).docs
             : (await db.fetch({ keys: ids })).rows
                 .map(x => x.doc)
                 // ignore not found documents
@@ -290,17 +291,18 @@ export default class CouchDBStorage {
      */
     async searchRaw(selector = {}, limit = 0, skip = 0, extraProps = {}, timeout = 30000) {
         const db = await this.getDB()
-        const query = {
+        const query = db.find({
             fields: this.fields,
             ...extraProps,
             selector,
-            limit: limit === 0 ? undefined : limit,
+            limit: limit === 0
+                ? undefined
+                : limit,
             skip,
-        }
-        return await PromisE.timeout(
-            db.find(query),
-            timeout,
-        )
+        })
+        return await !isPositiveInteger(timeout)
+            ? query
+            : PromisE.timeout(query, timeout)
     }
 
     /**
