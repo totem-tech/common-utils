@@ -146,7 +146,11 @@ export const FormInput = React.memo(props => {
         uncheckedValue = false,
         useOptions = _useOptions,
         validate,
+        inputPropsToWatch = [],
     } = input
+    inputPropsToWatch.forEach(key => {
+        input.inputProps[key] = useRxSubjectOrValue(inputProps[key])
+    })
     components = {
         InputGroup: FormInputGroup,
         ...defaultNativeComponents,
@@ -207,12 +211,13 @@ export const FormInput = React.memo(props => {
         rxMessageExt, // used to keep track of and update any external message (props.message)
         rxIsFocused,  // keeps track of whether input field is focused
         msgEl, // message element
-        rxValueModifier,
+        __rxValueModifier,
         rxValue,
         rxValueIsSubject,
         msgExtIsSubject,
         isOptionsType,
-        handleChange,
+        __handleChange,
+        rxMessage
     ] = useMemo(() => {
         const addDeferred = (subject, defer = 0) => {
             const nextOrg = subject.next.bind(subject)
@@ -274,7 +279,7 @@ export const FormInput = React.memo(props => {
             }} />
         )
         const handleChange = handleChangeCb(
-            input,
+            { ...input, inputProps },
             rxValue,
             rxMessage,
             setError,
@@ -307,6 +312,7 @@ export const FormInput = React.memo(props => {
             msgExtIsSubject,
             isOptionsType,
             handleChange,
+            rxMessage
         ]
     }, [])
     // synchronise rxMessageExt with external message if necessary
@@ -321,7 +327,30 @@ export const FormInput = React.memo(props => {
         ? 'select'
         : Input
 
+    const handleChange = handleChangeCb(
+        { ...input, inputProps },
+        rxValue,
+        rxMessage,
+        setError,
+    )
     // re-render on value change regardless of direction
+    const rxValueModifier = useCallback((newValue, oldValue) => {
+        if (isFn(_rxValueModifier)) newValue = _rxValueModifier(
+            newValue,
+            oldValue,
+            rxValue,
+        )
+        !isEqual(rxValue.___validated, newValue) && setTimeout(() => {
+            handleChange({
+                preventDefault: () => { },
+                target: {
+                    value: newValue,
+                },
+                stopPropagation: () => { },
+            })
+        }, 100)
+        return newValue
+    })
     const [value] = useRxSubject(rxValue, rxValueModifier)
 
     if (hidden) return ''
@@ -655,6 +684,8 @@ const handleChangeCb = (
         requiredAlt,
         type = _type,
     } = inputProps
+
+    if (input.name.includes('share')) console.warn({ inputProps })
     const isCheck = ['checkbox', 'radio'].includes(type)
 
     const { required = requiredAlt } = input
