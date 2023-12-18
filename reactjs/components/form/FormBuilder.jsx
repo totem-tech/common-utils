@@ -79,6 +79,7 @@ export const FormBuilder = React.memo(propsOrg => {
         // valuesToCompare,
     } = props
 
+
     const {
         formId,
         getButton,
@@ -91,10 +92,11 @@ export const FormBuilder = React.memo(propsOrg => {
     } = useMemo(() => {
         // setup form ID
         window.___formCount ??= 1000
+        const formIdPrefix = 'FormBuilder_'
         let formId = formProps.id
-        if (!formId || formIds.get(formId)) {
+        if (!formId || formId.startsWith(formIdPrefix) && formIds.get(formId)) {
             // create unique ID if multiple instances of the same form is created 
-            formId = `${formId || 'FormBuilder'}${++___formCount}`
+            formId = `${formIdPrefix}${++window.___formCount}`
         }
         formIds.set(formId, true)
         formProps.id = formId
