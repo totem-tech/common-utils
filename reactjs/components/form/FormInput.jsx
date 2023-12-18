@@ -685,9 +685,7 @@ const handleChangeCb = (
         type = _type,
     } = inputProps
 
-    if (input.name.includes('share')) console.warn({ inputProps })
     const isCheck = ['checkbox', 'radio'].includes(type)
-
     const { required = requiredAlt } = input
     let {
         persist,
