@@ -132,6 +132,7 @@ export const FormInput = React.memo(props => {
         messageHideOnBlur = true,
         name: _name,
         idPrefix = '',
+        onInvalid,
         onMount,
         onUnmount,
         placeholder: _placeholder,
@@ -406,6 +407,7 @@ export const FormInput = React.memo(props => {
                 {required && (
                     <span {...{
                         children: ' *',
+                        className: 'InputRequiredIndicator',
                         style: { color: 'red' },
                         title: textsCap.requiredField,
                     }} />
@@ -418,9 +420,9 @@ export const FormInput = React.memo(props => {
                         inline: inlineCounter,
                         maxLength,
                         minLength,
+                        rxValueModifier,
                         show: rxIsFocused,
                         subject: rxValue,
-                        rxValueModifier,
                         warnLength: counterWarnLength,
                     }} />
                 )}
@@ -428,6 +430,10 @@ export const FormInput = React.memo(props => {
                     <LabelDetails {...{
                         ...labelDetailsProps,
                         children: labelDetails,
+                        className: className([
+                            labelDetailsProps?.className,
+                            'FormInput-LabelDetails',
+                        ])
                     }} />
                 )}
             </Label>
@@ -572,6 +578,7 @@ FormInput.propTypes = {
     // Set a prefix for input element IDs to be passed down to the DOM to prevent duplicate IDs in case multiple instances of the same form is created
     // Using 'null' prevents adding any prefix.
     // idPrefix
+    // onError
     // onMount,
     // onUnmount,
     // prefix,
@@ -635,6 +642,7 @@ const handleChangeCb = (
         customMessages,
         inputProps = {},
         integer = false, // number validation
+        onError,
         onChangeSelectValue,
         uncheckedValue = false,
         validate,
@@ -693,7 +701,7 @@ const handleChangeCb = (
         } catch (_) { } // ignore unsupported
     })
 
-    const data = { ...input, value }
+    const data = { ...input, value, checked }
     let err, isANum = false
     let hasVal = hasValue(
         isCheck
@@ -718,7 +726,6 @@ const handleChangeCb = (
             break
         case 'checkbox':
         case 'radio':
-            console.log({ checked: event.target.checked })
             data.checked = !!checked
             data.value = !!checked
                 ? checkedValue
@@ -816,6 +823,8 @@ const handleChangeCb = (
             ...args
         )
         setCursor()
+
+        !!error && onError?.(message, value)
 
         // prevents re-validation because of the trigger
         rxValue.___validated = data.value

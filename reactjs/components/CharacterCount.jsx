@@ -89,6 +89,7 @@ export const CharacterCount = React.memo(props => {
 
         return (
             <div style={{
+                className: 'CharacterCount',
                 display: inline
                     ? 'inline-block'
                     : 'block',

@@ -9,6 +9,7 @@ import { translated } from '../../../languageHelper'
 import { copyRxSubject } from '../../../rx'
 import {
     arrUnique,
+    className,
     isArr,
     isFn,
     isStr,
@@ -86,6 +87,7 @@ export const FormBuilder = React.memo(propsOrg => {
         rxMessage,
         rxState,
         toUpdate,
+        rxValues,
     } = useMemo(() => {
         // setup form ID
         window.___formCount ??= 1000
@@ -215,6 +217,7 @@ export const FormBuilder = React.memo(propsOrg => {
             } catch (err) {
                 rxMessage.next({
                     header: textsCap.submitError,
+                    status: 'error',
                     text: `${err}`.replace('Error: ', ''),
                 })
             }
@@ -297,6 +300,7 @@ export const FormBuilder = React.memo(propsOrg => {
             rxMessage,
             rxState,
             toUpdate,
+            rxValues,
         }
     }, [])
 
@@ -346,7 +350,7 @@ export const FormBuilder = React.memo(propsOrg => {
     return (
         <Form {...{
             autoComplete: 'off',
-            className: 'form-builder',
+            className: 'FormBuilder',
             noValidate: true,
             ...formProps,
         }}>
@@ -357,6 +361,7 @@ export const FormBuilder = React.memo(propsOrg => {
                 .map(addInterceptorCb(
                     { ...props, ...state },
                     rxState.value.inputsHidden,
+                    rxValues,
                     handleChangeCb,
                     formId,
                 ))
@@ -401,7 +406,15 @@ export const FormBuilder = React.memo(propsOrg => {
                         const props = isStr(message) || isValidElement(message)
                             ? { content: message }
                             : message
-                        return !!message && <Message {...props} />
+                        return !!message && (
+                            <Message {...{
+                                ...props,
+                                className: className([
+                                    props.className,
+                                    'FormMessage'
+                                ]),
+                            }} />
+                        )
                     }
                 }} />
             )}
@@ -515,6 +528,7 @@ export default FormBuilder
 const addInterceptorCb = (
     props = {},
     inputsHidden = [],
+    rxValues,
     handleChange,
     formId,
     parentIndex = null,
@@ -524,8 +538,8 @@ const addInterceptorCb = (
         inputsCommonProps,
         inputsDisabled = [],
         inputsReadOnly = [],
-        values,
     } = props
+    const values = rxValues.value || {}
     let {
         content,
         hidden = false,
@@ -589,6 +603,7 @@ const addInterceptorCb = (
                 addInterceptorCb(
                     props,
                     inputsHidden,
+                    rxValues,
                     handleChange,
                     formId,
                     parentIndex || index,
@@ -617,7 +632,7 @@ const addInterceptorCb = (
                 event,
                 data,
                 {
-                    ...values,
+                    ...rxValues.value,
                     // this is required because onChange() is trigger after validate().
                     // otherwise, current input will have the old value or last character missing for text/number inputs
                     [name]: data.value,
