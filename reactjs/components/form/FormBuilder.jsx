@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types'
-import React, { isValidElement, useMemo } from 'react'
+import React, { isValidElement, useEffect, useMemo } from 'react'
 import { BehaviorSubject } from 'rxjs'
 import { translated } from '../../../languageHelper'
 import { copyRxSubject } from '../../../rx'
@@ -7,7 +7,9 @@ import {
     arrUnique,
     className,
     isArr,
+    isBool,
     isFn,
+    isObj,
     isStr,
     isSubjectLike,
     toArray,
@@ -41,8 +43,7 @@ const defaultComponents = {
     FormInput: _FormInput,
     Message: _Message,
 }
-export const FormBuilder = React.memo(propsOrg => {
-    const props = { ...propsOrg }
+export const FormBuilder = React.memo(props => {
     const {
         formId,
         getButton,
@@ -51,218 +52,18 @@ export const FormBuilder = React.memo(propsOrg => {
         rxMessage,
         rxState,
         rxValues,
-    } = useMemo(() => {
-        // setup form ID
-        window.___formCount ??= 1000
-        const formIdPrefix = 'FormBuilder_'
-        propsOrg.formProps ??= {}
-        let formId = propsOrg.formProps.id
-        if (!formId || formId.startsWith(formIdPrefix) && formIds.get(formId)) {
-            // create unique ID if multiple instances of the same form is created 
-            formId = `${formIdPrefix}${++window.___formCount}`
-        }
-        formIds.set(formId, true)
-        propsOrg.formProps.id = formId
+        rxMirroredProps,
+        keysToMirror,
+    } = useMemo(() => setup(props), [])
 
-        // subject for internal error messages
-        const rxMessage = new BehaviorSubject()
-        const propsToWatch = arrUnique([
-            'inputs',
-            'inputsHidden',
-            'inputsDisabled',
-            'inputsReadOnly',
-            'loading',
-            'submitInProgress',
-            'submitDisabled',
-            'values',
-            'valuesToCompare',
-            ...Object
-                .keys(propsOrg)
-                .filter(x => isSubjectLike(propsOrg[x]))
-        ]);
-        [['inputs', []], ['values', {}]]
-            .forEach(([key, defaultValue]) => {
-                if (isSubjectLike(props[key])) return
-                props[key] = new BehaviorSubject(props[key] || defaultValue)
-            })
-        const rxInputs = props.inputs
-        const rxValues = props.values
-        rxInputs.value?.forEach?.(addMissingProps)
-        // auto update watched props to state
-        const stateModifier = (propValues = []) => {
-            let inputs = propValues[propsToWatch.indexOf('inputs')] ?? []
-            let inputsHidden = toArray(propValues[propsToWatch.indexOf('inputsHidden')] ?? [])
-            let loading = propValues[propsToWatch.indexOf('loading')] ?? false
-            let submitInProgress = propValues[propsToWatch.indexOf('submitInProgress')] ?? false
-            let submitDisabled = propValues[propsToWatch.indexOf('submitDisabled')] ?? false
-            let valuesToCompare = propValues[propsToWatch.indexOf('valuesToCompare')] ?? undefined
-            inputsHidden = arrUnique([
-                ...toArray(inputsHidden),
-                ...inputs?.filter(({ inputProps = {} }) => {
-                    const { hidden, name } = inputProps
-                    return !inputsHidden.includes(name) && (
-                        isSubjectLike(hidden)
-                            ? hidden.value
-                            : isFn(hidden)
-                                ? !!hidden(values, name)
-                                : hidden
-                    )
-                })
-                    ?.map(x => x.inputProps.name)
-                || []
-            ])
-            const inputsInvalid = !!inputs?.find?.(x =>
-                checkInputInvalid(x, inputsHidden)
-            )
-            const valuesChanged = requireChange && checkValuesChanged(
-                inputs,
-                values,
-                valuesToCompare,
-                inputsHidden,
-            )
-
-            // disable submit button if one of the following is true:
-            // 1. none of the input's value has changed
-            // 2. message status or form is "loading" (indicates submit or some input validation is in progress)
-            // 3. one or more inputs contains invalid value (based on validation criteria)
-            // 4. one or more required inputs does not contain a value
-            submitDisabled = submitDisabled
-                || submitInProgress
-                || loading
-                || !!inputsInvalid
-                || valuesChanged
-            return {
-                ...props,
-                ...propsToWatch.reduce((obj, key) => ({
-                    ...obj,
-                    [key]: propValues[key],
-                }), {}),
-                init: true,
-                inputs,
-                inputsHidden,
-                loading,
-                submitInProgress,
-                submitDisabled,
-                valuesToCompare,
-            }
-        }
-        const rxState = copyRxSubject(
-            propsToWatch.map(key => propsOrg[key]),
-            null,
-            stateModifier,
-            defer,
-        )
-
-        const handleSubmit = async (event) => {
-            try {
-                event?.preventDefault?.()
-                const {
-                    inputsHidden,
-                    loading,
-                    submitDisabled,
-                } = rxState.value
-                if (submitDisabled || loading) return
-
-                const inputs = rxInputs.value || []
-                const values = getValues(inputs)
-                const allOk = !loading
-                    && !submitDisabled
-                    && !inputs.find(x => checkInputInvalid(x, inputsHidden))
-                isFn(onSubmit) && await onSubmit(
-                    allOk,
-                    values,
-                    inputs,
-                    event,
-                )
-                closeOnSubmit && onClose?.()
-            } catch (err) {
-                rxMessage.next({
-                    header: textsCap.submitError,
-                    status: 'error',
-                    text: `${err}`.replace('Error: ', ''),
-                })
-            }
-        }
-
-        const handleChangeCb = name => async (event, { error, value }) => {
-            const inputs = rxInputs.value || []
-            const input = name && findInput(name, inputs)
-            if (!input) return
-
-            const { inputProps } = input
-            inputProps.error = error
-            inputProps.value = value
-            input.valid = error !== true
-
-            const triggerChange = values => {
-                values = values || getValues(inputs)
-                rxInputs.next([...inputs])
-                rxValues.next({ ...values })
-            }
-
-            // clear submit error message
-            if (rxMessage.value) setTimeout(() => rxMessage.next(null))
-
-            let values = getValues(inputs)
-            let doTrigger = await input
-                ?.inputProps
-                ?.onChange?.(
-                    values,
-                    inputs,
-                    event,
-                )
-
-            if (!isFn(formOnChange)) return doTrigger !== false && triggerChange()
-
-            const formValid = !inputs.find(x =>
-                checkInputInvalid(x, rxState.value.inputsHidden)
-            )
-            doTrigger = await formOnChange(
-                formValid,
-                doTrigger
-                    ? getValues(inputs)
-                    : values,
-                inputs,
-                name,
-            )
-
-            doTrigger !== false && triggerChange()
-        }
-
-        const getButton = (textOrProps, extraProps) => {
-            if (textOrProps === null) return
-            const {
-                Component = Button,
-                ...props
-            } = toProps(textOrProps)
-            return (
-                <Component {...{
-                    ...props,
-                    ...extraProps,
-                    children: props.children || extraProps.children,
-                    onClick: (...args) => {
-                        args[0]?.preventDefault?.()
-                        props.onClick?.(...args)
-                        extraProps?.onClick?.(...args)
-                    },
-                    style: {
-                        ...extraProps?.style,
-                        ...props.style,
-                    },
-                }} />
-            )
-        }
-
-        return {
-            formId,
-            getButton,
-            handleChangeCb,
-            handleSubmit,
-            rxMessage,
-            rxState,
-            rxValues,
-        }
-    }, [])
+    const valuesToMirror = keysToMirror.map(x => props[x])
+    keysToMirror.length > 0 && useEffect(() => {
+        const mirroredValues = keysToMirror.reduce((obj, key) => ({
+            ...obj,
+            [key]: props[key]
+        }), {})
+        rxMirroredProps.next(mirroredValues)
+    }, valuesToMirror)
 
     // delay form state update when multiple update is triggered concurrently/too frequently
     const [state] = useRxSubject(rxState)
@@ -287,9 +88,8 @@ export const FormBuilder = React.memo(propsOrg => {
         submitText, // string or element or object
         suffix,
         submitDisabledIfUnchanged: requireChange = false,
-        init,
         inputs = [],
-        // inputsHidden = [],
+        inputsHidden = [],
         // inputsDisabled = [],
         // inputsReadOnly = [],
         loading = false,
@@ -297,6 +97,10 @@ export const FormBuilder = React.memo(propsOrg => {
         submitDisabled = false,
         values = {},
         // valuesToCompare = {},
+
+        // local state
+        init,
+        submitShouldDisable,
     } = state
     let { // default components
         Actions,
@@ -308,13 +112,13 @@ export const FormBuilder = React.memo(propsOrg => {
 
     useMount(
         () => onMount?.(
-            propsOrg,
+            props,
             formId,
             values,
             submitDisabled,
         ),
         () => onUnmount?.(
-            propsOrg,
+            props,
             formId,
             values,
             submitDisabled,
@@ -327,14 +131,15 @@ export const FormBuilder = React.memo(propsOrg => {
             className: 'FormBuilder',
             noValidate: true,
             ...formProps,
+            id: formId,
         }}>
             {prefix}
 
             {/* Form inputs */}
             {init && inputs
                 .map(addInterceptorCb(
-                    state,
-                    rxState.value.inputsHidden,
+                    { ...props, ...state },
+                    inputsHidden,
                     rxValues,
                     handleChangeCb,
                     formId,
@@ -358,7 +163,7 @@ export const FormBuilder = React.memo(propsOrg => {
                     })}
                     {actions.map((action, i) => getButton(action, { key: i }))}
                     {getButton(submitText, {
-                        disabled: submitDisabled,
+                        disabled: submitDisabled || submitShouldDisable,
                         onClick: handleSubmit,
                         [loadingProp || '']: !loadingProp
                             ? undefined
@@ -377,14 +182,14 @@ export const FormBuilder = React.memo(propsOrg => {
                     subject: [rxMessage, message],
                     valueModifier: ([message, messageExt]) => {
                         message = message || messageExt
-                        const props = isStr(message) || isValidElement(message)
+                        const msgProps = isStr(message) || isValidElement(message)
                             ? { content: message }
                             : message
                         return !!message && (
                             <Message {...{
-                                ...props,
+                                ...msgProps,
                                 className: className([
-                                    props.className,
+                                    msgProps.className,
                                     'FormMessage'
                                 ]),
                             }} />
@@ -613,5 +418,268 @@ const addInterceptorCb = (
                 },
                 rxValue,
             ),
+    }
+}
+
+const setup = props => {
+    let {
+        components,
+        defer = 300,
+        formProps: {
+            id: formId
+        } = {},
+    } = props
+    // setup form ID
+    window.___formCount ??= 1000
+    const formIdPrefix = 'FormBuilder_'
+    const generateId = !formId
+        || (formId.startsWith(formIdPrefix) && formIds.get(formId))
+    // create unique ID if multiple instances of the same form is created 
+    if (generateId) formId = `${formIdPrefix}${++window.___formCount}`
+    formIds.set(formId, true)
+
+    // subject for internal error messages
+    const rxMessage = new BehaviorSubject()
+    const rxMirroredProps = new BehaviorSubject({})
+    const rxState = new BehaviorSubject({})
+    const propsToWatch = Object
+        .keys(props)
+        .filter(x => isSubjectLike(props[x]))
+    const rxValues = isSubjectLike(props.values)
+        ? props.values
+        : new BehaviorSubject(props.values || {})
+    // auto update watched props to state
+    const stateModifier = ([
+        mirroredProps,
+        values = {},
+        ...propValues
+    ]) => {
+        const watchedValues = propsToWatch
+            .reduce((obj, key, i) => ({
+                ...obj,
+                [key]: propValues[i],
+            }), {})
+        const state = {
+            ...props,
+            ...rxState.value,
+            ...mirroredProps,
+            ...watchedValues,
+            values,
+        }
+        let {
+            inputs = [],
+            inputsHidden = [],
+            loading = false,
+            submitInProgress = false,
+            submitDisabled = false,
+            submitDisabledIfUnchanged: requireChange = false,
+            valuesToCompare,
+        } = state
+
+        if (!state.init) {
+            inputs?.forEach?.(addMissingProps)
+            state.init = true
+            state.components = { ...defaultComponents, ...components }
+        }
+
+        // let inputs = propValues[propsToWatch.indexOf('inputs')] ?? []
+        inputsHidden = toArray(inputsHidden)
+        submitDisabled = isObj(submitDisabled)
+            ? Object
+                .values(submitDisabled)
+                .every(Boolean)
+            : !!submitDisabled
+        inputsHidden = arrUnique([
+            ...toArray(inputsHidden),
+            ...inputs?.filter(({ inputProps = {} }) => {
+                const { hidden, name } = inputProps
+                return !inputsHidden.includes(name) && (
+                    isSubjectLike(hidden)
+                        ? hidden.value
+                        : isFn(hidden)
+                            ? !!hidden(values, name)
+                            : hidden
+                )
+            })?.map(x => x.inputProps.name) || []
+        ])
+        const inputsInvalid = !!inputs?.find?.(x =>
+            checkInputInvalid(x, inputsHidden)
+        )
+        const valuesChanged = requireChange && checkValuesChanged(
+            inputs,
+            values,
+            valuesToCompare,
+            inputsHidden,
+        )
+
+        // disable submit button if one of the following is true:
+        // 1. none of the input's value has changed
+        // 2. message status or form is "loading" (indicates submit or some input validation is in progress)
+        // 3. one or more inputs contains invalid value (based on validation criteria)
+        // 4. one or more required inputs does not contain a value
+        const submitShouldDisable = submitDisabled
+            || submitInProgress
+            || loading
+            || !!inputsInvalid
+            || valuesChanged
+
+        return {
+            ...state,
+            inputs,
+            inputsHidden,
+            loading,
+            submitInProgress,
+            submitDisabled,
+            submitShouldDisable,
+            valuesToCompare,
+        }
+    }
+    copyRxSubject(
+        [
+            rxMirroredProps,
+            rxValues,
+            ...propsToWatch.map(key => props[key])
+        ],
+        rxState,
+        stateModifier,
+        defer,
+    )
+
+    const handleSubmit = async (event) => {
+        try {
+            event?.preventDefault?.()
+            const {
+                closeOnSubmit,
+                inputsHidden,
+                loading,
+                onSubmit,
+                submitDisabled,
+            } = rxState.value
+            if (submitDisabled || loading) return
+
+            const { inputs = [] } = rxState.value
+            const values = getValues(inputs)
+            const allOk = !loading
+                && !submitDisabled
+                && !inputs.find(x => checkInputInvalid(x, inputsHidden))
+            isFn(onSubmit) && await onSubmit(
+                allOk,
+                values,
+                inputs,
+                event,
+            )
+            closeOnSubmit && onClose?.()
+        } catch (err) {
+            rxMessage.next({
+                header: textsCap.submitError,
+                status: 'error',
+                text: `${err}`.replace('Error: ', ''),
+            })
+        }
+    }
+
+    const handleChangeCb = name => async (event, { error, value }) => {
+        const {
+            inputs = [],
+            onChange: formOnChange,
+        } = rxState.value
+        const input = name && findInput(name, inputs)
+        if (!input) return
+
+        const { inputProps } = input
+        inputProps.error = error
+        inputProps.value = value
+        input.valid = error !== true
+
+        const triggerChange = values => {
+            values = values || getValues(inputs)
+            isSubjectLike(props.inputs)
+                ? props.inputs.next([...inputs])
+                : rxState.next({ ...rxState.value, inputs })
+
+            rxValues.next({ ...values })
+        }
+
+        // clear submit error message
+        if (rxMessage.value) setTimeout(() => rxMessage.next(null))
+
+        let values = getValues(inputs)
+        let doTrigger = await input
+            ?.inputProps
+            ?.onChange?.(
+                values,
+                inputs,
+                event,
+            )
+
+        if (!isFn(formOnChange)) return doTrigger !== false && triggerChange()
+
+        const formValid = !inputs.find(x =>
+            checkInputInvalid(x, rxState.value.inputsHidden)
+        )
+        doTrigger = await formOnChange(
+            formValid,
+            doTrigger
+                ? getValues(inputs)
+                : values,
+            inputs,
+            name,
+        )
+
+        doTrigger !== false && triggerChange()
+    }
+
+    const getButton = (textOrProps, extraProps) => {
+        if (textOrProps === null) return
+        const {
+            components: { Button } = {}
+        } = rxState.value
+        const {
+            Component = Button,
+            ...btnProps
+        } = toProps(textOrProps)
+        return (
+            <Component {...{
+                ...extraProps,
+                ...btnProps,
+                children: btnProps.children || extraProps.children,
+                disabled: !!(
+                    isBool(btnProps.disabled)
+                        ? btnProps.disabled
+                        : extraProps.disabled
+                ),
+                onClick: (...args) => {
+                    args[0]?.preventDefault?.()
+                    btnProps.onClick?.(...args)
+                    extraProps?.onClick?.(...args)
+                },
+                style: {
+                    ...extraProps?.style,
+                    ...btnProps.style,
+                },
+            }} />
+        )
+    }
+
+    return {
+        formId,
+        getButton,
+        handleChangeCb,
+        handleSubmit,
+        rxMessage,
+        rxState,
+        rxValues,
+        rxMirroredProps,
+        keysToMirror: [
+            'inputs',
+            'inputsHidden',
+            'inputsDisabled',
+            'inputsReadOnly',
+            'loading',
+            'submitInProgress',
+            'submitDisabled',
+            'values',
+            'valuesToCompare',
+        ].filter(key => !isSubjectLike(props[key]))
     }
 }

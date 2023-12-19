@@ -90,6 +90,9 @@ export const FormInput = React.memo(props => {
             ...uiLibProps?.inputProps,
         },
     }
+    input.inputPropsToWatch?.forEach?.(key => {
+        input.inputProps[key] = useRxSubjectOrValue(input.inputProps[key])
+    })
     let {
         checkedValue = true,
         components,
@@ -115,6 +118,7 @@ export const FormInput = React.memo(props => {
         inputSuffix,
         inputProps,
         inputPropsIgnored = [],
+        inputPropsToWatch = [],
         integer = false, // number validation
         label,
         labelBeforeInput = true,
@@ -146,11 +150,7 @@ export const FormInput = React.memo(props => {
         uncheckedValue = false,
         useOptions = _useOptions,
         validate,
-        inputPropsToWatch = [],
     } = input
-    inputPropsToWatch.forEach(key => {
-        input.inputProps[key] = useRxSubjectOrValue(inputProps[key])
-    })
     components = {
         InputGroup: FormInputGroup,
         ...defaultNativeComponents,
@@ -204,7 +204,6 @@ export const FormInput = React.memo(props => {
     hidden = useRxSubjectOrValue(hidden)
     const isTypeHidden = type === 'hidden'
     const isHidden = hidden || isTypeHidden
-
     // internal validation error status
     const [error, setError] = useState()
     const [
@@ -274,6 +273,7 @@ export const FormInput = React.memo(props => {
                     rxMessage,
                     rxMessageExt,
                     rxIsFocused,
+                    rxValue,
                 ],
                 valueModifier: getMessageEl,
             }} />
