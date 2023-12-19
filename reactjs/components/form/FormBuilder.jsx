@@ -266,13 +266,6 @@ export const FormBuilder = React.memo(propsOrg => {
 
     // delay form state update when multiple update is triggered concurrently/too frequently
     const [state] = useRxSubject(rxState)
-    let { // default components
-        Actions,
-        Button,
-        Form,
-        FormInput = _FormInput,
-        Message = _Message,
-    } = { ...defaultComponents, ...components }
     const {
         actions = [],
         actionsPrefix,
@@ -305,6 +298,13 @@ export const FormBuilder = React.memo(propsOrg => {
         values = {},
         // valuesToCompare = {},
     } = state
+    let { // default components
+        Actions,
+        Button,
+        Form,
+        FormInput = _FormInput,
+        Message = _Message,
+    } = { ...defaultComponents, ...components }
 
     useMount(
         () => onMount?.(
