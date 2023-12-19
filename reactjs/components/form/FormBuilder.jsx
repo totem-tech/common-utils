@@ -1,9 +1,5 @@
 import PropTypes from 'prop-types'
-import React, {
-    isValidElement,
-    useEffect,
-    useMemo,
-} from 'react'
+import React, { isValidElement, useMemo } from 'react'
 import { BehaviorSubject } from 'rxjs'
 import { translated } from '../../../languageHelper'
 import { copyRxSubject } from '../../../rx'
@@ -47,39 +43,6 @@ const defaultComponents = {
 }
 export const FormBuilder = React.memo(propsOrg => {
     const props = { ...propsOrg }
-    let {
-        actions = [],
-        actionsPrefix,
-        actionsSuffix,
-        components,
-        defer = 300,
-        submitButtonLoadingProp: loadingProp,
-        closeText = textsCap.close,
-        closeOnSubmit,
-        formProps = {},
-        // inputs,
-        // inputsCommonProps,
-        // inputsDisabled = [],
-        // inputsHidden = [],
-        // inputsReadOnly = [],
-        // loading,
-        message,
-        onChange: formOnChange,
-        onClose,
-        onMount,
-        onSubmit,
-        onUnmount,
-        prefix,
-        // submitDisabled, // Boolean or BehaviorSubject
-        submitDisabledIfUnchanged: requireChange = false,
-        // submitInProgress,// Boolean or BehaviorSubject
-        submitText, // string or element or object
-        suffix,
-        // values: _values, // Object or BehaviorSubject
-        // valuesToCompare,
-    } = props
-
-
     const {
         formId,
         getButton,
@@ -87,69 +50,64 @@ export const FormBuilder = React.memo(propsOrg => {
         handleSubmit,
         rxMessage,
         rxState,
-        toUpdate,
         rxValues,
     } = useMemo(() => {
         // setup form ID
         window.___formCount ??= 1000
         const formIdPrefix = 'FormBuilder_'
-        let formId = formProps.id
+        propsOrg.formProps ??= {}
+        let formId = propsOrg.formProps.id
         if (!formId || formId.startsWith(formIdPrefix) && formIds.get(formId)) {
             // create unique ID if multiple instances of the same form is created 
             formId = `${formIdPrefix}${++window.___formCount}`
         }
         formIds.set(formId, true)
-        formProps.id = formId
+        propsOrg.formProps.id = formId
 
         // subject for internal error messages
         const rxMessage = new BehaviorSubject()
-        const toObserve = [
+        const propsToWatch = arrUnique([
             'inputs',
             'inputsHidden',
             'inputsDisabled',
             'inputsReadOnly',
             'loading',
-            'message',
             'submitInProgress',
             'submitDisabled',
             'values',
             'valuesToCompare',
-        ]
-        const toUpdate = toObserve
-            .map(key => {
-                const value = propsOrg[key]
-                if (isSubjectLike(value)) return
-                const subject = new BehaviorSubject(value)
-                props[key] = subject
-                return [key, subject]
+            ...Object
+                .keys(propsOrg)
+                .filter(x => isSubjectLike(propsOrg[x]))
+        ]);
+        [['inputs', []], ['values', {}]]
+            .forEach(([key, defaultValue]) => {
+                if (isSubjectLike(props[key])) return
+                props[key] = new BehaviorSubject(props[key] || defaultValue)
             })
-            .filter(Boolean)
         const rxInputs = props.inputs
-        rxInputs.value?.forEach?.(addMissingProps)
         const rxValues = props.values
-        const stateModifier = ([
-            inputs,
-            inputsHidden = [],
-            inputsDisabled,
-            inputsReadOnly,
-            loading,
-            submitInProgress,
-            submitDisabled,
-            valuesToCompare,
-        ]) => {
+        rxInputs.value?.forEach?.(addMissingProps)
+        // auto update watched props to state
+        const stateModifier = (propValues = []) => {
+            let inputs = propValues[propsToWatch.indexOf('inputs')] ?? []
+            let inputsHidden = toArray(propValues[propsToWatch.indexOf('inputsHidden')] ?? [])
+            let loading = propValues[propsToWatch.indexOf('loading')] ?? false
+            let submitInProgress = propValues[propsToWatch.indexOf('submitInProgress')] ?? false
+            let submitDisabled = propValues[propsToWatch.indexOf('submitDisabled')] ?? false
+            let valuesToCompare = propValues[propsToWatch.indexOf('valuesToCompare')] ?? undefined
             inputsHidden = arrUnique([
                 ...toArray(inputsHidden),
-                ...inputs
-                    ?.filter(({ inputProps = {} }) => {
-                        const { hidden, name } = inputProps
-                        return !inputsHidden.includes(name) && (
-                            isSubjectLike(hidden)
-                                ? hidden.value
-                                : isFn(hidden)
-                                    ? !!hidden(values, name)
-                                    : hidden
-                        )
-                    })
+                ...inputs?.filter(({ inputProps = {} }) => {
+                    const { hidden, name } = inputProps
+                    return !inputsHidden.includes(name) && (
+                        isSubjectLike(hidden)
+                            ? hidden.value
+                            : isFn(hidden)
+                                ? !!hidden(values, name)
+                                : hidden
+                    )
+                })
                     ?.map(x => x.inputProps.name)
                 || []
             ])
@@ -173,22 +131,23 @@ export const FormBuilder = React.memo(propsOrg => {
                 || loading
                 || !!inputsInvalid
                 || valuesChanged
-
             return {
+                ...props,
+                ...propsToWatch.reduce((obj, key) => ({
+                    ...obj,
+                    [key]: propValues[key],
+                }), {}),
+                init: true,
                 inputs,
                 inputsHidden,
-                inputsDisabled: toArray(inputsDisabled),
-                inputsReadOnly: toArray(inputsReadOnly),
-                init: true,
                 loading,
                 submitInProgress,
                 submitDisabled,
-                values,
                 valuesToCompare,
             }
         }
         const rxState = copyRxSubject(
-            toObserve.map(key => props[key]),
+            propsToWatch.map(key => propsOrg[key]),
             null,
             stateModifier,
             defer,
@@ -301,17 +260,10 @@ export const FormBuilder = React.memo(propsOrg => {
             handleSubmit,
             rxMessage,
             rxState,
-            toUpdate,
             rxValues,
         }
     }, [])
 
-    // synchronize with local subjects
-    toUpdate.forEach(([key, subject]) =>
-        useEffect(() => {
-            subject.next(propsOrg[key])
-        }, [propsOrg[key]])
-    )
     // delay form state update when multiple update is triggered concurrently/too frequently
     const [state] = useRxSubject(rxState)
     let { // default components
@@ -322,6 +274,26 @@ export const FormBuilder = React.memo(propsOrg => {
         Message = _Message,
     } = { ...defaultComponents, ...components }
     const {
+        actions = [],
+        actionsPrefix,
+        actionsSuffix,
+        components,
+        defer = 300,
+        submitButtonLoadingProp: loadingProp,
+        closeText = textsCap.close,
+        closeOnSubmit,
+        formProps = {},
+        message,
+        onChange: formOnChange,
+        onClose,
+        onMount,
+        onSubmit,
+        onUnmount,
+        prefix,
+
+        submitText, // string or element or object
+        suffix,
+        submitDisabledIfUnchanged: requireChange = false,
         init,
         inputs = [],
         // inputsHidden = [],
@@ -336,13 +308,13 @@ export const FormBuilder = React.memo(propsOrg => {
 
     useMount(
         () => onMount?.(
-            props,
+            propsOrg,
             formId,
             values,
             submitDisabled,
         ),
         () => onUnmount?.(
-            props,
+            propsOrg,
             formId,
             values,
             submitDisabled,
@@ -361,7 +333,7 @@ export const FormBuilder = React.memo(propsOrg => {
             {/* Form inputs */}
             {init && inputs
                 .map(addInterceptorCb(
-                    { ...props, ...state },
+                    state,
                     rxState.value.inputsHidden,
                     rxValues,
                     handleChangeCb,
