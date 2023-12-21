@@ -209,7 +209,7 @@ class ChatClient {
                 },
                 err => {
                     const translatedErr = translateError(err)
-                    log('EmitError', eventName, { translatedErr, err })
+                    // log('EmitError', eventName, { translatedErr, err })
                     isFn(onError) && onError(translatedErr, err)
                     isFn(callback) && callback(err)
                     isFn(onFail) && onFail(err, args)
@@ -1316,17 +1316,19 @@ export const translateError = err => {
         const keys = Object.keys(err)
         // no errors
         if (keys.length === 0) return null
-        return keys.forEach(key => err[key] = translateError(err[key]))
+        return keys.forEach(key =>
+            err[key] = translateError(err?.[key])
+        )
     }
 
     // translate if there is any error message
     const inputNameSeperator = ' => '
     const infoSeperator = ': '
-    err = translated(err.split(inputNameSeperator))[0]
+    err = translated(err?.split(inputNameSeperator))[0]
         .join(inputNameSeperator)
     err = !err.includes(infoSeperator)
         ? err
-        : translated(err.split(infoSeperator))[0]
+        : translated(err?.split(infoSeperator))[0]
             .join(infoSeperator)
     return err
     // let inputName = ''
