@@ -111,6 +111,7 @@ const msgOrTrue = (msg, value) => !msg || msg === true
  * 
  * @param   {*} value 
  * @param   {Object} config 
+ * @param   {Object|String} customMessages message overrides. Use string to override all error messages with single
  * 
  * @example 
  * <BR>
@@ -156,9 +157,14 @@ export const validate = (value, config, customMessages = {}) => {
             type,
             unique = false,
         } = config || {}
-        const _msgOrTrue = !includeValue
-            ? msg => msgOrTrue(msg)
-            : msgOrTrue
+        const _msgOrTrue = (msg, value) => msgOrTrue(
+            isStr(config.customMessages)
+                ? config.customMessages
+                : msg,
+            includeValue
+                ? value
+                : undefined
+        )
         strict ??= type !== TYPES.email
 
         const gotValue = hasValue(value)
@@ -347,6 +353,7 @@ export const validate = (value, config, customMessages = {}) => {
  * @param   {Object}  config      configuration to validate specific keys in the object
  * @param   {Boolean} failFast    whether to return on first error
  * @param   {Boolean} includeLabel whether to include property name in the error
+ * @param   {String|Object} customMessages if `string`, all errors will use a single message.
  * @param   {Boolen}  includeValue whether to include value in the error (where applicable)
  * 
  * @example
@@ -384,7 +391,13 @@ export const validateObj = (
     includeValue = true,
 ) => {
     try {
-        const errorMsgs = { ...messages, ...customMessages }
+        const errorMsgs = {
+            ...messages,
+            ...customMessages,
+            ...isStr(customMessages) && Object
+                .keys(messages)
+                .reduce((obj, key) => ({ ...obj, [key]: customMessages }), {})
+        }
         if (!isObj(obj, config.strict || false)) return msgOrTrue(errorMsgs.object)
 
         const keys = Object.keys(config)
@@ -396,7 +409,7 @@ export const validateObj = (
             const keyConf = config[key]
             const {
                 // config: childConf,
-                customMessages: keyErrMsgs,
+                customMessages: entryMsgs,
                 label,
                 name,
                 // type,
@@ -409,11 +422,10 @@ export const validateObj = (
                     includeValue,
                     ...keyConf,
                 },
-                {
+                isStr(entryMsgs)
+                    ? entryMsgs
                     // combine error messages
-                    ...errorMsgs,
-                    ...keyErrMsgs,
-                },
+                    : { ...errorMsgs, ...entryMsgs },
             )
             if (!error) continue
 
