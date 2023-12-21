@@ -57,16 +57,11 @@ export const messages = {
 }
 translated(messages, true)
 export const messagesAlt = {
-    max: 'numberMax',
-    maxLength: 'lengthMax',
-    min: 'numberMin',
-    minLegnth: 'lengthMin',
+    numberMax: 'max',
+    numberMin: 'min',
+    lengthMax: 'maxLength',
+    lengthMin: 'minLegnth',
 }
-Object
-    .keys(messagesAlt)
-    .forEach(key =>
-        messages[key] ??= messages[messagesAlt[key]]
-    )
 // Accepted validation types.
 // Any type not listed here will be ignored.
 export const TYPES = Object.freeze({
@@ -132,7 +127,6 @@ export const validate = (value, config, customMessages = {}) => {
         ...customMessages,
         ...config.customMessages,
     }
-
 
     // If error message is falsy change it to `true`
     Object
@@ -238,14 +232,22 @@ export const validate = (value, config, customMessages = {}) => {
                 break
             case TYPES.number:
                 if (!isValidNumber(value)) return _msgOrTrue(errorMsgs.number)
-                if (isValidNumber(min) && value < min) return _msgOrTrue(errorMsgs.numberMin, min)
-                if (isValidNumber(max) && value > max) return _msgOrTrue(errorMsgs.numberMax, max)
+                if (isValidNumber(min) && value < min) return _msgOrTrue(
+                    errorMsgs.min ?? errorMsgs.numberMin,
+                    min
+                )
+                if (isValidNumber(max) && value > max) return _msgOrTrue(
+                    errorMsgs.max ?? errorMsgs.numberMax,
+                    max
+                )
                 if (isValidNumber(decimals) && decimals >= 0) {
                     if (decimals === 0) {
                         if (!isInteger(value)) return _msgOrTrue(errorMsgs.integer)
                         break
                     }
-                    const len = (value.toString().split('.')[1] || '').length
+                    const len = `${value || ''}`
+                        .split('.')[1]
+                        ?.length || 0
                     if (len > decimals) return _msgOrTrue(errorMsgs.decimals, decimals)
                 }
                 break
@@ -317,8 +319,14 @@ export const validate = (value, config, customMessages = {}) => {
 
         // validate array/integer/number/string length
         const len = (valueIsArr ? value : `${value}`).length
-        if (isValidNumber(maxLength) && len > maxLength) return _msgOrTrue(errorMsgs.lengthMax, maxLength)
-        if (isValidNumber(minLength) && len < minLength) return _msgOrTrue(errorMsgs.lengthMin, minLength)
+        if (isValidNumber(maxLength) && len > maxLength) return _msgOrTrue(
+            errorMsgs.maxLength ?? errorMsgs.lengthMax,
+            maxLength
+        )
+        if (isValidNumber(minLength) && len < minLength) return _msgOrTrue(
+            errorMsgs.minLength ?? errorMsgs.lengthMin,
+            minLength
+        )
 
         // valid according to the config
         return null
