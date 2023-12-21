@@ -144,6 +144,9 @@ class ChatClient {
             const eventMeta = await this.awaitReady(eventName, timeout) || {}
             let {
                 customMessages,
+                failFast,
+                includeLabel,
+                includeValue,
                 params = [],
                 result: resultDef = {},
             } = eventMeta
@@ -176,9 +179,10 @@ class ChatClient {
                 const err = validateObj(
                     args,
                     _params,
-                    true,
-                    true,
-                    customMessages
+                    failFast,
+                    includeLabel,
+                    customMessages,
+                    includeValue
                 )
                 if (err) throw new Error(err)
             }
