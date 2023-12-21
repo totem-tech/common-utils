@@ -112,28 +112,25 @@ export const checkValuesChanged = (
 export const fillInputs = (
     inputs = [],
     values = [],
-    addRxValue = false
+    addRxValue = false,
 ) => {
     inputs.forEach(input => {
         if (addRxValue) input.rxValue ??= new BehaviorSubject('')
         input.inputProps ??= {}
         const {
             inputs: childInputs,
-            inputProps: {
-                name: _name,
-            },
+            inputProps: { name: _name },
             name = _name,
             rxValue,
         } = input
-        if (isArr(childInputs)) return fillInputs(childInputs, values)
+        if (isArr(childInputs)) fillInputs(childInputs, values)
 
         if (!values.hasOwnProperty(name)) return
 
         const value = values[name]
-        // if value is RxJS subject trigger a value change
-        if (isSubjectLike(rxValue)) return rxValue.next(value)
-
         input.inputProps.value = value
+        // if value is RxJS subject trigger a value change
+        rxValue?.next?.(value)
     })
     return inputs
 }

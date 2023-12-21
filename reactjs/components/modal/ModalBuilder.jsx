@@ -165,12 +165,13 @@ export function ModalBuilder({
     )
 }
 const actionPropType = PropTypes.oneOfType([
+    PropTypes.element,
+    PropTypes.object,
     PropTypes.string,
     // any props that are accepted by MUI Button component
     PropTypes.shape({
         Component: PropTypes.element,// for custom button
     }),
-    PropTypes.element,
 ])
 ModalBuilder.propTypes = {
     // Additional buttons to be displayed on the right side of the close button

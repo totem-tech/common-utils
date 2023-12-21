@@ -44,9 +44,11 @@ export const copyRxSubject = (
     defer,
 ) => {
     const sourceIsArr = isArr(rxSource)
-    const gotSource = !sourceIsArr
-        ? isSubjectLike(rxSource)
-        : rxSource.every(isSubjectLike)
+    if (sourceIsArr) rxSource = rxSource.map(x => !isSubjectLike(x)
+        ? new BehaviorSubject(x)
+        : x
+    )
+    const gotSource = sourceIsArr || isSubjectLike(rxSource)
     const gotModifier = isFn(valueModifier)
 
     const isValid = value => value !== IGNORE_UPDATE_SYMBOL
@@ -89,7 +91,7 @@ export const copyRxSubject = (
         const subs = !sourceIsArr
             ? rxSource.subscribe(value => setValue(value))
             : rxSource.map((x, i) =>
-                x.subscribe(value => {
+                x?.subscribe(value => {
                     values[i] = value
                     setValue(values)
                 })
