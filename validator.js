@@ -101,7 +101,7 @@ export const setMessages = (messagesOverrides = {}) => {
 }
 
 // if msg is falsy, returns true
-const _msgOrTrue = (msg, value) => !msg || msg === true
+const msgOrTrue = (msg, value) => !msg || msg === true
     ? true
     : `${msg}${isDefined(value) ? ': ' + value : ''}`
 
@@ -140,6 +140,7 @@ export const validate = (value, config, customMessages = {}) => {
             config: propertiesAlt,
             failFast,
             includeLabel,
+            includeValue = true,
             instanceOf,
             requiredKeys,
             max,
@@ -155,6 +156,9 @@ export const validate = (value, config, customMessages = {}) => {
             type,
             unique = false,
         } = config || {}
+        const _msgOrTrue = !includeValue
+            ? msg => msgOrTrue(msg)
+            : msgOrTrue
         strict ??= type !== TYPES.email
 
         const gotValue = hasValue(value)
@@ -343,6 +347,7 @@ export const validate = (value, config, customMessages = {}) => {
  * @param   {Object}  config      configuration to validate specific keys in the object
  * @param   {Boolean} failFast    whether to return on first error
  * @param   {Boolean} includeLabel whether to include property name in the error
+ * @param   {Boolen}  includeValue whether to include value in the error (where applicable)
  * 
  * @example
  * <BR>
@@ -370,10 +375,17 @@ export const validate = (value, config, customMessages = {}) => {
  * 
  * @returns {String|Object|Null} Null if no errors. If @failFast, String otherwise, Object with one or more errors.
  */
-export const validateObj = (obj = {}, config = {}, failFast = true, includeLabel = true, customMessages = {}) => {
+export const validateObj = (
+    obj = {},
+    config = {},
+    failFast = true,
+    includeLabel = true,
+    customMessages = {},
+    includeValue = true,
+) => {
     try {
         const errorMsgs = { ...messages, ...customMessages }
-        if (!isObj(obj, config.strict || false)) return _msgOrTrue(errorMsgs.object)
+        if (!isObj(obj, config.strict || false)) return msgOrTrue(errorMsgs.object)
 
         const keys = Object.keys(config)
         let errors = {}
@@ -392,13 +404,10 @@ export const validateObj = (obj = {}, config = {}, failFast = true, includeLabel
             let error = validate(
                 value,
                 {
+                    failFast,
+                    includeLabel,
+                    includeValue,
                     ...keyConf,
-                    failFast: isBool(keyConf.failFast)
-                        ? keyConf.failFast
-                        : failFast,
-                    includeLabel: isBool(keyConf.includeLabel)
-                        ? keyConf.includeLabel
-                        : includeLabel,
                 },
                 {
                     // combine error messages
