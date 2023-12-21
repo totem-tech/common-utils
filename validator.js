@@ -111,7 +111,7 @@ const msgOrTrue = (msg, value) => !msg || msg === true
  * 
  * @param   {*} value 
  * @param   {Object} config 
- * @param   {Object|String} customMessages message overrides. Use string to override all error messages with single
+ * @param   {String|Object} customMessages if `string`, all errors will use a single message.
  * 
  * @example 
  * <BR>
