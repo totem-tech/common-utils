@@ -56,6 +56,17 @@ export const messages = {
     unexpectedError: 'unexpected validation error occured',
 }
 translated(messages, true)
+export const messagesAlt = {
+    max: 'numberMax',
+    maxLength: 'lengthMax',
+    min: 'numberMin',
+    minLegnth: 'lengthMin',
+}
+Object
+    .keys(messagesAlt)
+    .forEach(key =>
+        messages[key] ??= messages[messagesAlt[key]]
+    )
 // Accepted validation types.
 // Any type not listed here will be ignored.
 export const TYPES = Object.freeze({
@@ -121,6 +132,7 @@ export const validate = (value, config, customMessages = {}) => {
         ...customMessages,
         ...config.customMessages,
     }
+
 
     // If error message is falsy change it to `true`
     Object
