@@ -424,7 +424,7 @@ const addInterceptorCb = (
 const setup = props => {
     let {
         components,
-        defer = 300,
+        defer = 100,
         formProps: {
             id: formId
         } = {},

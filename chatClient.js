@@ -1330,7 +1330,7 @@ export const translateError = err => {
         ? err
         : translated(err?.split(infoSeperator))[0]
             .join(infoSeperator)
-    return err
+    return textCapitalize(err)
     // let inputName = ''
     // let message = err
     // let suffix = ''
