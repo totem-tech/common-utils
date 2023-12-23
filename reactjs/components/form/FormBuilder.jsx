@@ -1,5 +1,9 @@
 import PropTypes from 'prop-types'
-import React, { isValidElement, useEffect, useMemo } from 'react'
+import React, {
+    isValidElement,
+    useEffect,
+    useMemo
+} from 'react'
 import { BehaviorSubject } from 'rxjs'
 import { translated } from '../../../languageHelper'
 import { copyRxSubject } from '../../../rx'
@@ -49,16 +53,16 @@ export const FormBuilder = React.memo(props => {
         getButton,
         handleChangeCb,
         handleSubmit,
+        propsToMirror = [],
         rxMessage,
         rxState,
         rxValues,
         rxMirroredProps,
-        keysToMirror,
     } = useMemo(() => setup(props), [])
 
-    const valuesToMirror = keysToMirror.map(x => props[x])
-    keysToMirror.length > 0 && useEffect(() => {
-        const mirroredValues = keysToMirror.reduce((obj, key) => ({
+    const valuesToMirror = propsToMirror.map(x => props[x])
+    propsToMirror.length > 0 && useEffect(() => {
+        const mirroredValues = propsToMirror.reduce((obj, key) => ({
             ...obj,
             [key]: props[key]
         }), {})
@@ -482,8 +486,6 @@ const setup = props => {
             state.components = { ...defaultComponents, ...components }
         }
 
-        // let inputs = propValues[propsToWatch.indexOf('inputs')] ?? []
-        inputsHidden = toArray(inputsHidden)
         submitDisabled = isObj(submitDisabled)
             ? Object
                 .values(submitDisabled)
@@ -589,7 +591,7 @@ const setup = props => {
         const { inputProps } = input
         inputProps.error = error
         inputProps.value = value
-        input.valid = error !== true
+        input.valid = !error
 
         const triggerChange = values => {
             values = values || getValues(inputs)
@@ -666,11 +668,7 @@ const setup = props => {
         getButton,
         handleChangeCb,
         handleSubmit,
-        rxMessage,
-        rxState,
-        rxValues,
-        rxMirroredProps,
-        keysToMirror: [
+        propsToMirror: [
             'inputs',
             'inputsHidden',
             'inputsDisabled',
@@ -680,6 +678,10 @@ const setup = props => {
             'submitDisabled',
             'values',
             'valuesToCompare',
-        ].filter(key => !isSubjectLike(props[key]))
+        ].filter(key => !isSubjectLike(props[key])),
+        rxMessage,
+        rxState,
+        rxValues,
+        rxMirroredProps,
     }
 }

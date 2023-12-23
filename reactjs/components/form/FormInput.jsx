@@ -73,10 +73,8 @@ const defaultNativeComponents = {
 let defaultUILibProps
 
 export const FormInput = React.memo(props => {
-    let input = !props.addMissingProps
-        ? props
-        // makes sure required variables are set
-        : useMemo(() => addMissingProps(props), [props])
+    // makes sure required variables are set
+    let input = useMemo(() => addMissingProps(props), [props])
 
     const uiLibProps = defaultUILibProps?.(
         input.type || input.inputProps?.type || 'text',
@@ -435,9 +433,9 @@ export const FormInput = React.memo(props => {
                 {label}
                 {required && (
                     <span {...{
-                        children: ' *',
+                        children: '*',
                         className: 'InputRequiredIndicator',
-                        style: { color: 'red' },
+                        style: { color: 'red', paddingLeft: 3 },
                         title: textsCap.requiredField,
                     }} />
                 )}
