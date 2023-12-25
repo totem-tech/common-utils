@@ -572,6 +572,7 @@ const setup = props => {
             )
             closeOnSubmit && onClose?.()
         } catch (err) {
+            console.error(err)
             rxMessage.next({
                 header: textsCap.submitError,
                 status: 'error',

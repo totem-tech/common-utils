@@ -138,9 +138,10 @@ export const fillInputs = (
         if (!values.hasOwnProperty(name)) return
 
         const value = values[name]
-        input.inputProps.value = value
         // if value is RxJS subject trigger a value change
-        rxValue?.next?.(value)
+        if (addRxValue || isSubjectLike(rxValue)) return rxValue.next(value)
+        input.inputProps.value = value
+
     })
     return inputs
 }

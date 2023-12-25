@@ -333,6 +333,7 @@ export const FormInput = React.memo(props => {
     )
     // re-render on value change regardless of direction
     const rxValueModifier = useCallback((newValue, oldValue) => {
+        const checked = rxValue.___checked
         if (isFn(_rxValueModifier)) newValue = _rxValueModifier(
             newValue,
             oldValue,
@@ -342,14 +343,15 @@ export const FormInput = React.memo(props => {
             handleChange({
                 preventDefault: () => { },
                 target: {
+                    checked,
                     value: newValue,
                 },
                 stopPropagation: () => { },
             })
         }, 100)
-        return newValue
+        return [newValue, checked]
     })
-    const [value] = useRxSubject(rxValue, rxValueModifier)
+    const [[value, newChecked]] = useRxSubject(rxValue, rxValueModifier)
 
     if (hidden) return ''
     if (isTypeHidden) return (
@@ -470,8 +472,7 @@ export const FormInput = React.memo(props => {
 
     if (type === 'html') return getContainer(content)
 
-    const isCheckRadio = type.startsWith('checkbox')
-        || type.startsWith('radio')
+    const isCheckRadio = ['checkbox', 'radio'].includes(type)
 
     inputChildren = !optionsReplaceProp
         && optionItems
@@ -481,7 +482,9 @@ export const FormInput = React.memo(props => {
         <Input {...objWithoutKeys(
             {
                 ...inputProps,
-                checked: undefined,
+                checked: !isCheckRadio
+                    ? undefined
+                    : newChecked ?? value === checkedValue,
                 ...inputChildren && {
                     children: inputChildren
                 },
@@ -693,9 +696,7 @@ const handleChangeCb = (
             value: eValue,
         } = {},
     } = event || {}
-    let value = isObj(args[0]) && args[0].hasOwnProperty('value')
-        ? args[0].value
-        : eValue
+    let value = args[0]?.value ?? eValue
     if (isFn(onChangeSelectValue)) {
         const changedValue = onChangeSelectValue(event, ...args)
         value = changedValue !== undefined
@@ -733,15 +734,21 @@ const handleChangeCb = (
         } catch (_) { } // ignore unsupported
     })
 
+    if (isCheck) {
+        checked ??= JSON.stringify(value) === JSON.stringify(checkedValue)
+        value = checked
+            ? checkedValue
+            : uncheckedValue
+        rxValue.___checked = checked
+    }
+
     const data = { ...input, value, checked }
     let err, isANum = false
-    let hasVal = hasValue(
-        isCheck
-            ? required
-                ? data.checked === true
-                : data.checked
-            : data.value
-    )
+    let hasVal = isCheck
+        ? required
+            ? data.checked === true
+            : data.checked
+        : hasValue(data.value)
     const customMsgs = {
         ...errorMessages,
         // Hide min & max length related error messages as a counter will be displayed for appropriate types.
@@ -757,11 +764,6 @@ const handleChangeCb = (
             break
         case 'checkbox':
         case 'radio':
-            data.checked = !!checked
-            data.value = !!checked
-                ? checkedValue
-                : uncheckedValue
-            if (required && !data.checked) hasVal = false
             break
         case 'date':
             validatorConfig.type ??= TYPES.date
