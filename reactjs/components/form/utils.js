@@ -26,6 +26,7 @@ export const addMissingProps = (input, nameSuffix = ++addMissingProps.count) => 
         inputProps: ip,
         inputs: childInputs,
         name,
+        onChange,
         type = ip?.type,
     } = input
     input._init_ = 'yes'
@@ -37,6 +38,7 @@ export const addMissingProps = (input, nameSuffix = ++addMissingProps.count) => 
     ip.type ??= type || 'text'
     ip.name ??= name || `${ip.type}${nameSuffix}`
     ip.id ??= id || ip.name
+    ip.onChange ??= onChange
     return input
 }
 addMissingProps.count = 10000
@@ -119,8 +121,8 @@ export const checkValuesChanged = (
  */
 export const fillInputs = (
     inputs = [],
-    values = [],
-    addRxValue = false,
+    values = {},
+    addRxValue = true,
 ) => {
     inputs.forEach(input => {
         if (addRxValue) input.rxValue ??= new BehaviorSubject('')

@@ -605,6 +605,7 @@ FormInput.propTypes = {
     // Set a prefix for input element IDs to be passed down to the DOM to prevent duplicate IDs in case multiple instances of the same form is created
     // Using 'null' prevents adding any prefix.
     // idPrefix
+    // onChangeSelectValue (event, ...) : value
     // onError
     // onMount,
     // onUnmount,
@@ -689,9 +690,6 @@ const handleChangeCb = (
         persist,
         target: {
             checked,
-            selectionEnd,
-            selectionStart,
-            setSelectionRange,
             value: eValue,
         } = {},
     } = event || {}
@@ -716,6 +714,13 @@ const handleChangeCb = (
     // preserves cursor position
     const setCursor = () => setTimeout(() => {
         try {
+            let {
+                target: {
+                    selectionEnd,
+                    selectionStart,
+                    setSelectionRange,
+                } = {},
+            } = event || {}
             isFn(setSelectionRange)
                 && selectionStart
                 && selectionEnd
@@ -743,7 +748,6 @@ const handleChangeCb = (
         // To override this simply set `undefined` in the `customMessages`.
         lengthMax: true,
         lengthMin: true,
-        ...customMessages,
     }
 
     // ignore if doens't have value
@@ -821,6 +825,7 @@ const handleChangeCb = (
         err = validator.validate(
             value,
             {
+                customMessages,
                 ...inputProps,
                 ...validatorConfig,
             },
