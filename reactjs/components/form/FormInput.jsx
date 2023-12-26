@@ -677,7 +677,9 @@ const handleChangeCb = (
         onChangeSelectValue,
         uncheckedValue = false,
         validate,
-        validatorConfig = {},
+        validatorConfig = {
+            includeValue: !isStr(customMessages)
+        },
         type: _type,
     } = input
     let {
