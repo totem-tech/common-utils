@@ -72,7 +72,7 @@ const defaultNativeComponents = {
 }
 let defaultUILibProps
 
-export const FormInput = React.memo(props => {
+export const FormInput = React.memo(function FormInput(props) {
     // makes sure required variables are set
     let input = useMemo(() => addMissingProps(props), [props])
 

@@ -13,4 +13,5 @@ export * from './RxSubjectView'
 export * from './ScrollbarStyled'
 export * from './ScrollIndicator'
 export * from './setupDefaults' // keep at the end 
+export * from './StringReplace'
 export * from './UseHook'

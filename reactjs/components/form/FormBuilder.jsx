@@ -47,7 +47,7 @@ const defaultComponents = {
     FormInput: _FormInput,
     Message: _Message,
 }
-export const FormBuilder = React.memo(props => {
+export const FormBuilder = React.memo(function FormBuilder(props) {
     const {
         formId,
         getButton,
