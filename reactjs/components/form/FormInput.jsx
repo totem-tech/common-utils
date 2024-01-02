@@ -11,6 +11,7 @@ import { translated } from '../../../languageHelper'
 import {
     className,
     deferred,
+    fallbackIfFails,
     hasValue,
     isArr,
     isDefined,
@@ -74,8 +75,10 @@ let defaultUILibProps
 
 export const FormInput = React.memo(function FormInput(props) {
     // makes sure required variables are set
-    let input = useMemo(() => addMissingProps(props), [props])
+    let [input, setInput, rxInput] = useRxSubject(undefined, undefined, props)
 
+    useMemo(() => setInput(props), [props])
+    // let input = useMemo(() => addMissingProps(props), [props])
     const uiLibProps = defaultUILibProps?.(
         input.type || input.inputProps?.type || 'text',
         input
@@ -208,12 +211,10 @@ export const FormInput = React.memo(function FormInput(props) {
         rxMessageExt, // used to keep track of and update any external message (props.message)
         rxIsFocused,  // keeps track of whether input field is focused
         msgEl, // message element
-        __rxValueModifier,
         rxValue,
         rxValueIsSubject,
         msgExtIsSubject,
         isOptionsType,
-        __handleChange,
         rxMessage
     ] = useMemo(() => {
         const addDeferred = (subject, defer = 0) => {
@@ -260,7 +261,7 @@ export const FormInput = React.memo(function FormInput(props) {
                         className: className([
                             'FormInput-Message',
                             message?.className,
-                        ])
+                        ]),
                     }} />
                 )
         }
@@ -276,40 +277,14 @@ export const FormInput = React.memo(function FormInput(props) {
                 valueModifier: getMessageEl,
             }} />
         )
-        const handleChange = handleChangeCb(
-            { ...input, inputProps },
-            rxValue,
-            rxMessage,
-            setError,
-        )
-        // local rxValue modifier
-        const rxValueModifier = (newValue, oldValue) => {
-            if (isFn(_rxValueModifier)) newValue = _rxValueModifier(
-                newValue,
-                oldValue,
-                rxValue,
-            )
-            !isEqual(rxValue.___validated, newValue) && setTimeout(() => {
-                handleChange({
-                    preventDefault: () => { },
-                    target: {
-                        value: newValue,
-                    },
-                    stopPropagation: () => { },
-                })
-            }, 100)
-            return newValue
-        }
         return [
             rxMessageExt,
             rxIsFocused,
             msgEl,
-            rxValueModifier,
             rxValue,
             rxValueIsSubject,
             msgExtIsSubject,
             isOptionsType,
-            handleChange,
             rxMessage
         ]
     }, [])
@@ -326,20 +301,22 @@ export const FormInput = React.memo(function FormInput(props) {
         : Input
 
     const handleChange = handleChangeCb(
-        { ...input, inputProps },
+        rxInput, //{ ...rxInput.value, inputProps },
         rxValue,
         rxMessage,
         setError,
     )
     // re-render on value change regardless of direction
-    const rxValueModifier = useCallback((newValue, oldValue) => {
+    const rxValueModifier = useCallback((newValue, [oldValue, _oldChecked] = []) => {
         const checked = rxValue.___checked
         if (isFn(_rxValueModifier)) newValue = _rxValueModifier(
             newValue,
             oldValue,
             rxValue,
         )
-        !isEqual(rxValue.___validated, newValue) && setTimeout(() => {
+
+        const shouldTrigger = !isEqual(rxValue.___validated, newValue)
+        shouldTrigger && setTimeout(() => {
             handleChange({
                 preventDefault: () => { },
                 target: {
@@ -348,7 +325,7 @@ export const FormInput = React.memo(function FormInput(props) {
                 },
                 stopPropagation: () => { },
             })
-        }, 100)
+        })
         return [newValue, checked]
     })
     const [[value, newChecked]] = useRxSubject(rxValue, rxValueModifier)
@@ -373,10 +350,11 @@ export const FormInput = React.memo(function FormInput(props) {
                 containerProps?.className,
                 { error }
             ]),
+            name,
             style: {
                 ...containerProps?.style,
                 ...labelInline && { display: 'table' },
-            }
+            },
         }}>
             {prefix}
             {labelBeforeInput && label}
@@ -663,11 +641,12 @@ FormInput.setupDefaults = (name, module) => {
 export default FormInput
 
 const handleChangeCb = (
-    input,
+    rxInput,
     rxValue,
     rxMessage,
     setError,
 ) => (event, ...args) => {
+    const input = rxInput.value
     let {
         checkedValue = true,
         customMessages,
@@ -704,8 +683,8 @@ const handleChangeCb = (
         value = changedValue !== undefined
             ? changedValue
             : value
-
     }
+
     // value unchanged
     const unchanged = !isCheck && isEqual(rxValue.___validated, value)
     if (unchanged) return
@@ -737,7 +716,7 @@ const handleChangeCb = (
     })
 
     if (isCheck) {
-        checked ??= JSON.stringify(value) === JSON.stringify(checkedValue)
+        checked ??= isEqual(value, checkedValue)
         value = checked
             ? checkedValue
             : uncheckedValue
@@ -748,8 +727,8 @@ const handleChangeCb = (
     let err, isANum = false
     let hasVal = isCheck
         ? required
-            ? data.checked === true
-            : data.checked
+            ? checked === true
+            : !!checked
         : hasValue(data.value)
     const customMsgs = {
         ...errorMessages,
@@ -760,12 +739,13 @@ const handleChangeCb = (
     }
 
     // ignore if doens't have value
-    if (hasVal) switch (type) {
+    if (hasVal || validatorConfig.required) switch (type) {
         case 'array':
             validatorConfig.type ??= TYPES.array
             break
         case 'checkbox':
         case 'radio':
+            validatorConfig.type ??= TYPES.boolean
             break
         case 'date':
             validatorConfig.type ??= TYPES.date
@@ -804,9 +784,10 @@ const handleChangeCb = (
     // input value is required but empty
     // if (required && !hasVal) err = true
 
+    const validateType = validatorConfig.type ?? type
     const requireValidator = !err
-        && hasVal
-        && validationTypes.includes(type)
+        && (hasVal || validatorConfig.required)
+        && validationTypes.includes(validateType)
     if (!!requireValidator) {
         // hide min & max length error messages if not defined by external error messages
         objSetPropUndefined(
@@ -827,9 +808,14 @@ const handleChangeCb = (
             errorMessages.minLengthNum,
         )
         err = validator.validate(
-            value,
+            !isCheck
+                ? value
+                : checked
+                    ? true
+                    : undefined,
             {
                 customMessages,
+                required,
                 ...inputProps,
                 ...validatorConfig,
             },
@@ -882,11 +868,15 @@ const handleChangeCb = (
 }
 
 const isEqual = (v1, v2) => {
-    v1 = isStr(v1)
-        ? v1
-        : JSON.stringify(v1)
-    v2 = isStr(v2)
-        ? v2
-        : JSON.stringify(v2)
-    return v1 === v2
+    try {
+        v1 = isStr(v1)
+            ? v1
+            : JSON.stringify(v1)
+        v2 = isStr(v2)
+            ? v2
+            : JSON.stringify(v2)
+        return v1 === v2
+    } catch (err) {
+        return false
+    }
 }

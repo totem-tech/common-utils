@@ -196,3 +196,47 @@ export const getValues = (
         : value
     return values
 }, values)
+
+
+
+// trigger re-validation of empty inputs
+export const reValidateInputs = (
+    inputs,
+    values,
+    inputsHidden = [],
+    scrollToSelector = 'html'
+) => {
+    const names = Object
+        .keys(values)
+        .map(name => {
+            const input = findInput(name, inputs) || {}
+            const {
+                hidden,
+                required: _required,
+                type: _type,
+                inputProps: {
+                    required = _required,
+                    type = _type,
+                } = {},
+                rxValue,
+            } = input
+            const ignore = !(required?.value ?? required)
+                || !rxValue
+                || hidden
+                || type === 'hidden'
+            if (ignore) return
+            const invalid = checkInputInvalid(input, inputsHidden)
+            if (!invalid) return
+
+            rxValue.___validated = null
+            rxValue?.next?.(values[name])
+            return name
+        })
+        .filter(Boolean)
+    const top = document
+        .querySelector(`.FormInput-Container[name="${names[0]}"`)
+        ?.offsetTop
+    top && document
+        .querySelector(scrollToSelector)
+        ?.scrollTo?.({ top, behavior: 'smooth' })
+}
