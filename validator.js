@@ -138,21 +138,23 @@ export const validate = (value, config, customMessages = {}) => {
         let {
             accept,
             decimals,
-            config: propertiesAlt,
+            config: propertiesAlt, // to be deprecated
             failFast,
             includeLabel,
             includeValue = true,
             instanceOf,
-            requiredKeys,
+            label,
             max,
             maxLength,
             min,
             minLength,
+            name,
             properties: childConf = propertiesAlt,
             or, // alternative validation configaration if validation fails
             regex,
             reject,
             required,
+            requiredKeys,
             strict, // for url or object types
             type,
             unique = false,
@@ -165,6 +167,14 @@ export const validate = (value, config, customMessages = {}) => {
                 ? value
                 : undefined
         )
+        childConf = !isArr(childConf)
+            ? childConf
+            : childConf // turn properties array into an object validation config
+                .filter(x => !!x.name) // must have a name of the property
+                .reduce((obj, item) => ({
+                    ...obj,
+                    [item.name]: item,
+                }), { required, type: TYPES.object })
         strict ??= type !== TYPES.email
 
         const gotValue = hasValue(value)
@@ -182,7 +192,8 @@ export const validate = (value, config, customMessages = {}) => {
             ? _msgOrTrue(errorMsgs.required)
             : null
 
-        let valueIsArr = false
+        let valueIsArr, valueIsMap, valueIsObj
+
         // validate value type
         switch (type) {
             case TYPES.array:
@@ -225,7 +236,11 @@ export const validate = (value, config, customMessages = {}) => {
                 if (!isHex(value)) return _msgOrTrue(errorMsgs.hex)
                 break
             case TYPES.identity:
-                const { chainType, chainId, ignoreChecksum } = config || {}
+                const {
+                    chainType,
+                    chainId,
+                    ignoreChecksum
+                } = config || {}
                 const isIdentityValid = isAddress(
                     value,
                     chainType,
@@ -239,6 +254,7 @@ export const validate = (value, config, customMessages = {}) => {
                 break
             case TYPES.map:
                 if (!isMap(value)) return _msgOrTrue(errorMsgs.map)
+                valueIsMap = true
                 break
             case TYPES.number:
                 if (!isValidNumber(value)) return _msgOrTrue(errorMsgs.number)
@@ -268,14 +284,15 @@ export const validate = (value, config, customMessages = {}) => {
                     && requiredKeys.length > 0
                     && !objHasKeys(value, requiredKeys)
                 ) return _msgOrTrue(errorMsgs.requiredKeys)
-                // validate child properties of the `value` object
-                err = isObj(childConf, strict) && validateObj(
-                    value,
-                    childConf,
-                    failFast,
-                    includeLabel,
-                    errorMsgs,
-                )
+                valueIsObj = true
+                // // validate child properties of the `value` object
+                // err = isObj(childConf, strict) && validateObj(
+                //     value,
+                //     childConf,
+                //     failFast,
+                //     includeLabel,
+                //     errorMsgs,
+                // )
                 if (err) return err
                 break
             case TYPES.string:
@@ -311,14 +328,14 @@ export const validate = (value, config, customMessages = {}) => {
             // if `value` is array all items in it must be in the `accept` array
             const valid = !valueIsArr
                 ? accept.includes(value)
-                : value.every(v => accept.includes(v))
+                : !value.find(v => !accept.includes(v))
             if (!valid) return _msgOrTrue(errorMsgs.accept)
         }
         // valid only if value `reject` array does not include the `value` or items in `value` array
         if (isArr(reject) && reject.length) {
             const valid = !valueIsArr
                 ? !reject.includes(value)
-                : value.every(v => !reject.includes(v))
+                : !value.find(v => reject.includes(v))
             if (!valid) return _msgOrTrue(errorMsgs.reject)
         }
 
@@ -338,6 +355,36 @@ export const validate = (value, config, customMessages = {}) => {
             minLength
         )
 
+        // WIP: validate children | test required
+        const validateChildren = [TYPES.array, TYPES.map].includes(type) && isObj(childConf)
+        if (validateChildren) {
+            const items = valueIsArr
+                ? value
+                : valueIsMap
+                    ? [...value].map(([_, item]) => item)
+                    : valueIsObj
+                        ? [value]
+                        : []
+            for (let i = 0;i < items.length;i++) {
+                err = validateObj(
+                    items[i],
+                    {
+                        label: valueIsObj
+                            ? label
+                            : `${label} [${i}]`,
+                        name: valueIsObj
+                            ? name
+                            : `${name}[${i}]`,
+                        ...childConf,
+                    },
+                    failFast,
+                    includeLabel,
+                    errorMsgs,
+                    includeValue,
+                )
+                if (err) return _msgOrTrue(err)
+            }
+        }
         // valid according to the config
         return null
     } catch (err) {
