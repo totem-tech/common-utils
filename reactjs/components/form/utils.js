@@ -109,6 +109,20 @@ export const checkValuesChanged = (
         return newValue !== oldValue
     }) !== undefined
 
+// clear input values
+export const clearInputs = (
+    inputNames = {},
+    inputs = [],
+    overrideValues = {},
+) => {
+    const values = Object
+        .values(inputNames)
+        .reduce((values, name) => ({
+            ...values,
+            [name]: '',
+        }), {})
+    fillInputs(inputs, { ...values, ...overrideValues })
+}
 /**
  * @name    fillInputs
  * @summary fill inputs with values
@@ -124,7 +138,10 @@ export const fillInputs = (
     values = {},
     addRxValue = true,
 ) => {
-    inputs.forEach(input => {
+    const _inputs = isSubjectLike(inputs)
+        ? inputs.value
+        : inputs
+    _inputs.forEach(input => {
         if (addRxValue) input.rxValue ??= new BehaviorSubject('')
         input.inputProps ??= {}
         const {
@@ -206,6 +223,12 @@ export const reValidateInputs = (
     inputsHidden = [],
     scrollToSelector = 'html'
 ) => {
+    inputs = isSubjectLike(inputs)
+        ? inputs.value
+        : inputs
+    values = isSubjectLike(values)
+        ? values.value
+        : values || getValues(inputs)
     const names = Object
         .keys(values)
         .map(name => {
@@ -233,10 +256,13 @@ export const reValidateInputs = (
             return name
         })
         .filter(Boolean)
+
     const top = document
         .querySelector(`.FormInput-Container[name="${names[0]}"`)
         ?.offsetTop
     top && document
         .querySelector(scrollToSelector)
         ?.scrollTo?.({ top, behavior: 'smooth' })
+
+    return names
 }

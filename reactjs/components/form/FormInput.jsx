@@ -739,55 +739,58 @@ const handleChangeCb = (
     }
 
     // ignore if doens't have value
-    if (hasVal || validatorConfig.required) switch (type) {
-        case 'array':
-            validatorConfig.type ??= TYPES.array
-            break
-        case 'checkbox':
-        case 'radio':
-            validatorConfig.type ??= TYPES.boolean
-            break
-        case 'date':
-            validatorConfig.type ??= TYPES.date
-            break
-        case 'email':
-            validatorConfig.type ??= TYPES.email
-            break
-        case 'identity':
-            validatorConfig.type ??= TYPES.identity
-            break
-        case 'number':
-            isANum = true
-            validatorConfig.type ??= integer
-                ? TYPES.integer
-                : TYPES.number
-            data.value = !data.value
-                ? data.value
-                : Number(data.value)
-            value = data.value
-            break
-        case 'url':
-            validatorConfig.type ??= TYPES.url
-            break
-        case 'hex':
-            validatorConfig.type ??= TYPES.hex
-        case 'text':
-        case 'textarea':
-        default:
-            value = isArr(value)
-                ? value
-                : `${!isDefined(value) ? '' : value}`
-            validatorConfig.type ??= TYPES.string
-            break
+    const validateAs = validatorConfig.type ?? type
+    const shouldValidate = hasVal || validatorConfig.required
+    if (shouldValidate) {
+        switch (validateAs) {
+            case 'array':
+                validatorConfig.type ??= TYPES.array
+                break
+            case 'checkbox':
+            case 'radio':
+                validatorConfig.type ??= TYPES.boolean
+                break
+            case 'date':
+                validatorConfig.type ??= TYPES.date
+                break
+            case 'email':
+                validatorConfig.type ??= TYPES.email
+                break
+            case 'identity':
+                validatorConfig.type ??= TYPES.identity
+                break
+            case 'number':
+                isANum = true
+                validatorConfig.type ??= integer
+                    ? TYPES.integer
+                    : TYPES.number
+                data.value = !data.value
+                    ? data.value
+                    : Number(data.value)
+                value = data.value
+                break
+            case 'url':
+                validatorConfig.type ??= TYPES.url
+                break
+            case 'hex':
+                validatorConfig.type ??= TYPES.hex
+            case 'text':
+            case 'textarea':
+            default:
+                value = isArr(value)
+                    ? value
+                    : `${!isDefined(value) ? '' : value}`
+                validatorConfig.type ??= TYPES.string
+                break
+        }
     }
 
     // input value is required but empty
     // if (required && !hasVal) err = true
 
-    const validateType = validatorConfig.type ?? type
     const requireValidator = !err
-        && (hasVal || validatorConfig.required)
-        && validationTypes.includes(validateType)
+        && shouldValidate
+        && validationTypes.includes(validatorConfig?.type)
     if (!!requireValidator) {
         // hide min & max length error messages if not defined by external error messages
         objSetPropUndefined(

@@ -10,6 +10,7 @@ import { copyRxSubject } from '../../../rx'
 import {
     arrUnique,
     className,
+    deferred,
     hasValue,
     isArr,
     isBool,
@@ -99,14 +100,15 @@ export const FormBuilder = React.memo(function FormBuilder(props) {
         // inputsDisabled = [],
         // inputsReadOnly = [],
         loading = false,
-        // submitInProgress = false,
+        submitDefer = 0,
         submitDisabled = false,
+        // submitInProgress = false,
         values = {},
         // valuesToCompare = {},
 
         // local state
         init,
-        submitClicked = false,
+        submitClicked = props.submitClicked,
         submitShouldDisable,
     } = state
     let { // default components
@@ -173,7 +175,10 @@ export const FormBuilder = React.memo(function FormBuilder(props) {
                     {actions.map((action, i) => getButton(action, { key: i }))}
                     {getButton(submitText, {
                         disabled: !!(submitDisabled ?? submitShouldDisable),
-                        onClick: handleSubmit,
+                        onClick: e => {
+                            e?.preventDefault?.()
+                            handleSubmit(e)
+                        },
                         ...!!loadingProp && {
                             [loadingProp || '']: !loadingProp
                                 ? undefined
@@ -446,7 +451,8 @@ const setup = props => {
         formProps: {
             id: formId
         } = {},
-        scrollToSelector = 'html'
+        scrollToSelector = 'html',
+        submitDefer = 0,
     } = props
     // setup form ID
     window.___formCount ??= 1000
@@ -564,7 +570,6 @@ const setup = props => {
 
     const handleSubmit = async (event) => {
         try {
-            event?.preventDefault?.()
             const {
                 closeOnSubmit,
                 formProps,
@@ -602,8 +607,6 @@ const setup = props => {
                 event,
             )
             if (closeOnSubmit && valid) return onClose?.()
-
-            if (submitDisabled !== false) return
 
         } catch (err) {
             console.error(err)
@@ -704,13 +707,16 @@ const setup = props => {
         formId,
         getButton,
         handleChangeCb,
-        handleSubmit,
+        handleSubmit: submitDefer > 0
+            ? deferred(handleSubmit)
+            : handleSubmit,
         propsToMirror: [
             'inputs',
             'inputsHidden',
             'inputsDisabled',
             'inputsReadOnly',
             'loading',
+            'message',
             'submitInProgress',
             'submitDisabled',
             'values',
