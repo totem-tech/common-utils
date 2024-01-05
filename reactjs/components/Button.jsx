@@ -21,7 +21,9 @@ BasicButton.defaultProps = {
     buttonClass: 'BasicButton',
 }
 
-export const Button = React.memo(({ Component, ...props }) => <Component {...props} />)
+export const Button = React.memo(function Button({ Component, ...props }) {
+    return <Component {...props} />
+})
 Button.defaultProps = {
     Component: BasicButton,
 }

@@ -4,7 +4,7 @@ import {
     isArr,
     isDefined,
     isSubjectLike,
-    randomInt,
+    objEvalRxProps,
 } from '../../../utils'
 
 /**
@@ -12,56 +12,64 @@ import {
  * @summary add missing properties that are required to use `FormInput` component
  * 
  * @param   {Object} input 
- * @param   {*}      keyPrefix      (optional) used as prefix to generate `key` property if not already defined.
- *                                  Default: random number
+ * @param   {*}      nameSuffix     (optional) used as suffix to generate `name` property if not already defined.
+ *                                  Default: incremented number
  * 
  * @returns {Object} input
  */
-export const addMissingProps = (input, keyPrefix = randomInt(99, 9999)) => {
+export const addMissingProps = (input, nameSuffix = ++addMissingProps.count) => {
+    if (input._init_) return input
+
     input.inputProps ??= {}
     const {
         id,
         inputProps: ip,
         inputs: childInputs,
         name,
+        onChange,
         type = ip?.type,
     } = input
+    input._init_ = 'yes'
     if (type === 'group') {
         childInputs?.forEach?.(addMissingProps)
         return input
     }
 
     ip.type ??= type || 'text'
-    ip.name ??= name || `${ip.type}${keyPrefix}`
+    ip.name ??= name || `${ip.type}${nameSuffix}`
     ip.id ??= id || ip.name
+    ip.onChange ??= onChange
     return input
 }
+addMissingProps.count = 10000
 
 /**
  * @name    checkInput
  * @summary checks if everything is okay with an input: value is valid, not loading, not hidden....
  * 
- * @param   {Object} input 
+ * @param   {Object}    _input
+ * @param   {Array}     inputsHidden    (optional) names of hidden inputs
+ * @param   {Array}     evalRecursive   (optional) property names to check and evaluate/extract RxJS subject value.
  * 
  * @returns {Boolean} true: submit button should be disabled
  */
-export const checkInputInvalid = (input, inputsHidden = []) => {
+export const checkInputInvalid = (
+    input,
+    inputsHidden = [],
+    evalRecursive = ['inputProps']
+) => {
+    const _input = objEvalRxProps(input, evalRecursive)
     let {
-        inputProps = {},
-        required: _required,
-        rxValue,
-        valid,
-        type = typeAlt
-    } = input
-    let {
+        checkedValue = true,
         error,
         loading,
         name,
-        required = _required,
-        type: typeAlt,
-        value,
-    } = inputProps
-    value = rxValue?.value || value
+        required,
+        type,
+        valid,
+        value: _value,
+        rxValue: value = _value,
+    } = { ..._input, ..._input?.inputProps }
     const isValid = error !== true && valid !== false
     const ignore = inputsHidden.includes(name)
         || [
@@ -72,10 +80,12 @@ export const checkInputInvalid = (input, inputsHidden = []) => {
     if (ignore) return false
     if (error || loading) return true
 
-    const isEmpty = !hasValue(value)
+    const isEmpty = ['checkbox', 'radio'].includes(`${type}`.toLowerCase())
+        ? checkedValue !== value
+        : !hasValue(value)
     // value must be valid if not empty or required field
     const invalid = isEmpty
-        ? required
+        ? required?.value ?? required
         : !isValid
 
     return invalid
@@ -111,8 +121,8 @@ export const checkValuesChanged = (
  */
 export const fillInputs = (
     inputs = [],
-    values = [],
-    addRxValue = false,
+    values = {},
+    addRxValue = true,
 ) => {
     inputs.forEach(input => {
         if (addRxValue) input.rxValue ??= new BehaviorSubject('')
@@ -128,9 +138,10 @@ export const fillInputs = (
         if (!values.hasOwnProperty(name)) return
 
         const value = values[name]
-        input.inputProps.value = value
         // if value is RxJS subject trigger a value change
-        rxValue?.next?.(value)
+        if (addRxValue || isSubjectLike(rxValue)) return rxValue.next(value)
+        input.inputProps.value = value
+
     })
     return inputs
 }
@@ -167,20 +178,65 @@ export const findInput = (name, inputs = []) => {
  * 
  * @returns {Object} values
  */
-export const getValues = (inputs = [], values = {}) => inputs
-    .reduce((values, input) => {
-        const {
-            inputs: childInputs,
-            inputProps,
-            name: _name,
-            rxValue,
-        } = input
-        const {
+export const getValues = (
+    inputs = [],
+    values = {}
+) => inputs.reduce((values, input) => {
+    const {
+        inputs: childInputs,
+        name: _name,
+        rxValue,
+        inputProps: {
             name = _name,
             value = rxValue?.value,
-        } = inputProps
-        values[name] = isArr(childInputs)
-            ? getValues(childInputs, values)
-            : value
-        return values
-    }, values)
+        } = {},
+    } = input
+    values[name] = isArr(childInputs)
+        ? getValues(childInputs, values)
+        : value
+    return values
+}, values)
+
+
+
+// trigger re-validation of empty inputs
+export const reValidateInputs = (
+    inputs,
+    values,
+    inputsHidden = [],
+    scrollToSelector = 'html'
+) => {
+    const names = Object
+        .keys(values)
+        .map(name => {
+            const input = findInput(name, inputs) || {}
+            const {
+                hidden,
+                required: _required,
+                type: _type,
+                inputProps: {
+                    required = _required,
+                    type = _type,
+                } = {},
+                rxValue,
+            } = input
+            const ignore = !(required?.value ?? required)
+                || !rxValue
+                || hidden
+                || type === 'hidden'
+            if (ignore) return
+            const invalid = checkInputInvalid(input, inputsHidden)
+            if (!invalid) return
+
+            rxValue.___validated = null
+            rxValue?.next?.(values[name])
+            return name
+        })
+        .filter(Boolean)
+    const top = document
+        .querySelector(`.FormInput-Container[name="${names[0]}"`)
+        ?.offsetTop
+    top && document
+        .querySelector(scrollToSelector)
+        ?.scrollTo?.({ top, behavior: 'smooth' })
+}

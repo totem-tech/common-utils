@@ -1,4 +1,4 @@
-import { fallbackIfFails } from '../../utils.js'
+import { fallbackIfFails } from '../../utils'
 
 /**
  * @name    setupDefaults

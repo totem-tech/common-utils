@@ -58,7 +58,7 @@ export const statusIcons = {
  * 
  * ```
  */
-export const Message = React.memo(({
+export const Message = React.memo(function Message({
     children,
     background,
     color,
@@ -80,7 +80,7 @@ export const Message = React.memo(({
     style = {},
     text = content,
     ...props
-}) => {
+}) {
     if (!text && !header) return ''
 
     const dp = Message.defaultProps || {}

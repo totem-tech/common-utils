@@ -11,6 +11,7 @@ import { translated } from '../../../languageHelper'
 import {
     className,
     deferred,
+    fallbackIfFails,
     hasValue,
     isArr,
     isDefined,
@@ -72,12 +73,12 @@ const defaultNativeComponents = {
 }
 let defaultUILibProps
 
-export const FormInput = React.memo(props => {
-    let input = !props.addMissingProps
-        ? props
-        // makes sure required variables are set
-        : useMemo(() => addMissingProps(props), [props])
+export const FormInput = React.memo(function FormInput(props) {
+    // makes sure required variables are set
+    let [input, setInput, rxInput] = useRxSubject(undefined, undefined, props)
 
+    useMemo(() => setInput(props), [props])
+    // let input = useMemo(() => addMissingProps(props), [props])
     const uiLibProps = defaultUILibProps?.(
         input.type || input.inputProps?.type || 'text',
         input
@@ -210,12 +211,10 @@ export const FormInput = React.memo(props => {
         rxMessageExt, // used to keep track of and update any external message (props.message)
         rxIsFocused,  // keeps track of whether input field is focused
         msgEl, // message element
-        __rxValueModifier,
         rxValue,
         rxValueIsSubject,
         msgExtIsSubject,
         isOptionsType,
-        __handleChange,
         rxMessage
     ] = useMemo(() => {
         const addDeferred = (subject, defer = 0) => {
@@ -262,7 +261,7 @@ export const FormInput = React.memo(props => {
                         className: className([
                             'FormInput-Message',
                             message?.className,
-                        ])
+                        ]),
                     }} />
                 )
         }
@@ -278,40 +277,14 @@ export const FormInput = React.memo(props => {
                 valueModifier: getMessageEl,
             }} />
         )
-        const handleChange = handleChangeCb(
-            { ...input, inputProps },
-            rxValue,
-            rxMessage,
-            setError,
-        )
-        // local rxValue modifier
-        const rxValueModifier = (newValue, oldValue) => {
-            if (isFn(_rxValueModifier)) newValue = _rxValueModifier(
-                newValue,
-                oldValue,
-                rxValue,
-            )
-            !isEqual(rxValue.___validated, newValue) && setTimeout(() => {
-                handleChange({
-                    preventDefault: () => { },
-                    target: {
-                        value: newValue,
-                    },
-                    stopPropagation: () => { },
-                })
-            }, 100)
-            return newValue
-        }
         return [
             rxMessageExt,
             rxIsFocused,
             msgEl,
-            rxValueModifier,
             rxValue,
             rxValueIsSubject,
             msgExtIsSubject,
             isOptionsType,
-            handleChange,
             rxMessage
         ]
     }, [])
@@ -328,30 +301,34 @@ export const FormInput = React.memo(props => {
         : Input
 
     const handleChange = handleChangeCb(
-        { ...input, inputProps },
+        rxInput, //{ ...rxInput.value, inputProps },
         rxValue,
         rxMessage,
         setError,
     )
     // re-render on value change regardless of direction
-    const rxValueModifier = useCallback((newValue, oldValue) => {
+    const rxValueModifier = useCallback((newValue, [oldValue, _oldChecked] = []) => {
+        const checked = rxValue.___checked
         if (isFn(_rxValueModifier)) newValue = _rxValueModifier(
             newValue,
             oldValue,
             rxValue,
         )
-        !isEqual(rxValue.___validated, newValue) && setTimeout(() => {
+
+        const shouldTrigger = !isEqual(rxValue.___validated, newValue)
+        shouldTrigger && setTimeout(() => {
             handleChange({
                 preventDefault: () => { },
                 target: {
+                    checked,
                     value: newValue,
                 },
                 stopPropagation: () => { },
             })
-        }, 100)
-        return newValue
+        })
+        return [newValue, checked]
     })
-    const [value] = useRxSubject(rxValue, rxValueModifier)
+    const [[value, newChecked]] = useRxSubject(rxValue, rxValueModifier)
 
     if (hidden) return ''
     if (isTypeHidden) return (
@@ -373,10 +350,11 @@ export const FormInput = React.memo(props => {
                 containerProps?.className,
                 { error }
             ]),
+            name,
             style: {
                 ...containerProps?.style,
                 ...labelInline && { display: 'table' },
-            }
+            },
         }}>
             {prefix}
             {labelBeforeInput && label}
@@ -435,9 +413,9 @@ export const FormInput = React.memo(props => {
                 {label}
                 {required && (
                     <span {...{
-                        children: ' *',
+                        children: '*',
                         className: 'InputRequiredIndicator',
-                        style: { color: 'red' },
+                        style: { color: 'red', paddingLeft: 3 },
                         title: textsCap.requiredField,
                     }} />
                 )}
@@ -472,8 +450,7 @@ export const FormInput = React.memo(props => {
 
     if (type === 'html') return getContainer(content)
 
-    const isCheckRadio = type.startsWith('checkbox')
-        || type.startsWith('radio')
+    const isCheckRadio = ['checkbox', 'radio'].includes(type)
 
     inputChildren = !optionsReplaceProp
         && optionItems
@@ -483,7 +460,9 @@ export const FormInput = React.memo(props => {
         <Input {...objWithoutKeys(
             {
                 ...inputProps,
-                checked: undefined,
+                checked: !isCheckRadio
+                    ? undefined
+                    : newChecked ?? value === checkedValue,
                 ...inputChildren && {
                     children: inputChildren
                 },
@@ -607,6 +586,7 @@ FormInput.propTypes = {
     // Set a prefix for input element IDs to be passed down to the DOM to prevent duplicate IDs in case multiple instances of the same form is created
     // Using 'null' prevents adding any prefix.
     // idPrefix
+    // onChangeSelectValue (event, ...) : value
     // onError
     // onMount,
     // onUnmount,
@@ -661,11 +641,12 @@ FormInput.setupDefaults = (name, module) => {
 export default FormInput
 
 const handleChangeCb = (
-    input,
+    rxInput,
     rxValue,
     rxMessage,
     setError,
 ) => (event, ...args) => {
+    const input = rxInput.value
     let {
         checkedValue = true,
         customMessages,
@@ -675,7 +656,9 @@ const handleChangeCb = (
         onChangeSelectValue,
         uncheckedValue = false,
         validate,
-        validatorConfig = {},
+        validatorConfig = {
+            includeValue: !isStr(customMessages)
+        },
         type: _type,
     } = input
     let {
@@ -691,22 +674,17 @@ const handleChangeCb = (
         persist,
         target: {
             checked,
-            selectionEnd,
-            selectionStart,
-            setSelectionRange,
             value: eValue,
         } = {},
     } = event || {}
-    let value = isObj(args[0]) && args[0].hasOwnProperty('value')
-        ? args[0].value
-        : eValue
+    let value = args[0]?.value ?? eValue
     if (isFn(onChangeSelectValue)) {
         const changedValue = onChangeSelectValue(event, ...args)
         value = changedValue !== undefined
             ? changedValue
             : value
-
     }
+
     // value unchanged
     const unchanged = !isCheck && isEqual(rxValue.___validated, value)
     if (unchanged) return
@@ -718,6 +696,13 @@ const handleChangeCb = (
     // preserves cursor position
     const setCursor = () => setTimeout(() => {
         try {
+            let {
+                target: {
+                    selectionEnd,
+                    selectionStart,
+                    setSelectionRange,
+                } = {},
+            } = event || {}
             isFn(setSelectionRange)
                 && selectionStart
                 && selectionEnd
@@ -730,36 +715,37 @@ const handleChangeCb = (
         } catch (_) { } // ignore unsupported
     })
 
+    if (isCheck) {
+        checked ??= isEqual(value, checkedValue)
+        value = checked
+            ? checkedValue
+            : uncheckedValue
+        rxValue.___checked = checked
+    }
+
     const data = { ...input, value, checked }
     let err, isANum = false
-    let hasVal = hasValue(
-        isCheck
-            ? required
-                ? data.checked === true
-                : data.checked
-            : data.value
-    )
+    let hasVal = isCheck
+        ? required
+            ? checked === true
+            : !!checked
+        : hasValue(data.value)
     const customMsgs = {
         ...errorMessages,
         // Hide min & max length related error messages as a counter will be displayed for appropriate types.
         // To override this simply set `undefined` in the `customMessages`.
         lengthMax: true,
         lengthMin: true,
-        ...customMessages,
     }
 
     // ignore if doens't have value
-    if (hasVal) switch (type) {
+    if (hasVal || validatorConfig.required) switch (type) {
         case 'array':
             validatorConfig.type ??= TYPES.array
             break
         case 'checkbox':
         case 'radio':
-            data.checked = !!checked
-            data.value = !!checked
-                ? checkedValue
-                : uncheckedValue
-            if (required && !data.checked) hasVal = false
+            validatorConfig.type ??= TYPES.boolean
             break
         case 'date':
             validatorConfig.type ??= TYPES.date
@@ -798,9 +784,10 @@ const handleChangeCb = (
     // input value is required but empty
     // if (required && !hasVal) err = true
 
+    const validateType = validatorConfig.type ?? type
     const requireValidator = !err
-        && hasVal
-        && validationTypes.includes(type)
+        && (hasVal || validatorConfig.required)
+        && validationTypes.includes(validateType)
     if (!!requireValidator) {
         // hide min & max length error messages if not defined by external error messages
         objSetPropUndefined(
@@ -821,8 +808,14 @@ const handleChangeCb = (
             errorMessages.minLengthNum,
         )
         err = validator.validate(
-            value,
+            !isCheck
+                ? value
+                : checked
+                    ? true
+                    : undefined,
             {
+                customMessages,
+                required,
                 ...inputProps,
                 ...validatorConfig,
             },
@@ -875,11 +868,15 @@ const handleChangeCb = (
 }
 
 const isEqual = (v1, v2) => {
-    v1 = isStr(v1)
-        ? v1
-        : JSON.stringify(v1)
-    v2 = isStr(v2)
-        ? v2
-        : JSON.stringify(v2)
-    return v1 === v2
+    try {
+        v1 = isStr(v1)
+            ? v1
+            : JSON.stringify(v1)
+        v2 = isStr(v2)
+            ? v2
+            : JSON.stringify(v2)
+        return v1 === v2
+    } catch (err) {
+        return false
+    }
 }

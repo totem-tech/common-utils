@@ -1,11 +1,16 @@
 import PropTypes from 'prop-types'
-import React, { isValidElement, useEffect, useMemo } from 'react'
+import React, {
+    isValidElement,
+    useEffect,
+    useMemo
+} from 'react'
 import { BehaviorSubject } from 'rxjs'
 import { translated } from '../../../languageHelper'
 import { copyRxSubject } from '../../../rx'
 import {
     arrUnique,
     className,
+    hasValue,
     isArr,
     isBool,
     isFn,
@@ -25,7 +30,8 @@ import {
     checkInputInvalid,
     checkValuesChanged,
     findInput,
-    getValues
+    getValues,
+    reValidateInputs
 } from './utils'
 
 const textsCap = {
@@ -43,22 +49,22 @@ const defaultComponents = {
     FormInput: _FormInput,
     Message: _Message,
 }
-export const FormBuilder = React.memo(props => {
+export const FormBuilder = React.memo(function FormBuilder(props) {
     const {
         formId,
         getButton,
         handleChangeCb,
         handleSubmit,
+        propsToMirror = [],
         rxMessage,
         rxState,
         rxValues,
         rxMirroredProps,
-        keysToMirror,
     } = useMemo(() => setup(props), [])
 
-    const valuesToMirror = keysToMirror.map(x => props[x])
-    keysToMirror.length > 0 && useEffect(() => {
-        const mirroredValues = keysToMirror.reduce((obj, key) => ({
+    const valuesToMirror = propsToMirror.map(x => props[x])
+    propsToMirror.length > 0 && useEffect(() => {
+        const mirroredValues = propsToMirror.reduce((obj, key) => ({
             ...obj,
             [key]: props[key]
         }), {})
@@ -100,6 +106,7 @@ export const FormBuilder = React.memo(props => {
 
         // local state
         init,
+        submitClicked = false,
         submitShouldDisable,
     } = state
     let { // default components
@@ -143,6 +150,8 @@ export const FormBuilder = React.memo(props => {
                     rxValues,
                     handleChangeCb,
                     formId,
+                    null,
+                    submitClicked
                 ))
                 .map(input => <FormInput {...input} />)}
 
@@ -156,18 +165,20 @@ export const FormBuilder = React.memo(props => {
                     textAlign: 'right',
                 }}>
                     {actionsPrefix}
-                    {onClose && getButton(closeText, {
+                    {!!onClose && getButton(closeText, {
                         onClick: onClose,
                         status: 'success',
                         style: { marginLeft: 5 },
                     })}
                     {actions.map((action, i) => getButton(action, { key: i }))}
                     {getButton(submitText, {
-                        disabled: submitDisabled || submitShouldDisable,
+                        disabled: !!(submitDisabled ?? submitShouldDisable),
                         onClick: handleSubmit,
-                        [loadingProp || '']: !loadingProp
-                            ? undefined
-                            : loading,
+                        ...!!loadingProp && {
+                            [loadingProp || '']: !loadingProp
+                                ? undefined
+                                : loading,
+                        },
                         status: 'success',
                         style: { marginLeft: 5 },
                     })}
@@ -311,6 +322,7 @@ const addInterceptorCb = (
     handleChange,
     formId,
     parentIndex = null,
+    submitClicked,
 ) => (input, index) => {
     let {
         inputs,
@@ -327,14 +339,17 @@ const addInterceptorCb = (
         inputProps = {},
         key,
         name: nameAlt,
+        required: _required,
         rxValue,
         type: typeAlt,
         validate,
+        validatorConfig = {}
     } = input || {}
     const {
         disabled,
         name = nameAlt,
         readOnly,
+        required = _required,
         type = typeAlt,
     } = inputProps
     const typeLC = `${type || 'text'}`.toLowerCase()
@@ -348,6 +363,7 @@ const addInterceptorCb = (
             index
         )
     idPrefix ??= commonProps.idPrefix
+    if (submitClicked) validatorConfig.required ??= required?.value ?? !!required
 
     return {
         ...commonProps,
@@ -386,6 +402,7 @@ const addInterceptorCb = (
                     handleChange,
                     formId,
                     parentIndex || index,
+                    submitClicked,
                 )
             )
             : undefined,
@@ -418,6 +435,7 @@ const addInterceptorCb = (
                 },
                 rxValue,
             ),
+        validatorConfig,
     }
 }
 
@@ -428,6 +446,7 @@ const setup = props => {
         formProps: {
             id: formId
         } = {},
+        scrollToSelector = 'html'
     } = props
     // setup form ID
     window.___formCount ??= 1000
@@ -482,8 +501,6 @@ const setup = props => {
             state.components = { ...defaultComponents, ...components }
         }
 
-        // let inputs = propValues[propsToWatch.indexOf('inputs')] ?? []
-        inputsHidden = toArray(inputsHidden)
         submitDisabled = isObj(submitDisabled)
             ? Object
                 .values(submitDisabled)
@@ -550,26 +567,46 @@ const setup = props => {
             event?.preventDefault?.()
             const {
                 closeOnSubmit,
+                formProps,
                 inputsHidden,
                 loading,
                 onSubmit,
+                submitClicked,
                 submitDisabled,
             } = rxState.value
             if (submitDisabled || loading) return
 
             const { inputs = [] } = rxState.value
             const values = getValues(inputs)
-            const allOk = !loading
+            const valid = !loading
                 && !submitDisabled
                 && !inputs.find(x => checkInputInvalid(x, inputsHidden))
+
+            // set state to acknowledge that submit button is clicked
+            !valid
+                && !submitClicked
+                && rxState.next({
+                    ...rxState.value,
+                    submitClicked: true,
+                })
+            !valid && reValidateInputs(
+                inputs,
+                values,
+                inputsHidden,
+                scrollToSelector
+            )
             isFn(onSubmit) && await onSubmit(
-                allOk,
+                valid,
                 values,
                 inputs,
                 event,
             )
-            closeOnSubmit && onClose?.()
+            if (closeOnSubmit && valid) return onClose?.()
+
+            if (submitDisabled !== false) return
+
         } catch (err) {
+            console.error(err)
             rxMessage.next({
                 header: textsCap.submitError,
                 status: 'error',
@@ -589,7 +626,7 @@ const setup = props => {
         const { inputProps } = input
         inputProps.error = error
         inputProps.value = value
-        input.valid = error !== true
+        input.valid = !error
 
         const triggerChange = values => {
             values = values || getValues(inputs)
@@ -630,15 +667,17 @@ const setup = props => {
     }
 
     const getButton = (textOrProps, extraProps) => {
-        if (textOrProps === null) return
+        if (textOrProps === null) return ''
+
         const {
             components: { Button } = {}
         } = rxState.value
         const {
-            Component = Button,
+            Component = Button || 'button',
             ...btnProps
         } = toProps(textOrProps)
-        return (
+
+        return !!Component && (
             <Component {...{
                 ...extraProps,
                 ...btnProps,
@@ -666,11 +705,7 @@ const setup = props => {
         getButton,
         handleChangeCb,
         handleSubmit,
-        rxMessage,
-        rxState,
-        rxValues,
-        rxMirroredProps,
-        keysToMirror: [
+        propsToMirror: [
             'inputs',
             'inputsHidden',
             'inputsDisabled',
@@ -680,6 +715,10 @@ const setup = props => {
             'submitDisabled',
             'values',
             'valuesToCompare',
-        ].filter(key => !isSubjectLike(props[key]))
+        ].filter(key => !isSubjectLike(props[key])),
+        rxMessage,
+        rxState,
+        rxValues,
+        rxMirroredProps,
     }
 }

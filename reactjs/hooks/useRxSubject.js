@@ -5,10 +5,7 @@ import {
     useState,
 } from 'react'
 import { BehaviorSubject, SubjectLike } from 'rxjs'
-import {
-    copyRxSubject,
-    IGNORE_UPDATE_SYMBOL
-} from '../../rx.js'
+import { copyRxSubject, IGNORE_UPDATE_SYMBOL } from '../../rx'
 import {
     deferred,
     isFn,

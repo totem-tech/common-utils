@@ -4,6 +4,7 @@
 import DataStorage, { rxForceUpdateCache } from './DataStorage'
 import {
     downloadFile,
+    fallbackIfFails,
     generateHash,
     hasValue,
     isFn,
@@ -16,35 +17,35 @@ import {
 } from './utils'
 
 // Local Storage item key prefix for all items
-const PREFIX = 'totem_'
+const PREFIX = fallbackIfFails(() => process.env.STORAGE_HELPER_PREFIX) || 'totem_'
 const PREFIX_STATIC = PREFIX + 'static_'
-const CACHE_KEY = PREFIX + 'cache'
-const SETTINGS_KEY = PREFIX + 'settings'
-const MODULE_SETTINGS_KEY = 'module_settings'
+export const CACHE_KEY = PREFIX + 'cache'
+export const SETTINGS_KEY = PREFIX + 'settings'
+export const MODULE_SETTINGS_KEY = 'module_settings'
 const storage = {}
 const cache = new DataStorage(CACHE_KEY, true) // directly read and write from storage
 const settings = new DataStorage(SETTINGS_KEY)
 
 // LocalStorage items that are essential for the applicaiton to run. 
 export const essentialKeys = [
-    'totem_chat-history', // chat history
-    'totem_contacts',
-    'totem_history', // user activity history
-    'totem_identities',
-    'totem_locations',
+    'chat-history', // chat history
+    'contacts',
+    'history', // user activity history
+    'identities',
+    'locations',
     // notifications are essential because user may need to respond to them in case they are migrating to a new device.
-    'totem_notifications',
-    'totem_partners',
-    'totem_settings',
-]
+    'notifications',
+    'partners',
+    'settings',
+].map(x => `${PREFIX}${x}`)
 
 // Storage items that are to include a timestamp after being backed up
 export const modulesWithTS = [
-    'totem_contacts',
-    'totem_identities',
-    'totem_locations',
-    'totem_partners',
-]
+    'contacts',
+    'identities',
+    'locations',
+    'partners',
+].map(x => `${PREFIX}${x}`)
 
 /**
  * @name    rw

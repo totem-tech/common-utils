@@ -692,6 +692,30 @@ export const objCreate = (keys = [], values = [], result = {}) => {
 }
 
 /**
+ * @name	objEvalRxProps
+ * @summary evaluate/extract values from properties with RxJS subject.
+ * 
+ * @param {Object}	obj 
+ * @param {Array}	recursive property names of child objects to check and evaluate/extract RxJS subject value.
+ * 
+ * @returns {Object} a new object with RxJS subject values extracted for specified properties. 
+ */
+export const objEvalRxProps = (obj = {}, recursive = []) => {
+	const output = { ...obj }
+	Object
+		.keys(output)
+		.forEach(key => {
+			output[key] = isSubjectLike(output[key])
+				? output[key].value
+				: recursive === true || recursive?.includes?.(key)
+					? objEvalRxProps(output[key], false)
+					: output[key]
+		})
+
+	return output
+}
+
+/**
  * @name	objHasKeys
  * @summary checks if all the supplied keys exists in a object
  * 
