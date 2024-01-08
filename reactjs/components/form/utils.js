@@ -7,6 +7,11 @@ import {
     objEvalRxProps,
 } from '../../../utils'
 
+// property used by FormInput to prevent recursive validation when rxValue is changed.
+// can be used to prevent validation of a change in value
+// rxValue.___validated = value
+export const VALIDATED_KEY = '___validated'
+
 /**
  * @name    addMissingProps
  * @summary add missing properties that are required to use `FormInput` component
@@ -129,7 +134,10 @@ export const clearInputs = (
  * 
  * @param   {Array}     inputs 
  * @param   {Object}    values 
- * @param   {Boolean}   addRxValue populate `rxValue` property with `new BehaviorSubject()` if required.
+ * @param   {Boolean}   addRxValue      (optional) populate `rxValue` property with `new BehaviorSubject()` if required.
+ *                                      Default: `false`
+ * @param   {Boolean}   forceValidation (optional) whether to force input revalidation by FormInput.
+ *                                      Default: `false`
  * 
  * @returns {Array} inputs
  */
@@ -137,28 +145,29 @@ export const fillInputs = (
     inputs = [],
     values = {},
     addRxValue = true,
+    forceValidation = false,
 ) => {
+    // nothing to fill
+    if (!Object.keys(values).length) return inputs
+
     const _inputs = isSubjectLike(inputs)
         ? inputs.value
         : inputs
     _inputs.forEach(input => {
         if (addRxValue) input.rxValue ??= new BehaviorSubject('')
         input.inputProps ??= {}
-        const {
-            inputs: childInputs,
-            inputProps: { name: _name },
-            name = _name,
-            rxValue,
-        } = input
-        if (isArr(childInputs)) fillInputs(childInputs, values)
+        const { name = '', rxValue } = { ...input.inputProps, ...input }
+        if (isArr(input.inputs)) fillInputs(input.inputs, values)
 
         if (!values.hasOwnProperty(name)) return
 
         const value = values[name]
         // if value is RxJS subject trigger a value change
-        if (addRxValue || isSubjectLike(rxValue)) return rxValue.next(value)
+        if (isSubjectLike(rxValue)) {
+            if (forceValidation) rxValue[VALIDATED_KEY] = forceValidation?.[name] ?? null
+            return rxValue.next(value)
+        }
         input.inputProps.value = value
-
     })
     return inputs
 }
@@ -177,12 +186,12 @@ export const findInput = (name, inputs = []) => {
         ? inputs.value
         : inputs
     for (let i = 0;i < inputs.length;i++) {
-        if (name === inputs[i]?.inputProps?.name) return inputs[i]
+        const input = inputs[i]
+        const iName = input?.inputProps?.name ?? input.name
+        if (name === iName) return input
 
-        const children = inputs[i].inputs
-        if (!isArr(children)) continue
-
-        const child = findInput(name, children)
+        const children = input.inputs
+        const child = isArr(children) && findInput(name, children)
         if (child) return child
     }
 }
@@ -251,7 +260,7 @@ export const reValidateInputs = (
             const invalid = checkInputInvalid(input, inputsHidden)
             if (!invalid) return
 
-            rxValue.___validated = null
+            rxValue[VALIDATED_KEY] = null
             rxValue?.next?.(values[name])
             return name
         })

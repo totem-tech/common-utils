@@ -11,7 +11,6 @@ import {
     arrUnique,
     className,
     deferred,
-    hasValue,
     isArr,
     isBool,
     isFn,
@@ -135,87 +134,87 @@ export const FormBuilder = React.memo(function FormBuilder(props) {
     )
 
     return (
-        <Form {...{
-            autoComplete: 'off',
-            className: 'FormBuilder',
-            noValidate: true,
-            ...formProps,
-            id: formId,
-        }}>
+        <>
             {prefix}
+            <Form {...{
+                autoComplete: 'off',
+                className: 'FormBuilder',
+                noValidate: true,
+                ...formProps,
+                id: formId,
+            }}>
+                {/* Form inputs */}
+                {init && inputs
+                    .map(addInterceptorCb(
+                        { ...props, ...state },
+                        inputsHidden,
+                        rxValues,
+                        handleChangeCb,
+                        formId,
+                        null,
+                        submitClicked
+                    ))
+                    .map(input => <FormInput {...input} />)}
 
-            {/* Form inputs */}
-            {init && inputs
-                .map(addInterceptorCb(
-                    { ...props, ...state },
-                    inputsHidden,
-                    rxValues,
-                    handleChangeCb,
-                    formId,
-                    null,
-                    submitClicked
-                ))
-                .map(input => <FormInput {...input} />)}
+                {/* submit button */}
+                {(submitText || onClose) && (
+                    <Actions style={{
+                        cursor: loading
+                            ? 'progress'
+                            : '',
+                        padding: '15px 0 10px 0',
+                        textAlign: 'right',
+                    }}>
+                        {actionsPrefix}
+                        {!!onClose && getButton(closeText, {
+                            onClick: onClose,
+                            status: 'success',
+                            style: { marginLeft: 5 },
+                        })}
+                        {actions.map((action, i) => getButton(action, { key: i }))}
+                        {getButton(submitText, {
+                            disabled: !!(submitDisabled ?? submitShouldDisable),
+                            onClick: e => {
+                                e?.preventDefault?.()
+                                handleSubmit(e)
+                            },
+                            ...!!loadingProp && {
+                                [loadingProp || '']: !loadingProp
+                                    ? undefined
+                                    : loading,
+                            },
+                            status: 'success',
+                            style: { marginLeft: 5 },
+                        })}
+                        {actionsSuffix}
+                    </Actions>
+                )}
 
-            {/* submit button */}
-            {(submitText || onClose) && (
-                <Actions style={{
-                    cursor: loading
-                        ? 'progress'
-                        : '',
-                    padding: '15px 0 10px 0',
-                    textAlign: 'right',
-                }}>
-                    {actionsPrefix}
-                    {!!onClose && getButton(closeText, {
-                        onClick: onClose,
-                        status: 'success',
-                        style: { marginLeft: 5 },
-                    })}
-                    {actions.map((action, i) => getButton(action, { key: i }))}
-                    {getButton(submitText, {
-                        disabled: !!(submitDisabled ?? submitShouldDisable),
-                        onClick: e => {
-                            e?.preventDefault?.()
-                            handleSubmit(e)
-                        },
-                        ...!!loadingProp && {
-                            [loadingProp || '']: !loadingProp
-                                ? undefined
-                                : loading,
-                        },
-                        status: 'success',
-                        style: { marginLeft: 5 },
-                    })}
-                    {actionsSuffix}
-                </Actions>
-            )}
-
-            {/* Form message */}
-            {init && (
-                <RxSubjectView {...{
-                    key: 'message',
-                    subject: [rxMessage, message],
-                    valueModifier: ([message, messageExt]) => {
-                        message = message || messageExt
-                        const msgProps = isStr(message) || isValidElement(message)
-                            ? { content: message }
-                            : message
-                        return !!message && (
-                            <Message {...{
-                                ...msgProps,
-                                className: className([
-                                    msgProps.className,
-                                    'FormMessage'
-                                ]),
-                            }} />
-                        )
-                    }
-                }} />
-            )}
-
+                {/* Form message */}
+                {init && (
+                    <RxSubjectView {...{
+                        key: 'message',
+                        subject: [rxMessage, message],
+                        valueModifier: ([message, messageExt]) => {
+                            message = message || messageExt
+                            const msgProps = isStr(message) || isValidElement(message)
+                                ? { content: message }
+                                : message
+                            return !!message && (
+                                <Message {...{
+                                    ...msgProps,
+                                    className: className([
+                                        msgProps.className,
+                                        'FormMessage'
+                                    ]),
+                                }} />
+                            )
+                        }
+                    }} />
+                )}
+            </Form>
             {suffix}
-        </Form>
+        </>
     )
 })
 FormBuilder.defaultProps = {
@@ -324,7 +323,7 @@ const addInterceptorCb = (
     props = {},
     inputsHidden = [],
     rxValues,
-    handleChange,
+    handleChangeCb,
     formId,
     parentIndex = null,
     submitClicked,
@@ -404,7 +403,7 @@ const addInterceptorCb = (
                     props,
                     inputsHidden,
                     rxValues,
-                    handleChange,
+                    handleChangeCb,
                     formId,
                     parentIndex || index,
                     submitClicked,
@@ -417,7 +416,7 @@ const addInterceptorCb = (
             name,
             onChange: isGroup
                 ? undefined
-                : (e, data) => handleChange(name, inputs)(
+                : (e, data) => handleChangeCb(name, inputs)(
                     e,
                     data,
                     input,
@@ -572,7 +571,6 @@ const setup = props => {
         try {
             const {
                 closeOnSubmit,
-                formProps,
                 inputsHidden,
                 loading,
                 onSubmit,
@@ -685,11 +683,9 @@ const setup = props => {
                 ...extraProps,
                 ...btnProps,
                 children: btnProps.children || extraProps.children,
-                disabled: !!(
-                    isBool(btnProps.disabled)
-                        ? btnProps.disabled
-                        : extraProps.disabled
-                ),
+                disabled: isBool(btnProps.disabled)
+                    ? !!btnProps.disabled
+                    : !!extraProps.disabled,
                 onClick: (...args) => {
                     args[0]?.preventDefault?.()
                     btnProps.onClick?.(...args)
@@ -717,8 +713,9 @@ const setup = props => {
             'inputsReadOnly',
             'loading',
             'message',
-            'submitInProgress',
+            'submitClicked',
             'submitDisabled',
+            'submitInProgress',
             'values',
             'valuesToCompare',
         ].filter(key => !isSubjectLike(props[key])),

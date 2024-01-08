@@ -74,8 +74,7 @@ export const useOptions = (input = {}) => {
         // Add an option to indicate no result available.
         // Only for specific types.
         const isEmpty = !options.length
-        const addEmptyItem = isEmpty
-            && emptyText
+        const addEmptyItem = isEmpty && emptyText
         if (addEmptyItem) options = [{
             disabled: true,
             [optionsContentkey]: emptyText,

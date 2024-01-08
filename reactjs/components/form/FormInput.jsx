@@ -11,7 +11,6 @@ import { translated } from '../../../languageHelper'
 import {
     className,
     deferred,
-    fallbackIfFails,
     hasValue,
     isArr,
     isDefined,
@@ -27,7 +26,6 @@ import validator, { TYPES } from '../../../validator'
 import {
     useRxSubject,
     useRxSubjectOrValue,
-    useRxStateDeferred,
     useMount,
 } from '../../hooks'
 import CharacterCount from '../CharacterCount'
@@ -35,9 +33,9 @@ import Message, { statuses } from '../Message'
 import RxSubjectView from '../RxSubjectView'
 import FormInputGroup from './FormInputGroup'
 import { useOptions as _useOptions } from './useOptions'
-import { addMissingProps } from './utils'
+import { VALIDATED_KEY } from './utils'
 import validateCriteria from './validateCriteria'
-import CheckboxGroup from './CheckboxGroup'
+// import CheckboxGroup from './CheckboxGroup'
 
 export const errorMessages = {
     decimals: 'maximum number of decimals allowed',
@@ -308,14 +306,15 @@ export const FormInput = React.memo(function FormInput(props) {
     )
     // re-render on value change regardless of direction
     const rxValueModifier = useCallback((newValue, [oldValue, _oldChecked] = []) => {
-        const checked = rxValue.___checked
         if (isFn(_rxValueModifier)) newValue = _rxValueModifier(
             newValue,
             oldValue,
             rxValue,
         )
-
-        const shouldTrigger = !isEqual(rxValue.___validated, newValue)
+        const shouldTrigger = !isEqual(rxValue[VALIDATED_KEY], newValue)
+        const checked = isCheckRadio
+            ? newValue === checkedValue
+            : undefined
         shouldTrigger && setTimeout(() => {
             handleChange({
                 preventDefault: () => { },
@@ -686,7 +685,7 @@ const handleChangeCb = (
     }
 
     // value unchanged
-    const unchanged = !isCheck && isEqual(rxValue.___validated, value)
+    const unchanged = !isCheck && isEqual(rxValue[VALIDATED_KEY], value)
     if (unchanged) return
 
     // Forces the synthetic event and it's value to persist
@@ -720,7 +719,6 @@ const handleChangeCb = (
         value = checked
             ? checkedValue
             : uncheckedValue
-        rxValue.___checked = checked
     }
 
     const data = { ...input, value, checked }
@@ -852,7 +850,7 @@ const handleChangeCb = (
         !!error && onError?.(message, value)
 
         // prevents re-validation because of the trigger
-        rxValue.___validated = data.value
+        rxValue[VALIDATED_KEY] = data.value
         // trigger value change on the subject
         const unchagned = isEqual(rxValue.value, data.value)
         !unchagned && rxValue.next(data.value)
