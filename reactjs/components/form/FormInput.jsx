@@ -673,6 +673,9 @@ const handleChangeCb = (
         persist,
         target: {
             checked,
+            selectionEnd,
+            selectionStart,
+            setSelectionRange,
             value: eValue,
         } = {},
     } = event || {}
@@ -695,22 +698,12 @@ const handleChangeCb = (
     // preserves cursor position
     const setCursor = () => setTimeout(() => {
         try {
-            let {
-                target: {
-                    selectionEnd,
-                    selectionStart,
-                    setSelectionRange,
-                } = {},
-            } = event || {}
             isFn(setSelectionRange)
-                && selectionStart
-                && selectionEnd
+                && selectionStart >= 0
+                && selectionEnd >= 0
                 && event
                     .target
-                    .setSelectionRange(
-                        selectionStart,
-                        selectionEnd,
-                    )
+                    .setSelectionRange(selectionStart, selectionEnd)
         } catch (_) { } // ignore unsupported
     })
 

@@ -99,7 +99,7 @@ export const FormBuilder = React.memo(function FormBuilder(props) {
         // inputsDisabled = [],
         // inputsReadOnly = [],
         loading = false,
-        submitDefer = 0,
+        submitDefer = 300,
         submitDisabled = false,
         // submitInProgress = false,
         values = {},
@@ -451,7 +451,7 @@ const setup = props => {
             id: formId
         } = {},
         scrollToSelector = 'html',
-        submitDefer = 0,
+        submitDefer = 300,
     } = props
     // setup form ID
     window.___formCount ??= 1000
@@ -704,7 +704,7 @@ const setup = props => {
         getButton,
         handleChangeCb,
         handleSubmit: submitDefer > 0
-            ? deferred(handleSubmit)
+            ? deferred(handleSubmit, submitDefer)
             : handleSubmit,
         propsToMirror: [
             'inputs',
