@@ -682,19 +682,8 @@ const handleChangeCb = (
     let value = args[0]?.value ?? eValue
     if (isFn(onChangeSelectValue)) {
         const changedValue = onChangeSelectValue(event, ...args)
-        value = changedValue !== undefined
-            ? changedValue
-            : value
+        if (changedValue !== undefined) value = changedValue
     }
-
-    // value unchanged
-    const unchanged = !isCheck && isEqual(rxValue[VALIDATED_KEY], value)
-    if (unchanged) return
-
-    // Forces the synthetic event and it's value to persist
-    // Required for use with deferred function
-    isFn(persist) && event.persist()
-
     // preserves cursor position
     const setCursor = () => setTimeout(() => {
         try {
@@ -706,6 +695,15 @@ const handleChangeCb = (
                     .setSelectionRange(selectionStart, selectionEnd)
         } catch (_) { } // ignore unsupported
     })
+
+    setCursor()
+    // value unchanged
+    const unchanged = !isCheck && isEqual(rxValue[VALIDATED_KEY], value)
+    if (unchanged) return
+
+    // Forces the synthetic event and it's value to persist
+    // Required for use with deferred function
+    isFn(persist) && event.persist()
 
     if (isCheck) {
         checked ??= isEqual(value, checkedValue)
@@ -822,7 +820,8 @@ const handleChangeCb = (
         || []
     if (crInvalid && !hasVal) crInvalid = false
 
-    const triggerChange = (err) => {
+    const triggerChange = err => {
+        setCursor()
         const error = !!err || !!crInvalid
         const message = err && err !== true
             ? {
@@ -838,7 +837,6 @@ const handleChangeCb = (
             { ...data, error },
             ...args
         )
-        setCursor()
 
         !!error && onError?.(message, value)
 
