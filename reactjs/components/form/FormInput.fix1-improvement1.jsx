@@ -324,14 +324,15 @@ export const FormInput = React.memo(function FormInput(props) {
         const valueOld = rxValue.setValue ?? value
         const valueChanged = valueOld !== newValue
         const el = valueChanged && document.getElementById(`${idPrefix}${id}`)
-        if (valueChanged) {
-            rxValue.setValue = newValue
-            setValue(newValue)
-
+        if (valueChanged && isFn(el?.setSelectionRange)) {
             const diffPosition = `${newValue || ''}`.length - `${valueOld || ''}`.length
             const start = (el?.selectionStart ?? 0) + diffPosition
             const end = (el?.selectionEnd ?? 0) + diffPosition
-            isFn(el?.setSelectionRange) && setTimeout(() => el?.setSelectionRange?.(start, end))
+            setTimeout(() => el?.setSelectionRange?.(start, end))
+        }
+        if (valueChanged) {
+            rxValue.setValue = newValue
+            setValue(newValue)
         }
 
         const ignore = !shouldTrigger

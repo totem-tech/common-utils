@@ -35,7 +35,6 @@ import FormInputGroup from './FormInputGroup'
 import { useOptions as _useOptions } from './useOptions'
 import { VALIDATED_KEY } from './utils'
 import validateCriteria from './validateCriteria'
-import { IGNORE_UPDATE_SYMBOL } from '../../../rx'
 // import CheckboxGroup from './CheckboxGroup'
 
 export const errorMessages = {
@@ -180,7 +179,7 @@ export const FormInput = React.memo(function FormInput(props) {
     )
     let {
         children: inputChildren,
-        checked: _checked, // default checked
+        checked,
         disabled = false,
         error: _error,
         id,
@@ -202,17 +201,10 @@ export const FormInput = React.memo(function FormInput(props) {
     content = useRxSubjectOrValue(content)
     disabled = useRxSubjectOrValue(disabled)
     hidden = useRxSubjectOrValue(hidden)
-
-    const isCheckRadio = ['checkbox', 'radio'].includes(type)
     const isTypeHidden = type === 'hidden'
     const isHidden = hidden || isTypeHidden
     // internal validation error status
     const [error, setError] = useState()
-    const [value, setValue] = useState(() => (
-        isSubjectLike(_rxValue)
-            ? _rxValue.value
-            : _value
-    ) ?? '')
     const [
         rxMessageExt, // used to keep track of and update any external message (props.message)
         rxIsFocused,  // keeps track of whether input field is focused
@@ -251,6 +243,26 @@ export const FormInput = React.memo(function FormInput(props) {
             ? _rxValue
             : new BehaviorSubject(_value)
 
+        // addDeferred(rxValue, 100)
+        const getMessageEl = ([message, messageExt, focused]) => {
+            message = message || messageExt
+            message = !isStr(message) && !isValidElement(message)
+                ? message
+                : { content: message }
+
+            return !!message
+                && !!(focused || !messageHideOnBlur)
+                && !isHidden
+                && (
+                    <Message {...{
+                        ...message,
+                        className: className([
+                            'FormInput-Message',
+                            message?.className,
+                        ]),
+                    }} />
+                )
+        }
         const msgEl = (
             <RxSubjectView {...{
                 key: 'message',
@@ -260,17 +272,7 @@ export const FormInput = React.memo(function FormInput(props) {
                     rxIsFocused,
                     rxValue,
                 ],
-                render: ([message, messageExt, focused]) => {
-                    message = message || messageExt
-                    message = !isStr(message) && !isValidElement(message)
-                        ? message
-                        : { content: message }
-                    const cls = className(['FormInput-Message', message?.className])
-                    return !!message
-                        && !!(focused || !messageHideOnBlur)
-                        && !isHidden
-                        && <Message {...{ ...message, className: cls }} />
-                },
+                valueModifier: getMessageEl,
             }} />
         )
         return [
@@ -297,52 +299,35 @@ export const FormInput = React.memo(function FormInput(props) {
         : Input
 
     const handleChange = handleChangeCb(
-        rxInput,
+        rxInput, //{ ...rxInput.value, inputProps },
         rxValue,
         rxMessage,
         setError,
     )
     // re-render on value change regardless of direction
-    const rxValueModifier = useCallback((newValue, _oldChecked) => {
+    const rxValueModifier = useCallback((newValue, [oldValue, _oldChecked] = []) => {
         if (isFn(_rxValueModifier)) newValue = _rxValueModifier(
             newValue,
             oldValue,
             rxValue,
         )
         const shouldTrigger = !isEqual(rxValue[VALIDATED_KEY], newValue)
-        const newChecked = newValue === checkedValue
+        const checked = isCheckRadio
+            ? newValue === checkedValue
+            : undefined
         shouldTrigger && setTimeout(() => {
             handleChange({
                 preventDefault: () => { },
                 target: {
-                    checked: newChecked,
+                    checked,
                     value: newValue,
                 },
                 stopPropagation: () => { },
             })
         })
-        const valueOld = rxValue.setValue ?? value
-        const valueChanged = valueOld !== newValue
-        const el = valueChanged && document.getElementById(`${idPrefix}${id}`)
-        if (valueChanged) {
-            rxValue.setValue = newValue
-            setValue(newValue)
-
-            const diffPosition = `${newValue || ''}`.length - `${valueOld || ''}`.length
-            const start = (el?.selectionStart ?? 0) + diffPosition
-            const end = (el?.selectionEnd ?? 0) + diffPosition
-            isFn(el?.setSelectionRange) && setTimeout(() => el?.setSelectionRange?.(start, end))
-        }
-
-        const ignore = !shouldTrigger
-            || !isCheckRadio
-            || newChecked === _oldChecked
-
-        return ignore
-            ? IGNORE_UPDATE_SYMBOL
-            : newChecked
+        return [newValue, checked]
     })
-    const [checked] = useRxSubject(rxValue, rxValueModifier)
+    const [[value, newChecked]] = useRxSubject(rxValue, rxValueModifier)
 
     if (hidden) return ''
     if (isTypeHidden) return (
@@ -380,7 +365,6 @@ export const FormInput = React.memo(function FormInput(props) {
             {suffix}
         </Container>
     )
-    if (type === 'html') return getContainer(content)
 
     /**
      * @name    getLabel
@@ -462,6 +446,11 @@ export const FormInput = React.memo(function FormInput(props) {
         )
     }
     label = label && getLabel(label, false)
+
+    if (type === 'html') return getContainer(content)
+
+    const isCheckRadio = ['checkbox', 'radio'].includes(type)
+
     inputChildren = !optionsReplaceProp
         && optionItems
         || inputChildren
@@ -472,7 +461,7 @@ export const FormInput = React.memo(function FormInput(props) {
                 ...inputProps,
                 checked: !isCheckRadio
                     ? undefined
-                    : checked ?? value === checkedValue,
+                    : newChecked ?? value === checkedValue,
                 ...inputChildren && {
                     children: inputChildren
                 },
@@ -496,11 +485,7 @@ export const FormInput = React.memo(function FormInput(props) {
                     rxIsFocused.next(false)
                     isFn(onBlur) && onBlur(...args)
                 },
-                onChange: (e, ...args) => {
-                    rxValue.setValue = e?.target?.value
-                    setValue(e?.target?.value)
-                    handleChange(e, ...args)
-                },
+                onChange: handleChange,
                 onFocus: (...args) => {
                     rxIsFocused.next(true)
                     isFn(onFocus) && onFocus(...args)
@@ -628,6 +613,7 @@ FormInput.setupDefaults = (name, module) => {
             //         inputProps: {}
             //     }
             //     const components = {}
+            //     console.log({ type })
             //     switch (type) {
             //         case 'checkbox-group':
             //         case 'radio-group':
@@ -710,7 +696,7 @@ const handleChangeCb = (
         } catch (_) { } // ignore unsupported
     })
 
-    // setCursor()
+    setCursor()
     // value unchanged
     const unchanged = !isCheck && isEqual(rxValue[VALIDATED_KEY], value)
     if (unchanged) return

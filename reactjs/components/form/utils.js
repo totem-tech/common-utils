@@ -63,6 +63,7 @@ export const checkInputInvalid = (
     inputsHidden = [],
     evalRecursive = ['inputProps']
 ) => {
+    // const validatedValue = input?.rxValue?.[VALIDATED_KEY]
     const _input = objEvalRxProps(input, evalRecursive)
     let {
         checkedValue = true,
@@ -75,6 +76,8 @@ export const checkInputInvalid = (
         value: _value,
         rxValue: value = _value,
     } = { ..._input, ..._input?.inputProps }
+    // if (validatedValue !== undefined && validatedValue !== value) return true
+
     const isValid = error !== true && valid !== false
     const ignore = inputsHidden.includes(name)
         || [
@@ -162,6 +165,7 @@ export const fillInputs = (
         if (!values.hasOwnProperty(name)) return
 
         const value = values[name]
+        input.key = value
         // if value is RxJS subject trigger a value change
         if (isSubjectLike(rxValue)) {
             if (forceValidation) rxValue[VALIDATED_KEY] = forceValidation?.[name] ?? null

@@ -321,18 +321,7 @@ export const FormInput = React.memo(function FormInput(props) {
                 stopPropagation: () => { },
             })
         })
-        const valueOld = rxValue.setValue ?? value
-        const valueChanged = valueOld !== newValue
-        const el = valueChanged && document.getElementById(`${idPrefix}${id}`)
-        if (valueChanged) {
-            rxValue.setValue = newValue
-            setValue(newValue)
-
-            const diffPosition = `${newValue || ''}`.length - `${valueOld || ''}`.length
-            const start = (el?.selectionStart ?? 0) + diffPosition
-            const end = (el?.selectionEnd ?? 0) + diffPosition
-            isFn(el?.setSelectionRange) && setTimeout(() => el?.setSelectionRange?.(start, end))
-        }
+        if (shouldTrigger) setValue(newValue)
 
         const ignore = !shouldTrigger
             || !isCheckRadio
@@ -466,6 +455,8 @@ export const FormInput = React.memo(function FormInput(props) {
         && optionItems
         || inputChildren
 
+    isCheckRadio && console.log({ name, checked, value })
+
     return getContainer(
         <Input {...objWithoutKeys(
             {
@@ -497,7 +488,6 @@ export const FormInput = React.memo(function FormInput(props) {
                     isFn(onBlur) && onBlur(...args)
                 },
                 onChange: (e, ...args) => {
-                    rxValue.setValue = e?.target?.value
                     setValue(e?.target?.value)
                     handleChange(e, ...args)
                 },
@@ -628,6 +618,7 @@ FormInput.setupDefaults = (name, module) => {
             //         inputProps: {}
             //     }
             //     const components = {}
+            //     console.log({ type })
             //     switch (type) {
             //         case 'checkbox-group':
             //         case 'radio-group':
