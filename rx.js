@@ -156,7 +156,8 @@ export const subjectAsPromise = (
     subject,
     expectedValue,
     timeout,
-    modifier
+    modifier,
+    timeoutMsg = textsCap.timedout
 ) => {
     if (!isSubjectLike(subject)) return
 
@@ -187,7 +188,7 @@ export const subjectAsPromise = (
             if (unsubscribed) return
 
             unsubscribe()
-            reject(textsCap.timedout)
+            reject(timeoutMsg)
         }, timeout)
     })
 

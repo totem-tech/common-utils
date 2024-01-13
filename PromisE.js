@@ -1,8 +1,11 @@
+import { BehaviorSubject } from 'rxjs'
 import { translated } from './languageHelper'
 import {
     deferred,
+    fallbackIfFails,
     isArr,
     isAsyncFn,
+    isError,
     isFn,
     isInteger,
     isObj,
@@ -11,6 +14,7 @@ import {
     isStr,
     isValidURL,
 } from './utils'
+import { subjectAsPromise } from './rx'
 
 const textsCap = {
     invalidUrl: 'invalid URL',
@@ -110,10 +114,11 @@ PromisE.all = (...promises) => PromisE(
  * @param   {Number}    defer       (optional)
  * @param   {Object}    conf        (optional)
  * @param   {Function}  conf.onError   (optional)
+ * @param   {Function}  conf.onIgnore  (optional) invoked whenever callback invocation is ignored by a newer invocation
  * @param   {Function}  conf.onResult  (optional)
- * @param   {Boolean}   conf.strict     (optional) only used if `throttle` is truthy.
- *                                      Default: `false`
- * @param   {Boolean}   conf.throttle   (optional) Default: `false`
+ * @param   {Boolean}   conf.strict    (optional) only used if `throttle` is truthy.
+ *                                     Default: `false`
+ * @param   {Boolean}   conf.throttle  (optional) Default: `false`
  * 
  * @description The main difference is that:
  *  - Notes: 
@@ -169,6 +174,7 @@ PromisE.deferred = (
     defer,
     {
         onError = () => { },
+        onIgnore,
         onResult, // result: whatever is returned from the callback on the execution/request that was "handled"
         strict,
         thisArg,
@@ -219,20 +225,42 @@ PromisE.deferred = (
         !strict && queue.push(handler)
     })
     // when a defer/delay is specified, only start executing after the specified delay
-    if (isPositiveNumber(defer)) dp = deferred(dp, defer)
+    if (isPositiveNumber(defer)) dp = PromisE.deferredAsync(dp, defer)
     if (!isFn(callback)) return dp
 
     const cb = async (...args) => {
         const result = await dp(() => callback.call(thisArg, ...args))
             ?.catch(err => {
-                onError?.(err)
-                return Promise.reject(err)
+                const throwError = onError?.(err) !== false
+                return throwError && Promise.reject(err) || undefined
             })
-        onResult?.(result)
+        onResult?.(result)?.catch(() => { })
         return result
     }
 
     return cb
+}
+
+PromisE.deferredAsync = (
+    callback,
+    delay = 50,
+    tid,
+) => async (...args) => {
+    clearTimeout(tid)
+    const emptySymbol = Symbol('empty')
+    const rxResult = new BehaviorSubject(emptySymbol)
+    tid = setTimeout(
+        () => rxResult.next(
+            // catch any error
+            (async () => await callback?.(...args))()
+        ),
+        delay,
+    )
+    const resultPromise = subjectAsPromise(
+        rxResult,
+        x => x !== emptySymbol,
+    )[0]
+    return await resultPromise
 }
 
 /**

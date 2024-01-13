@@ -531,15 +531,6 @@ export const className = value => {
  * 
  * @returns {Function}
  */
-// export const deferred = (callback, delay, thisArg) => {
-// 	if (!isFn(callback)) return // nothing to do!!
-// 	let timeoutId
-// 	return (...args) => {
-// 		if (timeoutId) clearTimeout(timeoutId)
-// 		timeoutId = setTimeout(() => callback.apply(thisArg, args), delay || 50)
-// 		return timeoutId
-// 	}
-// }
 export const deferred = (
 	callback,
 	delay = 50,
@@ -552,6 +543,35 @@ export const deferred = (
 		delay,
 		...args //arguments for callback
 	)
+}
+
+/**
+ * @name	deferredAsync
+ * @summary deferred function that returns a promise which resolves/rejejcts based on `callback` result.
+ * If a callback is ignored the promise will never resolve.
+ * 
+ * @param	{Function}	callback 	function to be invoked after timeout
+ * @param	{Number}	delay		(optional) timeout duration in milliseconds.
+ * 									Default: 50
+ * @param	{*}			thisArg		(optional) the special `thisArgs` to be used when invoking the callback.
+ * @param	{*}			tid			(optional) timeout id to be cleared on callback invocation.
+ * 
+ * @returns {Function}
+ */
+export const deferredAsync = (
+	callback,
+	delay = 50,
+	thisArg,
+	tid,
+) => (...args) => {
+	clearTimeout(tid)
+	return new Promise((resolve, reject) => {
+		tid = setTimeout(
+			() => (async () => await callback?.call?.(thisArg, ...args))()
+				.then(resolve, reject),
+			delay,
+		)
+	})
 }
 
 /**
