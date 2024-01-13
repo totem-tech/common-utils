@@ -193,7 +193,7 @@ PromisE.deferred = (
             .pop()
         handler && handler()
     }
-    const dp = promise => PromisE((resolve, reject) => {
+    let dp = promise => PromisE((resolve, reject) => {
         const handler = () => {
             const id = Symbol()
             try {
@@ -218,22 +218,21 @@ PromisE.deferred = (
         // simply add subsequent requests to the queue and only execute/resolve the last in the queue
         !strict && queue.push(handler)
     })
+    // when a defer/delay is specified, only start executing after the specified delay
+    if (isPositiveNumber(defer)) dp = deferred(dp, defer)
     if (!isFn(callback)) return dp
 
     const cb = async (...args) => {
         const result = await dp(() => callback.call(thisArg, ...args))
-            .catch(err => {
+            ?.catch(err => {
                 onError?.(err)
                 return Promise.reject(err)
             })
-        // .then(onResult, onError)
         onResult?.(result)
         return result
     }
 
-    return isPositiveNumber(defer)
-        ? deferred(cb, defer)
-        : cb
+    return cb
 }
 
 /**
