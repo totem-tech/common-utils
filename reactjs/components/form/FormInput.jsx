@@ -496,12 +496,7 @@ export const FormInput = React.memo(function FormInput(props) {
                 onChange: (e, ...args) => {
                     const valueNew = onChangeSelectValue?.(e, ...args)
                     rxValue.setValue = e.target.value
-                    updateCaretPosition(
-                        e.target,
-                        valueNew,
-                        name,
-                        'onCHange',
-                    )
+                    updateCaretPosition(e.target, valueNew)
                     setValue(e?.target?.value)
                     handleChange(e, ...args)
                 },

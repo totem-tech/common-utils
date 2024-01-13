@@ -295,7 +295,7 @@ export const updateCaretPosition = (el, newValue) => {
         selectionStart: startOrg,
         value: currentValue
     } = el || {}
-    const ignore = newValue === undefined
+    let ignore = newValue === undefined
         || !isFn(el?.setSelectionRange)
         || currentValue === newValue
     if (ignore) return
@@ -305,13 +305,25 @@ export const updateCaretPosition = (el, newValue) => {
     // check if caret has changed after setting the new value
     const caretChanged = endOrg !== el.selectionEnd
         || el.selectionStart !== startOrg
+
+    // check if text has been added before or after
     const diffPosition = `${newValue || ''}`.length - `${currentValue || ''}`.length
-    const start = (startOrg ?? 0) + diffPosition
-    const end = (endOrg ?? 0) + diffPosition
+    let start = (startOrg ?? 0) + diffPosition
+    let end = (endOrg ?? 0) + diffPosition
 
     // caret position doesn't need to be updated
-    if (!caretChanged && endOrg === end && startOrg === start) return
+    ignore = !caretChanged
+        && endOrg === end
+        && startOrg === start
+    if (ignore) return
 
+    // new character has been added to the right
+    const unchangedLeft = diffPosition > 0
+        && currentValue.slice(0, end - 1).toLowerCase() === newValue.slice(0, end - 1).toLowerCase()
+    if (unchangedLeft) {
+        end = endOrg
+        start = startOrg
+    }
     el.setSelectionRange(start, end)
     return true
 }
