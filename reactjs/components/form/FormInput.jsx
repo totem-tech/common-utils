@@ -324,18 +324,13 @@ export const FormInput = React.memo(function FormInput(props) {
         })
         const valueOld = rxValue.setValue ?? value
         const valueChanged = valueOld !== valueNew
-        if (valueChanged) {
+        if (valueChanged && !isCheckRadio) {
             rxValue.setValue = valueNew
             const el = document.getElementById(`${idPrefix}${id}`)
             updateCaretPosition(el, valueNew)
             setValue(valueNew)
         }
-
-        const ignore = !shouldTrigger
-            || !isCheckRadio
-            || newChecked === _oldChecked
-
-        return ignore
+        return !isCheckRadio
             ? IGNORE_UPDATE_SYMBOL
             : newChecked
     })
@@ -467,9 +462,7 @@ export const FormInput = React.memo(function FormInput(props) {
         <Input {...objWithoutKeys(
             {
                 ...inputProps,
-                checked: !isCheckRadio
-                    ? undefined
-                    : checked ?? value === checkedValue,
+                ...isCheckRadio && { checked },
                 ...inputChildren && {
                     children: inputChildren
                 },
@@ -497,7 +490,20 @@ export const FormInput = React.memo(function FormInput(props) {
                     const valueNew = onChangeSelectValue?.(e, ...args)
                     rxValue.setValue = e.target.value
                     updateCaretPosition(e.target, valueNew)
-                    setValue(e?.target?.value)
+                    setValue(
+                        isCheckRadio
+                            ? `${e?.target?.value}` !== checkedValue
+                                ? checkedValue
+                                : uncheckedValue
+                            : valueNew ?? e.target.value
+                    )
+                    // if (isCheckRadio) console.log(e?.target?.checked, 'checked',
+                    //     isCheckRadio
+                    //         ? `${e?.target?.value}` !== checkedValue
+                    //             ? checkedValue
+                    //             : uncheckedValue
+                    //         : valueNew ?? e.target.value)
+                    // if (isCheckRadio) setChecked(`${e?.target?.value}` !== checkedValue)
                     handleChange(e, ...args)
                 },
                 onFocus: (...args) => {
