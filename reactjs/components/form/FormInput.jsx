@@ -33,10 +33,10 @@ import Message, { statuses } from '../Message'
 import RxSubjectView from '../RxSubjectView'
 import FormInputGroup from './FormInputGroup'
 import { useOptions as _useOptions } from './useOptions'
-import { VALIDATED_KEY } from './utils'
+import { VALIDATED_KEY, updateCaretPosition } from './utils'
 import validateCriteria from './validateCriteria'
 import { IGNORE_UPDATE_SYMBOL } from '../../../rx'
-// import CheckboxGroup from './CheckboxGroup'
+
 
 export const errorMessages = {
     decimals: 'maximum number of decimals allowed',
@@ -136,6 +136,7 @@ export const FormInput = React.memo(function FormInput(props) {
         messageHideOnBlur = true,
         name: _name,
         idPrefix = '',
+        onChangeSelectValue,
         onInvalid,
         onMount,
         onUnmount,
@@ -303,35 +304,31 @@ export const FormInput = React.memo(function FormInput(props) {
         setError,
     )
     // re-render on value change regardless of direction
-    const rxValueModifier = useCallback((newValue, _oldChecked) => {
-        if (isFn(_rxValueModifier)) newValue = _rxValueModifier(
-            newValue,
+    const rxValueModifier = useCallback((valueNew, _oldChecked) => {
+        if (isFn(_rxValueModifier)) valueNew = _rxValueModifier(
+            valueNew,
             oldValue,
             rxValue,
         )
-        const shouldTrigger = !isEqual(rxValue[VALIDATED_KEY], newValue)
-        const newChecked = newValue === checkedValue
+        const shouldTrigger = !isEqual(rxValue[VALIDATED_KEY], valueNew)
+        const newChecked = valueNew === checkedValue
         shouldTrigger && setTimeout(() => {
             handleChange({
                 preventDefault: () => { },
                 target: {
                     checked: newChecked,
-                    value: newValue,
+                    value: valueNew,
                 },
                 stopPropagation: () => { },
             })
         })
         const valueOld = rxValue.setValue ?? value
-        const valueChanged = valueOld !== newValue
-        const el = valueChanged && document.getElementById(`${idPrefix}${id}`)
+        const valueChanged = valueOld !== valueNew
         if (valueChanged) {
-            rxValue.setValue = newValue
-            setValue(newValue)
-
-            const diffPosition = `${newValue || ''}`.length - `${valueOld || ''}`.length
-            const start = (el?.selectionStart ?? 0) + diffPosition
-            const end = (el?.selectionEnd ?? 0) + diffPosition
-            isFn(el?.setSelectionRange) && setTimeout(() => el?.setSelectionRange?.(start, end))
+            rxValue.setValue = valueNew
+            const el = document.getElementById(`${idPrefix}${id}`)
+            updateCaretPosition(el, valueNew)
+            setValue(valueNew)
         }
 
         const ignore = !shouldTrigger
@@ -348,7 +345,7 @@ export const FormInput = React.memo(function FormInput(props) {
     if (isTypeHidden) return (
         <input {...{
             ...inputProps,
-            autoComplete: 'username',
+            autoComplete: name,
             style: { display: 'none' },
             type: 'text',
             value,
@@ -497,7 +494,14 @@ export const FormInput = React.memo(function FormInput(props) {
                     isFn(onBlur) && onBlur(...args)
                 },
                 onChange: (e, ...args) => {
-                    rxValue.setValue = e?.target?.value
+                    const valueNew = onChangeSelectValue?.(e, ...args)
+                    rxValue.setValue = e.target.value
+                    updateCaretPosition(
+                        e.target,
+                        valueNew,
+                        name,
+                        'onCHange',
+                    )
                     setValue(e?.target?.value)
                     handleChange(e, ...args)
                 },
@@ -694,21 +698,21 @@ const handleChangeCb = (
         } = {},
     } = event || {}
     let value = args[0]?.value ?? eValue
-    if (isFn(onChangeSelectValue)) {
-        const changedValue = onChangeSelectValue(event, ...args)
-        if (changedValue !== undefined) value = changedValue
-    }
+    // if (isFn(onChangeSelectValue)) {
+    //     const changedValue = onChangeSelectValue(event, ...args)
+    //     if (changedValue !== undefined) value = changedValue
+    // }
     // preserves cursor position
-    const setCursor = () => setTimeout(() => {
-        try {
-            isFn(setSelectionRange)
-                && selectionStart >= 0
-                && selectionEnd >= 0
-                && event
-                    .target
-                    .setSelectionRange(selectionStart, selectionEnd)
-        } catch (_) { } // ignore unsupported
-    })
+    // const setCursor = () => setTimeout(() => {
+    //     try {
+    //         isFn(setSelectionRange)
+    //             && selectionStart >= 0
+    //             && selectionEnd >= 0
+    //             && event
+    //                 .target
+    //                 .setSelectionRange(selectionStart, selectionEnd)
+    //     } catch (_) { } // ignore unsupported
+    // })
 
     // setCursor()
     // value unchanged
@@ -835,7 +839,7 @@ const handleChangeCb = (
     if (crInvalid && !hasVal) crInvalid = false
 
     const triggerChange = err => {
-        setCursor()
+        // setCursor()
         const error = !!err || !!crInvalid
         const message = err && err !== true
             ? {

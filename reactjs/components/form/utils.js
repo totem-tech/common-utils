@@ -3,6 +3,7 @@ import {
     hasValue,
     isArr,
     isDefined,
+    isFn,
     isSubjectLike,
     objEvalRxProps,
 } from '../../../utils'
@@ -278,4 +279,39 @@ export const reValidateInputs = (
         ?.scrollTo?.({ top, behavior: 'smooth' })
 
     return names
+}
+
+/**
+ * @name    updateCaretPosition
+ * 
+ * @param   {Element} el 
+ * @param   {*} newValue 
+ * 
+ * @returns {Boolean} whether caret position has ben updated
+ */
+export const updateCaretPosition = (el, newValue) => {
+    const {
+        selectionEnd: endOrg,
+        selectionStart: startOrg,
+        value: currentValue
+    } = el || {}
+    const ignore = newValue === undefined
+        || !isFn(el?.setSelectionRange)
+        || currentValue === newValue
+    if (ignore) return
+
+    el.value = newValue
+
+    // check if caret has changed after setting the new value
+    const caretChanged = endOrg !== el.selectionEnd
+        || el.selectionStart !== startOrg
+    const diffPosition = `${newValue || ''}`.length - `${currentValue || ''}`.length
+    const start = (startOrg ?? 0) + diffPosition
+    const end = (endOrg ?? 0) + diffPosition
+
+    // caret position doesn't need to be updated
+    if (!caretChanged && endOrg === end && startOrg === start) return
+
+    el.setSelectionRange(start, end)
+    return true
 }
