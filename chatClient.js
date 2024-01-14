@@ -9,8 +9,6 @@ import {
     deferred,
     fallbackIfFails,
     isArr,
-    isArr2D,
-    isAsyncFn,
     isBool,
     isFn,
     isNodeJS,
@@ -23,7 +21,17 @@ import {
 import { TYPES, validateObj } from './validator'
 
 let instance, socket
-const AUTO_DISCONNECT_MS = parseInt(process.env.REACT_APP_CHAT_AUTO_DISCONNECT_MS) || 0
+const [
+    API_URL,
+    AUTO_DISCONNECT_MS
+] = [
+    'API_URL',
+    'API_AUTO_DISCONNECT_MS',
+].map(x => fallbackIfFails(
+    () => process.env[x] || process.env[`REACT_APP_${x}`],
+    [],
+    undefined
+))
 const MODULE_KEY = 'messaging'
 const PREFIX = 'totem_'
 export const ROLE_ADMIN = 'admin'
@@ -56,23 +64,34 @@ if (rw().history) rw({ history: null })
 //- migrate end
 
 class ChatClient {
-    constructor(url, namespace, autoDisconnectMs = AUTO_DISCONNECT_MS) {
-        if (!isStr(url)) {
-            const hostProd = 'totem.live'
-            const hostStaging = 'dev.totem.live'
-            const isNode = isNodeJS()
-            const staging = isBool(url)
-                ? url
-                : !isNode && window.location.hostname === hostStaging
-            const hostname = !isNode
-                ? window.location.hostname // if frontend the use the URL
-                : staging
-                    ? hostStaging
-                    : hostProd
-            const port = staging
-                ? 3003
-                : 3001
-            url = `wss://${hostname}:${port}`
+    constructor(
+        url = API_URL,
+        namespace,
+        autoDisconnectMs = parseInt(AUTO_DISCONNECT_MS) || 0
+    ) {
+        if (!url) {
+            // const hostProd = 'totem.live'
+            // const hostStaging = 'dev.totem.live'
+            // const isNode = isNodeJS()
+            // const staging = isBool(url)
+            //     ? url
+            //     : !isNode && window.location.hostname === hostStaging
+            // const hostname = !isNode
+            //     ? window.location.hostname // if frontend the use the URL
+            //     : staging
+            //         ? hostStaging
+            //         : hostProd
+            // const port = staging
+            //     ? 3003
+            //     : 3001
+            // url = `wss://${hostname}:${port}`
+
+            let { hostname = '' } = fallbackIfFails(() => window.location) || {}
+            url = hostname.startsWith('192.168.') || ['127.0.0.1', 'localhost'].includes(hostname)
+                ? `wss://${hostname}:3001`
+                : hostname.startsWith('dev.')
+                    ? `wss://dev.api.${hostname.slice(4)}`
+                    : `wss://api.${hostname}`
         }
         this.url = `${url}${namespace || ''}`
         socket = ioClient(this.url, {
