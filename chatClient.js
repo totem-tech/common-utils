@@ -1255,17 +1255,6 @@ const generateEventHandlers = (chatClient, eventsMeta = {}) => {
             chatClient[name] = handler
             chatClient.on[name] = handler
         })
-    window.query = chatClient.query
-    window.listen = chatClient.on
-    window.listenables = listenables
-    window.emittables = emittables
-    log({
-        emittables,
-        query,
-        listenables,
-        listen,
-        types: dataTypes,
-    })
 }
 
 const log = (...args) => console.log(
