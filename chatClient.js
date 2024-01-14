@@ -70,22 +70,6 @@ class ChatClient {
         autoDisconnectMs = parseInt(AUTO_DISCONNECT_MS) || 0
     ) {
         if (!url) {
-            // const hostProd = 'totem.live'
-            // const hostStaging = 'dev.totem.live'
-            // const isNode = isNodeJS()
-            // const staging = isBool(url)
-            //     ? url
-            //     : !isNode && window.location.hostname === hostStaging
-            // const hostname = !isNode
-            //     ? window.location.hostname // if frontend the use the URL
-            //     : staging
-            //         ? hostStaging
-            //         : hostProd
-            // const port = staging
-            //     ? 3003
-            //     : 3001
-            // url = `wss://${hostname}:${port}`
-
             let { hostname = '' } = fallbackIfFails(() => window.location) || {}
             url = hostname.startsWith('192.168.') || ['127.0.0.1', 'localhost'].includes(hostname)
                 ? `wss://${hostname}:3001`
