@@ -300,15 +300,25 @@ export const validate = (value, config, customMessages = {}) => {
                 break
             case TYPES.url:
                 try {
-                    if (!isStr(value)) return _msgOrTrue(errorMsgs.url)
+                    if (!isStr(value)) throw errorMsgs.url
 
                     const url = new URL(value)
                     // Hack to fix comparison failure due to a trailing slash automatically added by `new URL()`
                     if (url.href.endsWith('/') && !value.endsWith('/')) value += '/'
 
-                    // catch any auto-correction by `new URL()`. 
-                    // Eg: spaces in the domain name being replaced by`%20` or missing `//` in protocol being auto added
-                    if (strict && url.href.toLowerCase() !== value.toLowerCase()) return _msgOrTrue(errorMsgs.url)
+                    const urlInvalid = url.host.endsWith('.')
+                        || url.hostname.endsWith('.')
+                        || strict && (
+                            // make sure domain extension is provided
+                            // Or if domain starts with www both extension and name is provided
+                            url.host.split('.').length <= (url.host.startsWith('www.') ? 2 : 1)
+                            // catch any auto-correction by `new URL()`. 
+                            // Eg: spaces in domain name being replaced by `%20`
+                            // or missing `//` in protocol being added.
+                            // When `new URL('https:google.com').href` is turned inot 'https://google.com/'
+                            || url.href.toLowerCase() !== value.toLowerCase()
+                        )
+                    if (urlInvalid) throw errorMsgs.url
                 } catch (e) {
                     return _msgOrTrue(errorMsgs.url)
                 }
