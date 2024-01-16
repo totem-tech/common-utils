@@ -326,7 +326,8 @@ export default class CouchDBStorage {
      * @name    set 
      * @summary create or update document
      * 
-     * @param   {String}    id      (optional) if exists, will update document
+     * @param   {String}    id      (optional) if ID already exists in database, will attempt to update the document.
+     * If empty string or non-string provided, will create a new UUID with `v1()` function.
      * @param   {Object}    value   
      * @param   {Boolean}   update  (optional) whether to allow updating existing document.
      *                              If truthy, will automatically check if `@id` already exists.
@@ -343,7 +344,7 @@ export default class CouchDBStorage {
      * @returns {Object}
      */
     async set(id, value, update = true, merge = true, timeout = 10000, updateTS = true) {
-        id = isStr(id)
+        id = isStr(id) && id.trim().length
             ? id
             : uuid.v1()
         const db = await this.getDB()
