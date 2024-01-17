@@ -1,4 +1,26 @@
+const { execSync: xs } = require('child_process')
+const fs = require('fs')
+
+const execSync = (cmd, ...args) => {
+    console.log(`>> Executing: ${cmd}\n`)
+    return xs(cmd, ...args)
+}
+const push = ([...process.argv][2] || '1') === '1'
+const distDir = [...process.argv][3] || 'dist'
+let buildBranchSuffix = [...process.argv][4] || '-build'
+
+const getBranch = () => execSync('git rev-parse --abbrev-ref HEAD')
+    .toString()
+    .split('\n')[0]
+
+const getCommitHash = () => execSync('git log -1')
+    .toString()
+    .split('\n')[0]
+    .split('commit')[1]
+    .trim()
+
 /**
+ * @name    run
  * @description Build and push only the build files to branch named "[branch-name]-build"
  * 
  * @param {String} push     (optional) Whether to push the commit.
@@ -29,28 +51,6 @@
  * 
  * ToDo: zip/compress dist directory to reduce Git history size??
  */
-export default function instructions() { }
-const { execSync: xs } = require('child_process')
-const fs = require('fs')
-
-const execSync = (cmd, ...args) => {
-    console.log(`>> Executing: ${cmd}\n`)
-    return xs(cmd, ...args)
-}
-const push = ([...process.argv][2] || '1') === '1'
-const distDir = [...process.argv][3] || 'dist'
-let buildBranchSuffix = [...process.argv][4] || '-build'
-
-const getBranch = () => execSync('git rev-parse --abbrev-ref HEAD')
-    .toString()
-    .split('\n')[0]
-
-const getCommitHash = () => execSync('git log -1')
-    .toString()
-    .split('\n')[0]
-    .split('commit')[1]
-    .trim()
-
 const run = async () => {
     // extract branch name
     let result
