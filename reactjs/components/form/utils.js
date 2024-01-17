@@ -62,13 +62,14 @@ addMissingProps.count = 10000
 export const checkInputInvalid = (
     input,
     inputsHidden = [],
-    evalRecursive = ['inputProps']
+    evalRecursive = ['hidden', 'inputProps']
 ) => {
     // const validatedValue = input?.rxValue?.[VALIDATED_KEY]
     const _input = objEvalRxProps(input, evalRecursive)
     let {
         checkedValue = true,
         error,
+        hidden,
         loading,
         name,
         required,
@@ -81,6 +82,7 @@ export const checkInputInvalid = (
 
     const isValid = error !== true && valid !== false
     const ignore = inputsHidden.includes(name)
+        || hidden === true
         || [
             'group',
             'hidden',
@@ -96,7 +98,6 @@ export const checkInputInvalid = (
     const invalid = isEmpty
         ? required?.value ?? required
         : !isValid
-
     return invalid
 }
 
