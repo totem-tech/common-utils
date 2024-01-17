@@ -591,7 +591,6 @@ const setup = props => {
                 && !submitDisabled
                 && !inputs.find(x => checkInputInvalid(x, inputsHidden))
 
-            if (!valid) console.log('invalidInputs', inputs.filter(x => checkInputInvalid(x, inputsHidden)))
             // set state to acknowledge that submit button is clicked
             !valid
                 && !submitClicked
