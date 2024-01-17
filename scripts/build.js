@@ -1,9 +1,8 @@
 /**
- * Build and push only the build files to branch named "[branch-name]-build"
+ * @description Build and push only the build files to branch named "[branch-name]-build"
  * 
- * @description
- * @param {String} push     (optional) '1' = true, anything else means build & commit only but do not push.
- *                          Default: '1'
+ * @param {String} push     (optional) Whether to push the commit.
+ *                          Default: '1' // '1' = true, anything else means only build & commit.
  * @param {String} distDir  (optional) directory where built files will be stored.
  *                          Typically this directory should be ignored by the "source" branch.
  *                          Default: 'dist'
@@ -30,6 +29,7 @@
  * 
  * ToDo: zip/compress dist directory to reduce Git history size??
  */
+export default function instructions() { }
 const { execSync: xs } = require('child_process')
 const fs = require('fs')
 

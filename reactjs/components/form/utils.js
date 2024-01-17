@@ -50,7 +50,7 @@ export const addMissingProps = (input, nameSuffix = ++addMissingProps.count) => 
 addMissingProps.count = 10000
 
 /**
- * @name    checkInput
+ * @name    checkInputInvalid
  * @summary checks if everything is okay with an input: value is valid, not loading, not hidden....
  * 
  * @param   {Object}    _input
@@ -157,7 +157,7 @@ export const fillInputs = (
     const _inputs = isSubjectLike(inputs)
         ? inputs.value
         : inputs
-    _inputs.forEach(input => {
+    _inputs.forEach((input, i) => {
         if (addRxValue) input.rxValue ??= new BehaviorSubject('')
         input.inputProps ??= {}
         const { name = '', rxValue } = { ...input.inputProps, ...input }
@@ -166,7 +166,7 @@ export const fillInputs = (
         if (!values.hasOwnProperty(name)) return
 
         const value = values[name]
-        input.key = value
+        input.key = `${i}${value}${name}`
         // if value is RxJS subject trigger a value change
         if (isSubjectLike(rxValue)) {
             if (forceValidation) rxValue[VALIDATED_KEY] = forceValidation?.[name] ?? null

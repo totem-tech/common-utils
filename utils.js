@@ -590,6 +590,20 @@ export const getFuncParams = func => func
 	.split(')')[0]
 	.split(', ')
 
+export const getUrlParam = (name, url) => {
+	url ??= fallbackIfFails(() => window.location.href)
+	try {
+		const params = new URLSearchParams('?' + url.split('?')[1])
+		return name
+			? params.get(name) || ''
+			: [...params].reduce((obj, [key, value]) => ({
+				...obj,
+				[key]: value,
+			}), {})
+	} catch (_) {
+		return getUrlParamRegex(name, url)
+	}
+}
 /**
  * @name    getUrlParam
  * @summary read parameters of a given URL
@@ -600,7 +614,8 @@ export const getFuncParams = func => func
  * 
  * @returns {String|Object}
  */
-export const getUrlParam = (name, url = fallbackIfFails(() => window.location.href, [], '')) => {
+export const getUrlParamRegex = (name, url) => {
+	url ??= fallbackIfFails(() => window.location.href, [], '')
 	const params = {}
 	const regex = /[?&]+([^=&]+)=([^&]*)/gi
 	url.replace(

@@ -110,6 +110,7 @@ export const FormBuilder = React.memo(function FormBuilder(props) {
         submitClicked = props.submitClicked,
         submitShouldDisable,
     } = state
+
     let { // default components
         Actions,
         Button,
@@ -367,8 +368,11 @@ const addInterceptorCb = (
             index
         )
     idPrefix ??= commonProps.idPrefix
-    if (submitClicked) validatorConfig.required ??= required?.value ?? !!required
-
+    hidden = inputsHidden.includes(name) || (
+        isFn(hidden)
+            ? !!hidden(values, name)
+            : hidden
+    )
     return {
         ...commonProps,
         ...input,
@@ -389,11 +393,7 @@ const addInterceptorCb = (
                 ? disabled(values, name)
                 : disabled
         ),
-        hidden: inputsHidden.includes(name) || (
-            isFn(hidden)
-                ? !!hidden(values, name)
-                : hidden
-        ),
+        hidden,
         idPrefix: idPrefix === null
             ? ''
             : idPrefix || `${formId}_`,
@@ -439,7 +439,12 @@ const addInterceptorCb = (
                 },
                 rxValue,
             ),
-        validatorConfig,
+        validatorConfig: {
+            ...submitClicked && {
+                required: !hidden && (required?.value ?? !!required)
+            },
+            ...validatorConfig,
+        },
     }
 }
 
@@ -452,6 +457,7 @@ const setup = props => {
         } = {},
         scrollToSelector = 'html',
         submitDefer = 300,
+        values
     } = props
     // setup form ID
     window.___formCount ??= 1000
@@ -469,9 +475,9 @@ const setup = props => {
     const propsToWatch = Object
         .keys(props)
         .filter(x => isSubjectLike(props[x]))
-    const rxValues = isSubjectLike(props.values)
-        ? props.values
-        : new BehaviorSubject(props.values || {})
+    const rxValues = isSubjectLike(values)
+        ? values
+        : new BehaviorSubject(values || {})
     // auto update watched props to state
     const stateModifier = ([
         mirroredProps,
@@ -585,6 +591,7 @@ const setup = props => {
                 && !submitDisabled
                 && !inputs.find(x => checkInputInvalid(x, inputsHidden))
 
+            if (!valid) console.log('invalidInputs', inputs.filter(x => checkInputInvalid(x, inputsHidden)))
             // set state to acknowledge that submit button is clicked
             !valid
                 && !submitClicked
@@ -592,12 +599,12 @@ const setup = props => {
                     ...rxState.value,
                     submitClicked: true,
                 })
-            !valid && reValidateInputs(
+            !valid && setTimeout(() => reValidateInputs(
                 inputs,
                 values,
                 inputsHidden,
                 scrollToSelector
-            )
+            ))
             isFn(onSubmit) && await onSubmit(
                 valid,
                 values,
@@ -716,6 +723,7 @@ const setup = props => {
             'submitClicked',
             'submitDisabled',
             'submitInProgress',
+            'submitText',
             'values',
             'valuesToCompare',
         ].filter(key => !isSubjectLike(props[key])),

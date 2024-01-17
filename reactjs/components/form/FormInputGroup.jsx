@@ -1,5 +1,5 @@
 import React from 'react'
-import { className, isValidNumber } from '../../../utils'
+import { className, isPositiveInteger } from '../../../utils'
 import Grid from '../Grid'
 
 const FormInputGroup = props => {
@@ -9,16 +9,17 @@ const FormInputGroup = props => {
             FormInput,
         } = {},
         containerProps = {},
-        columns = true,
+        columns = 1,
         hidden,
         inputs = [],
+        style,
     } = props
     const children = inputs?.map?.(x => <FormInput {...x} />)
     if (!children?.length || hidden) return ''
 
-    columns = isValidNumber(columns) && columns > 0
+    columns = isPositiveInteger(columns)
         ? columns
-        : columns === true && children?.length || 0
+        : columns === true && children?.length || 1
 
     return (
         <Grid {...{
@@ -29,8 +30,9 @@ const FormInputGroup = props => {
                 'FormInputGroup',
                 containerProps?.className,
             ]),
-            columns: 2,
+            columns,
             Component: Container,
+            style,
         }} />
     )
 }

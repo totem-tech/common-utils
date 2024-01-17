@@ -497,13 +497,6 @@ export const FormInput = React.memo(function FormInput(props) {
                                 : uncheckedValue
                             : valueNew ?? e.target.value
                     )
-                    // if (isCheckRadio) console.log(e?.target?.checked, 'checked',
-                    //     isCheckRadio
-                    //         ? `${e?.target?.value}` !== checkedValue
-                    //             ? checkedValue
-                    //             : uncheckedValue
-                    //         : valueNew ?? e.target.value)
-                    // if (isCheckRadio) setChecked(`${e?.target?.value}` !== checkedValue)
                     handleChange(e, ...args)
                 },
                 onFocus: (...args) => {
@@ -674,11 +667,11 @@ const handleChangeCb = (
         onChangeSelectValue,
         uncheckedValue = false,
         validate,
-        validatorConfig = {
-            includeValue: !isStr(customMessages)
-        },
+        validatorConfig = {},
         type: _type,
     } = input
+    const _validatorConfig = { ...validatorConfig }
+    _validatorConfig.includeValue ??= !isStr(customMessages)
     let {
         multiple,
         onChange,
@@ -692,30 +685,11 @@ const handleChangeCb = (
         persist,
         target: {
             checked,
-            selectionEnd,
-            selectionStart,
-            setSelectionRange,
             value: eValue,
         } = {},
     } = event || {}
     let value = args[0]?.value ?? eValue
-    // if (isFn(onChangeSelectValue)) {
-    //     const changedValue = onChangeSelectValue(event, ...args)
-    //     if (changedValue !== undefined) value = changedValue
-    // }
-    // preserves cursor position
-    // const setCursor = () => setTimeout(() => {
-    //     try {
-    //         isFn(setSelectionRange)
-    //             && selectionStart >= 0
-    //             && selectionEnd >= 0
-    //             && event
-    //                 .target
-    //                 .setSelectionRange(selectionStart, selectionEnd)
-    //     } catch (_) { } // ignore unsupported
-    // })
 
-    // setCursor()
     // value unchanged
     const unchanged = !isCheck && isEqual(rxValue[VALIDATED_KEY], value)
     if (unchanged) return
@@ -747,29 +721,29 @@ const handleChangeCb = (
     }
 
     // ignore if doens't have value
-    const validateAs = validatorConfig.type ?? type
-    const shouldValidate = hasVal || validatorConfig.required
+    const validateAs = _validatorConfig.type ?? type
+    const shouldValidate = hasVal || _validatorConfig.required
     if (shouldValidate) {
         switch (validateAs) {
             case 'array':
-                validatorConfig.type ??= TYPES.array
+                _validatorConfig.type ??= TYPES.array
                 break
             case 'checkbox':
             case 'radio':
-                validatorConfig.type ??= TYPES.boolean
+                _validatorConfig.type ??= TYPES.boolean
                 break
             case 'date':
-                validatorConfig.type ??= TYPES.date
+                _validatorConfig.type ??= TYPES.date
                 break
             case 'email':
-                validatorConfig.type ??= TYPES.email
+                _validatorConfig.type ??= TYPES.email
                 break
             case 'identity':
-                validatorConfig.type ??= TYPES.identity
+                _validatorConfig.type ??= TYPES.identity
                 break
             case 'number':
                 isANum = true
-                validatorConfig.type ??= integer
+                _validatorConfig.type ??= integer
                     ? TYPES.integer
                     : TYPES.number
                 data.value = !data.value
@@ -778,17 +752,17 @@ const handleChangeCb = (
                 value = data.value
                 break
             case 'url':
-                validatorConfig.type ??= TYPES.url
+                _validatorConfig.type ??= TYPES.url
                 break
             case 'hex':
-                validatorConfig.type ??= TYPES.hex
+                _validatorConfig.type ??= TYPES.hex
             case 'text':
             case 'textarea':
             default:
                 value = isArr(value)
                     ? value
                     : `${!isDefined(value) ? '' : value}`
-                validatorConfig.type ??= TYPES.string
+                _validatorConfig.type ??= TYPES.string
                 break
         }
     }
@@ -798,7 +772,7 @@ const handleChangeCb = (
 
     const requireValidator = !err
         && shouldValidate
-        && validationTypes.includes(validatorConfig?.type)
+        && validationTypes.includes(_validatorConfig?.type)
     if (!!requireValidator) {
         // hide min & max length error messages if not defined by external error messages
         objSetPropUndefined(
@@ -828,7 +802,7 @@ const handleChangeCb = (
                 customMessages,
                 required,
                 ...inputProps,
-                ...validatorConfig,
+                ..._validatorConfig,
             },
             customMsgs
         )
@@ -840,7 +814,6 @@ const handleChangeCb = (
     if (crInvalid && !hasVal) crInvalid = false
 
     const triggerChange = err => {
-        // setCursor()
         const error = !!err || !!crInvalid
         const message = err && err !== true
             ? {
