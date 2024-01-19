@@ -37,7 +37,7 @@ import {
 const textsCap = {
     close: 'close',
     submit: 'submit',
-    submitError: 'failed to submit form!',
+    submitErrorHeader: 'failed to submit form!',
 }
 translated(textsCap, true)
 
@@ -226,6 +226,7 @@ FormBuilder.defaultProps = {
     inputsHidden: [],
     inputsReadOnly: [],
     submitDisabledIfUnchanged: false,
+    submitErrorHeader: textsCap.submitErrorHeader,
     submitText: textsCap.submit, // string or element or object
 }
 const buttonProp = PropTypes.oneOfType([
@@ -297,6 +298,10 @@ FormBuilder.propTypes = {
     ]),
     // Name of the property in the Button component to indicate button loading status
     submitButtonLoadingProp: PropTypes.string,
+    submitErrorHeader: PropTypes.oneOfType([
+        PropTypes.element,
+        PropTypes.string,
+    ]),
     submitText: buttonProp,
     suffix: PropTypes.any,
     values: PropTypes.oneOfType([
@@ -457,6 +462,7 @@ const setup = props => {
         } = {},
         scrollToSelector = 'html',
         submitDefer = 300,
+        submitErrorHeader,
         values
     } = props
     // setup form ID
@@ -613,11 +619,11 @@ const setup = props => {
             if (closeOnSubmit && valid) return onClose?.()
 
         } catch (err) {
-            console.error(err)
+            console.errorDebug(err)
             rxMessage.next({
-                header: textsCap.submitError,
+                header: submitErrorHeader,
                 status: 'error',
-                text: `${err}`.replace('Error: ', ''),
+                text: (err?.message ?? err) || '',
             })
         }
     }

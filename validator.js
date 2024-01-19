@@ -410,7 +410,8 @@ export const validate = (value, config, customMessages = {}) => {
  * @param   {Object}  config      configuration to validate specific keys in the object
  * @param   {Boolean} failFast    whether to return on first error
  * @param   {Boolean} includeLabel whether to include property name in the error
- * @param   {String|Object} customMessages if `string`, all errors will use a single message.
+ * @param   {Boolean|String|Object} customMessages if `string`, all errors will use a single message.
+ * If `true`, will return true for all messages
  * @param   {Boolen}  includeValue whether to include value in the error (where applicable)
  * 
  * @example
@@ -451,9 +452,13 @@ export const validateObj = (
         const errorMsgs = {
             ...messages,
             ...customMessages,
-            ...isStr(customMessages) && Object
+            ...(isStr(customMessages) || isBool(customMessages))
+            && Object
                 .keys(messages)
-                .reduce((obj, key) => ({ ...obj, [key]: customMessages }), {})
+                .reduce((obj, key) => ({
+                    ...obj,
+                    [key]: customMessages,
+                }), {})
         }
         if (!isObj(obj, config.strict || false)) return msgOrTrue(errorMsgs.object)
 

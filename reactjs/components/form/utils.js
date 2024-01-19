@@ -152,9 +152,6 @@ export const fillInputs = (
     addRxValue = true,
     forceValidation = false,
 ) => {
-    // nothing to fill
-    if (!Object.keys(values).length) return inputs
-
     const _inputs = isSubjectLike(inputs)
         ? inputs.value
         : inputs
@@ -250,23 +247,20 @@ export const reValidateInputs = (
             const input = findInput(name, inputs) || {}
             const {
                 hidden,
-                required: _required,
-                type: _type,
-                inputProps: {
-                    required = _required,
-                    type = _type,
-                } = {},
+                id,
+                required,
                 rxValue,
-            } = input
+                type,
+            } = { ...input, ...input?.inputProps }
             const ignore = !(required?.value ?? required)
-                || !rxValue
                 || hidden
                 || type === 'hidden'
             if (ignore) return
+
             const invalid = checkInputInvalid(input, inputsHidden)
             if (!invalid) return
 
-            rxValue[VALIDATED_KEY] = null
+            if (rxValue) rxValue[VALIDATED_KEY] = null
             rxValue?.next?.(values[name])
             return name
         })
@@ -277,7 +271,7 @@ export const reValidateInputs = (
         ?.offsetTop
     top && document
         .querySelector(scrollToSelector)
-        ?.scrollTo?.({ top, behavior: 'smooth' })
+        ?.scrollTo?.({ top: top - 15, behavior: 'smooth' })
 
     return names
 }
