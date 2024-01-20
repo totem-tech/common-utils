@@ -8,7 +8,7 @@ import { isFn, isNodeJS } from '../utils'
  */
 export default class ExtensionHelper {
     constructor(dAppName) {
-        if (isNodeJS()) throw new Error('PolkadotJS ExtensionHelper can only be used from a browser!')
+        if (isNodeJS()) throw new Error('PolkadotJS ExtensionHelper can only be used from a browser')
 
         this.dAppName = dAppName
         this.web3 = require('@polkadot/extension-dapp')

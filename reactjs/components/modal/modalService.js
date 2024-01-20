@@ -30,8 +30,8 @@ translated(textsCap, true)
  * // For a full list of accepted props see ModalBuilder component.
  * const modalProps = {
  *       actionButtons: [{
- *          content: 'Click Me!',
- *          onClicked: () => alert('You clicked me!'),
+ *          content: 'Click Me',
+ *          onClicked: () => alert('You clicked me'),
  *       }],
  *       content: 'This is the body/content of the modal. You can use text or any React element here.',
  *       subtitle: 'This is the subtitle that appears underneath the title.',
@@ -41,7 +41,7 @@ translated(textsCap, true)
  * 
  * // === Update existing modal ===
  * modalProps.title = 'The updated title'
- * modalProps.subittle = 'This is cool!'
+ * modalProps.subittle = 'This is cool'
  * modalService.set(modalProps, modalId)
  * 
  * // === Remove modal ===
@@ -70,7 +70,7 @@ export class ModalService {
      * const confirmProps = {
      *     closeButton: 'No',
      *     confirmButton: 'Yes',
-     *     content: 'Are you sure? This action is irreversible!',
+     *     content: 'Are you sure? This action is irreversible',
      *     onConfirm: accepted => console.log({ accepted }),
      *     maxWidth: 'md',
      *     title: 'Delete object',

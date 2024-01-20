@@ -304,7 +304,7 @@ export const signAndSend = async (api, address, tx, nonce, rxStatus, tag) => {
                 }).filter(Boolean)
 
                 if (eventErrors.length > 0) {
-                    console.log('Totem Blockchain: Transaction failed!', tag, { blockHash: hash, eventErrors })
+                    console.log('Totem Blockchain: Transaction failed', tag, { blockHash: hash, eventErrors })
                     return reject(eventErrors.join(' | '))
                 }
 
