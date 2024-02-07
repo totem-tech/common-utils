@@ -13,10 +13,10 @@ const config = {
     nodes: [],
     timeout: 30000,
     types: {},
-    // minimum required amount in TOTEM to create a transation.
+    // minimum required amount in TOTEM Credits to create a transaction.
     // This is a temporary solution until upgraded to PolkadotJS V2.
-    // 140 TOTEM for a simple transaction.
-    // 1 TOTEM for existential balance.
+    // 140 TOTEM Credits for a simple transaction.
+    // 1 TOTEM Credits for existential balance.
     txFeeMin: 141, // unused/deprecated
     errorMsgs: {
         connectionFailed: 'Connection failed',
@@ -275,7 +275,7 @@ export const signAndSend = async (api, address, tx, nonce, rxStatus, tag) => {
         }
         nonces[address] = nonce
     }
-    console.log('Totem Blockchain: initiating transation', tag, { nonce })
+    console.log('Live Accounting: initiating transaction', tag, { nonce })
     return await new Promise(async (resolve, reject) => {
         try {
             const signed = await tx.sign(account, { nonce })
@@ -283,7 +283,7 @@ export const signAndSend = async (api, address, tx, nonce, rxStatus, tag) => {
                 const { events, status } = result
                 const isFuture = status.type !== 'Future'
                 let hash = ''
-                console.log('Totem Blockchain: Transaction status', tag, status.type)
+                console.log('Live Accounting: Transaction status', tag, status.type)
 
                 // notify
                 rxStatus && rxStatus.next(result)
@@ -304,7 +304,7 @@ export const signAndSend = async (api, address, tx, nonce, rxStatus, tag) => {
                 }).filter(Boolean)
 
                 if (eventErrors.length > 0) {
-                    console.log('Totem Blockchain: Transaction failed!', tag, { blockHash: hash, eventErrors })
+                    console.log('Live Accounting: Transaction failed', tag, { blockHash: hash, eventErrors })
                     return reject(eventErrors.join(' | '))
                 }
 
@@ -315,7 +315,7 @@ export const signAndSend = async (api, address, tx, nonce, rxStatus, tag) => {
                 }))
                     // exclude empty event data
                     .filter(event => event.data && event.data.length) || {}
-                console.log(`Totem Blockchain: Completed at block hash: ${hash}`, tag, isNode ? '' : { eventsArr })
+                console.log(`Live Accounting: Completed at block hash: ${hash}`, tag, isNode ? '' : { eventsArr })
                 rxStatus && rxStatus.complete()
                 resolve([hash, eventsArr])
             })

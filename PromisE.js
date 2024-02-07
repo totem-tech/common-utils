@@ -317,7 +317,7 @@ PromisE.delay = (delay, result = delay) => new PromisE(resolve =>
  *     if (resultPromise.timeout) alert('Request is taking longer than expected')
  *      resultPromise
  *          .promise
- *          .then(result => alert('Finally, got the result after the timeout!'))
+ *          .then(result => alert('Finally, got the result after the timeout'))
  * })
  * ```
  */

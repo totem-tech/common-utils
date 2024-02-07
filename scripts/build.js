@@ -110,7 +110,7 @@ const run = async () => {
             : console.log('Creating build branch: ' + buildBranch)
         execSync(`git switch ${!exists ? '-c ' : ''}${buildBranch}`)
         // make sure it has switched to the build branch
-        if (getBranch() !== buildBranch) return console.error('Failed to switch to build branch! Reason unknown!')
+        if (getBranch() !== buildBranch) return console.error('Failed to switch to build branch! Reason unknown')
 
         // check if the commit has already been built
         result = execSync('git log -1')
@@ -121,7 +121,7 @@ const run = async () => {
             ?.split('Build for ')[1]
             ?.split(' ')?.[0]
         const isBuilt = commitHash === lastBuiltCommit
-        if (isBuilt && !push) throw new Error('This build has already been committed!')
+        if (isBuilt && !push) throw new Error('This build has already been committed')
 
         if (!isBuilt) {
             const distPath = `${distDir}${distDir.endsWith('/') ? '' : '/'}`
@@ -153,7 +153,7 @@ const run = async () => {
             }
         }
 
-        console.log('All done!')
+        console.log('All done')
         cleanupCmds.push(`rm -rf ${tempPath}`)
     } catch (err) {
         console.log('\n==== Error Message Start =====')

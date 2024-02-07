@@ -10,7 +10,7 @@ import BlockchainHelper from './BlockchainHelper'
  */
 export default class CrowdloanHelper {
     constructor(blockchainHelper, parachainId, title) {
-        if (!(blockchainHelper instanceof BlockchainHelper)) throw new Error('Invalid BlockchainHelper!')
+        if (!(blockchainHelper instanceof BlockchainHelper)) throw new Error('Invalid BlockchainHelper')
         this.blockchainHelper = blockchainHelper
         this.formatAmount = blockchainHelper.formatAmount
         this.query = blockchainHelper.query

@@ -320,8 +320,8 @@
 //             false,
 //         )
 //         if (!encrypted && !sealed) {
-//             console.log('Encryption failed!', { value })
-//             throw new Error('Encryption failed!')
+//             console.log('Encryption failed', { value })
+//             throw new Error('Encryption failed')
 //         }
 
 //         const bytes = new Uint8Array([...nonce, ...(encrypted || sealed)])

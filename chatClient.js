@@ -142,7 +142,7 @@ class ChatClient {
             onError,
             timeout
         ) => {
-            if (!eventName) throw new Error('Event name required!')
+            if (!eventName) throw new Error('Event name required')
             let callbackIndex // if undefined will use last argument
             const eventMeta = await this.awaitReady(eventName, timeout) || {}
             let {
@@ -605,8 +605,8 @@ class ChatClient {
      * @returns {Function}  unsubscribe
      */
     on = (eventName, cb, once = false) => {
-        if (!eventName) throw new Error('Event name required!')
-        if (!isFn(cb)) throw new Error('Callback required!')
+        if (!eventName) throw new Error('Event name required')
+        if (!isFn(cb)) throw new Error('Callback required')
 
         const interceptor = eventName === eventEventsMeta
             ? cb
@@ -1233,7 +1233,7 @@ const generateEventHandlers = (chatClient, eventsMeta = {}) => {
                 chatClient.query[name] = emitHandler
                 chatClient[name] = emitHandler
             } catch (err) {
-                console.log('ChatClient: failed to generate event handler!', err)
+                console.log('ChatClient: failed to generate event handler', err)
             }
         })
     Object

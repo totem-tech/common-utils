@@ -33,7 +33,7 @@ export const texts = {
     disconnected: 'disconnected',
     reconnecting: 'attempting to reconnect...',
     reconnected: 'reconnected',
-    txInitiating: 'initiating transation',
+    txInitiating: 'initiating transaction',
     txFailed: 'transaction failed',
     txStatus: 'transaction status',
     txCompletedAtBlock: 'transaction completed at block hash',
