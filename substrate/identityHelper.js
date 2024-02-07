@@ -9,7 +9,7 @@ import {
 	objHasKeys,
 } from '../utils'
 import getKeyringHelper, { KeyringHelper } from './keyringHelper'
-import PolkadotExtensionHelper from './ExtensionHelper'
+// import ExtensionHelper from './ExtensionHelper' // imported only when enableExtension() function is called
 
 export const USAGE_TYPES = Object.freeze({
 	PERSONAL: 'personal',
@@ -64,7 +64,7 @@ export class IdentityHelper {
 				.toJson()
 		} catch (err) {
 			// error will occur if wasm-crypto is not initialised or invalid URI passed
-			// console.log('services.identity.addFromUri()', err)
+			// console.log('Failed to add URI to keyring', err)
 		}
 	}
 
@@ -75,7 +75,8 @@ export class IdentityHelper {
 	 */
 	enableExtionsion = async (dAppName) => {
 		if (isNodeJS()) return
-		this.extension = new PolkadotExtensionHelper(dAppName)
+		const ExtensionHelper = require('./ExtensionHelper')
+		this.extension = new ExtensionHelper(dAppName)
 		const result = await this.extension.enable()
 		const removeInjected = ignoreAddresses => {
 			const removed = []
