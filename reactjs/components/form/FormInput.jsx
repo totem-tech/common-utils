@@ -657,6 +657,9 @@ const handleChangeCb = (
     rxMessage,
     setError,
 ) => (event, ...args) => {
+    rxValue.___changeCount ??= 0
+    rxValue.___changeCount++
+    const { ___changeCount } = rxValue
     const input = rxInput.value
     let {
         checkedValue = true,
@@ -834,8 +837,10 @@ const handleChangeCb = (
 
         // prevents re-validation because of the trigger
         rxValue[VALIDATED_KEY] = data.value
+
         // trigger value change on the subject
-        const unchagned = isEqual(rxValue.value, data.value)
+        const unchagned = ___changeCount !== rxValue.___changeCount
+            || isEqual(rxValue.value, data.value)
         !unchagned && rxValue.next(data.value)
     }
 
