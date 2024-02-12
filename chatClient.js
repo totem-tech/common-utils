@@ -63,6 +63,11 @@ try {
 if (rw().history) rw({ history: null })
 //- migrate end
 
+export const textsCap = {
+    timeout: 'request timed out'
+}
+translated(textsCap, true)
+
 class ChatClient {
     constructor(
         url = API_URL,
@@ -131,7 +136,7 @@ class ChatClient {
          * @param   {Array}     args            (optional) arguments/data to supplied during event emission
          * @param   {Function}  resultModifier  (optional) modify result before being resolved
          * @param   {Function}  onError         (optional)
-         * @param   {Number}    timeout    (optional) timeout in milliseconds
+         * @param   {Number}    timeout         (optional) timeout in milliseconds
          * 
          * @returns {Promise}
          */
@@ -140,11 +145,13 @@ class ChatClient {
             args = [],
             resultModifier,
             onError,
-            timeout
+            timeout,
+            eventMeta
         ) => {
+            if (timeout instanceof EmitTimeout) timeout = timeout.value
             if (!eventName) throw new Error('Event name required')
             let callbackIndex // if undefined will use last argument
-            const eventMeta = await this.awaitReady(eventName, timeout) || {}
+            eventMeta ??= await this.awaitReady(eventName, timeout) || {}
             let {
                 customMessages,
                 failFast,
@@ -240,7 +247,8 @@ class ChatClient {
             await subjectAsPromise(
                 rxIsConnected,
                 true,
-                timeout
+                timeout,
+                textsCap.timeout
             )[0]
         }
         const eventMeta = await this.getEventsMeta(eventName, timeout)
@@ -250,7 +258,8 @@ class ChatClient {
         doWait && await subjectAsPromise(
             rxIsLoggedIn,
             true,
-            timeout
+            timeout,
+            textsCap.timeout,
         )[0]
 
         doWait = rxIsInMaintenanceMode.value && !maintenanceMode
@@ -260,7 +269,8 @@ class ChatClient {
             await subjectAsPromise(
                 rxIsInMaintenanceMode,
                 false,
-                timeout
+                timeout,
+                textsCap.timeout,
             )[0]
         }
 
@@ -416,7 +426,8 @@ class ChatClient {
         const result = await subjectAsPromise(
             this.rxEventsMeta,
             isObj,
-            timeout
+            timeout,
+            textsCap.timeout
         )[0]
         if (!eventName) return result
 
@@ -1003,6 +1014,20 @@ export const chatClient = new Proxy(getClientOrg, {
     get: (func, propKey) => func()[propKey],
 })
 
+export class EmitTimeout {
+    /**
+     * @name    EmitTimeout
+     * @summary Special class used with emit handlers when emitting events.
+     * Using this solves the issue of timeout not working when emitting events before Websocket connection is
+     * established and dynamic event emitter functions have been populated.
+     * 
+     * @param {Number} timeout 
+     */
+    constructor(timeout = 10000) {
+        this.value = timeout
+    }
+}
+
 // do event specific stuff after making a request.
 // key: eventName
 // value: [
@@ -1086,9 +1111,7 @@ export function getClientOrg(url, namespace, disconnectDelayMs) {
         namespace,
         disconnectDelayMs
     )
-    instance = getSafeClient(
-        chatClient
-    )
+    instance = getSafeClient(chatClient)
 
     const triggerChange = (rx, value) => rx.value !== value && rx.next(value)
     chatClient.on(
@@ -1159,7 +1182,29 @@ export const getSafeClient = chatClient => new Proxy(chatClient, {
         ).replaceAll(/[A-Z]/g, (char, i) => (i > 0 ? '-' : '') + char.toLowerCase())
         return isListenable
             ? (cb, once) => chatClient.on(eventName, cb, once)
-            : (...args) => chatClient.emit(eventName, args)
+            : async (...args) => {
+                let resultModifier, onError, timeout, eventMeta
+                if (args.slice(-1)[0] instanceof EmitTimeout) {
+                    timeout = args.slice(-1)[0].value
+                    args = args.slice(0, -1)
+                }
+                eventMeta = await chatClient.awaitReady(eventName, timeout)
+                const { params = [] } = eventMeta
+                if (params.length > 0) {
+                    resultModifier = args.slice(params.length + 1)[0]
+                    onError = args.slice(params.length + 2)[0]
+                    args = args.slice(0, params.length)
+                }
+
+                return chatClient.emit(
+                    eventName,
+                    args,
+                    resultModifier,
+                    onError,
+                    timeout,
+                    eventMeta
+                )
+            }
     },
 })
 

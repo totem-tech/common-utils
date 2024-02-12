@@ -16,7 +16,7 @@ import {
 } from './utils'
 
 const textsCap = {
-    timedout: 'request timed out before an expected value is received.'
+    timedout: 'request timed out before an expected value is received'
 }
 translated(textsCap, true)
 
@@ -147,6 +147,8 @@ export const getRxInterval = (
  * @param   {*|Function}        expectedValue   (optional) if undefined, will resolve as soon as any value is received.
  *                      If function, it should return true or false to indicate whether the value should be resolved.
  * @param   {Number|Function}   timeout         (optional) will reject if no value received within given time
+ * @param   {String}            timeoutMsg      (optional) error message to use when times out.
+ *                                              Default: 'Request timed out before an expected value is received'
  * 
  * @returns {[Promise, Function]}   will reject with: 
  *                                  - `null` if times out
@@ -156,12 +158,15 @@ export const subjectAsPromise = (
     subject,
     expectedValue,
     timeout,
-    modifier,
-    timeoutMsg = textsCap.timedout
+    timeoutMsg = textsCap.timedout,
+    timeoutMsg2
 ) => {
     if (!isSubjectLike(subject)) return
 
-    if (modifier) console.warn('utils/rx.js => subjectAsPromise: `modifier` deprecated! Use `promise.then()` instead.')
+    if (isFn(timeoutMsg)) {
+        console.warn('utils/rx.js => subjectAsPromise: `modifier` deprecated! Use `promise.then()` instead.')
+        timeoutMsg = timeoutMsg2 || textsCap.timedout
+    }
 
     let subscription, timeoutId, unsubscribed
     const unsubscribe = () => setTimeout(() => {
