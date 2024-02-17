@@ -39,7 +39,10 @@ export const secretBoxDecrypt = (encrypted, nonce, secret, asString = true) => {
  * @param   {Boolean}           asHex   (optional) whether to return encrypted message as bytes or hex string
  *                                      Default: true
  * 
- * @returns {Object}    `{ encrypted, nonce }`
+ * @returns {{ 
+ *  encrypted: String|Uint8Array,
+ *  nonce: String|Uint8Array,
+ * }}
  */
 export const secretBoxEncrypt = (message, secret, nonce, asHex = true) => {
     nonce = nonce || newNonce(false) // generate new nonce

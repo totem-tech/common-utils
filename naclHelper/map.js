@@ -5,7 +5,7 @@ import { decryptObj, encryptObj } from './object'
  * @name    mapDecrypt
  * @summary recursively decrypt objects encrypted using the `encryptObj()` function. 
  * 
- * @param   {Map}               map         data to decrypt
+ * @param   {Map}               data         data to decrypt
  * @param   {String|Uint8Array} senderPublicKey (optional) if not supplied, will decrypt using SecretBox. 
  *                                          Otherwise, will use Box encryption.
  * @param   {String|Uint8Array} secretKey   recipient secret key (box encrypted) or shared secret (secret box encrypted)
@@ -14,14 +14,14 @@ import { decryptObj, encryptObj } from './object'
  *                                          Otherwise, will attempt to decrypt all String (hex) or Uint8Array values.
  *                                          See examples for different usage cases.
  * 
- * @returns {Object} decrypted object
+ * @returns {Map|Boolean} Map with decrypted values or false if data is not a Map.
  * 
  * @example see see `encryptObj()` function documentation for examples
  */
-export const mapDecrypt = (map, senderPublicKey, recipientSecretKey, keys) => isMap(map)
+export const mapDecrypt = (data, senderPublicKey, recipientSecretKey, keys) => isMap(data)
     && new Map(
         Array
-            .from(map)
+            .from(data)
             .map(([key, value]) => {
                 value = !isObj(value)
                     ? value
@@ -42,7 +42,7 @@ export const mapDecrypt = (map, senderPublicKey, recipientSecretKey, keys) => is
  * @description For Box encryption `recipientPublicKey` is required. All values are stringified before encryption. 
  * Make sure to parse into appropriate types after decryption. Encryption examples available below.
  * 
- * @param   {Map}               map       data to encrypt
+ * @param   {Map}               data       data to encrypt
  * @param   {String|Uint8Array} secretKey sender secret key (box encrypted) or shared secret (secret box encrypted)
  * @param   {String|Uint8Array} recipientPublicKey (optional) if not supplied, will encrypt using SecretBox. 
  *                                      Otherwise, will use Box encryption.
@@ -52,12 +52,12 @@ export const mapDecrypt = (map, senderPublicKey, recipientSecretKey, keys) => is
  *                                      See examples for different usage cases.
  * @param   {Boolean}           asHex   (optional) Default: `true`
  * 
- * @returns {Array} `[result, isBox]`
+ * @returns {Map}   Map with encrypted values
  */
-export const mapEncrypt = (map, secretKey, recipientPublicKey, keys, asHex = true) => isMap(map)
+export const mapEncrypt = (data, secretKey, recipientPublicKey, keys, asHex = true) => isMap(data)
     && new Map(
         Array
-            .from(map)
+            .from(data)
             .map(([key, value]) => {
                 value = !isObj(value)
                     ? value

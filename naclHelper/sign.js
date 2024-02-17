@@ -31,7 +31,10 @@ export const newSignature = (message, secretKey, asHex = true) => {
  * 
  * @param   {Boolean}   asHex   (optional) Default: `true`
  * 
- * @returns {Object}    `{ publicKey, secretKey }`
+ * @returns {{ 
+ *  publicKey: String|Uint8Array,
+ *  secretKey: String|Uint8Array
+ * }}
  */
 export const randomKeypair = (asHex = true) => {
     const { keyPair } = require('tweetnacl').sign
@@ -51,7 +54,10 @@ export const randomKeypair = (asHex = true) => {
  * @param   {String|Uint8Array} keyData 
  * @param   {Boolean}           asHex   (optional) Default: true
  * 
- * @returns {Object}            `{ publicKey, secretKey }`
+ * @returns {{ 
+ *  publicKey: String|Uint8Array,
+ *  secretKey: String|Uint8Array
+ * }}
  */
 export const signingKeyPair = (keyData, asHex = true) => {
     const bytes = keyDataFromEncoded(keyData)
