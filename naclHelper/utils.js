@@ -32,7 +32,7 @@ export const keyDataFromEncoded = (encoded, asHex = false) => {
 /**
  * @name    keyInfoFromKeyData
  * @summary generates keypair and Polkadot address from encoded or keyData.
- * @description FYI: the generated keypair is not an encryption or signing keypair.
+ * @description FYI: the generated keypair is not an encryption or signing keypair and unsupported by TweetNacl.
  * 
  * @param   {String|Uint8Array} keyData 
  * @param   {Number}            ss58Format (optional) use to generate address for any supported parachain identity.

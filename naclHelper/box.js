@@ -44,7 +44,10 @@ export const decrypt = (sealed, nonce, senderPublicKey, recipientSecretKey, asSt
  * @param   {String|Uint8Array} nonce               (optional) if undefined, will generate new nonce
  * @param   {Boolean}           asHex               whether to convert to hex or reutrn Uint8Array
  *
- * @returns Object `{sealed, nonce}`
+ * @returns {{
+ *  sealed: String|Uint8Array,
+ *  nonce: String|Uint8Array,
+ * }}
  */
 export const encrypt = (message, senderSecretKey, recipientPublicKey, nonce, asHex = true) => {
     nonce = !!nonce
@@ -70,10 +73,13 @@ export const encrypt = (message, senderSecretKey, recipientPublicKey, nonce, asH
  * @name    encryptionKeypair
  * @summary generate encryption keypair from identity (oo7-substrate library's `keyData` or PolkadotJS's `encoded`)
  * 
- * @param   {String}    keyData hex string (keyData or encoded)
+ * @param   {String|Uint8Array}    keyData hex string (keyData or encoded)
  * @param   {Boolean}   asHex   whether to convert to `publicKey` and `secretKey` to hex string or keep as Uint8Array
  *  
- * @returns {Object}    { publicKey, secretKey }
+ * @returns {{
+ *  publicKey: String|Uint8Array,
+ *  secretKey: String|Uint8Array,
+ * }}
  */
 export const encryptionKeypair = (keyData, asHex = true) => {
     const bytes = keyDataFromEncoded(keyData)

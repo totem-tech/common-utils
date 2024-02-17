@@ -18,14 +18,14 @@ import { newNonce } from './utils'
  * @summary recursively decrypt objects encrypted using the `encryptObj()` function. 
  * 
  * @param   {Object}            obj         data object to decrypt
- * @param   {String|Uint8Array} senderPublicKey (optional) if not supplied, will decrypt using SecretBox. 
+ * @param   {String|Uint8Array} senderPublicKey (optional) if not supplied, will attempt to decrypt using SecretBox. 
  *                                          Otherwise, will use Box encryption.
  * @param   {String|Uint8Array} secretKey   recipient secret key (box encrypted) or shared secret (secret box encrypted)
  * @param   {Array}             keys        (optional) `obj` property names, to be decrypted. 
  *                                          If valid array, unlisted properties will not be decrypted.
  *                                          Otherwise, will attempt to decrypt all String (hex) or Uint8Array values.
  *                                          See examples for different usage cases.
- * @param   {Boolean}           asString    (optional) whether to convert result bytes to string.
+ * @param   {Boolean}           asString    (optional) whether to convert result bytes to string. The Object will still needs to be parsed externally.
  *                                          Default: `true`
  * 
  * @returns {Object} decrypted object
@@ -46,7 +46,7 @@ export const decryptObj = (obj, senderPublicKey, secretKey, keys, asString = tru
         // decrypt only specified properties
         : keys.filter(k => result.hasOwnProperty(k))
 
-    for (let i = 0; i < validKeys.length; i++) {
+    for (let i = 0;i < validKeys.length;i++) {
         const key = validKeys[i]
         const value = result[key]
         if (!obj.hasOwnProperty(key)) continue
@@ -98,13 +98,16 @@ export const decryptObj = (obj, senderPublicKey, secretKey, keys, asString = tru
  * @param   {String|Uint8Array} secretKey sender secret key (box encrypted) or shared secret (secret box encrypted)
  * @param   {String|Uint8Array} recipientPublicKey (optional) if not supplied, will encrypt using SecretBox. 
  *                                      Otherwise, will use Box encryption.
- * @param   {Array}             keys    (optional) to encrypt only specified object properties. 
+ * @param   {Array}             propsToEncrypt    (optional) to encrypt only specified object properties. 
  *                                      If valid array, unlisted properties will not be encrypted.
  *                                      If not a valid array, will attempt to encrypt all properties.
  *                                      See examples for different usage cases.
  * @param   {Boolean}           asHex   (optional) Default: `true`
  * 
- * @returns {Array} `[result, isBox]`
+ * @returns {[
+ *  result: Object,
+ *  isBox: boolean,
+ * ]} result:  encrypted object, isBox: indicates whether TweetNacl box or secretBox encrypted is used
  * 
  * @example ```javascript
  * // object to encrypt
@@ -180,7 +183,13 @@ export const decryptObj = (obj, senderPublicKey, secretKey, keys, asString = tru
  * })
  * ```
  */
-export const encryptObj = (obj, secretKey, recipientPublicKey, keys, asHex = true) => {
+export const encryptObj = (
+    obj,
+    secretKey,
+    recipientPublicKey,
+    propsToEncrypt,
+    asHex = true
+) => {
     if (!isObj(obj)) return
 
     const result = objCopy(obj, {}, [])
@@ -188,13 +197,13 @@ export const encryptObj = (obj, secretKey, recipientPublicKey, keys, asHex = tru
     const encrypt = isBox
         ? box.encrypt
         : secretBox.encrypt
-    const validKeys = !isArr(keys)
+    const validKeys = !isArr(propsToEncrypt)
         // encrypt all properties
         ? Object.keys(result)
         //  encrypt only specified properties
-        : keys.filter(k => result.hasOwnProperty(k))
+        : propsToEncrypt.filter(k => result.hasOwnProperty(k))
 
-    for (let i = 0; i < validKeys.length; i++) {
+    for (let i = 0;i < validKeys.length;i++) {
         const key = validKeys[i]
         const value = result[key]
         if (!obj.hasOwnProperty(key)) continue

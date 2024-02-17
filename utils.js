@@ -1060,7 +1060,7 @@ export const mapSort = (map, key, reverse = false, caseInsensitive = true) => {
  * 
  * @returns {Number}
  */
-export const randomInt = (min, max) => parseInt(Math.random() * (max - min) + min)
+export const randomInt = (min = 0, max = 1e12) => parseInt(Math.random() * (max - min) + min)
 
 /**
  * @name	search
