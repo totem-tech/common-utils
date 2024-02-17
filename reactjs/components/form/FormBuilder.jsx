@@ -37,7 +37,7 @@ import {
 const textsCap = {
     close: 'close',
     submit: 'submit',
-    submitErrorHeader: 'form submission error.',
+    submitErrorHeader: 'form submission failed',
 }
 translated(textsCap, true)
 
