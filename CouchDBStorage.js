@@ -62,17 +62,32 @@ export default class CouchDBStorage {
             url = connections[url] || url
         }
         this.connectionOrUrl = url || connectionOrUrl
-        // whether to use the global connection or database specific
-        this.useGlobalCon = !this.connectionOrUrl
         this.db = null
         this.dbName = dbName
         this.fields = fields
+        // whether to use the global connection or database specific
+        this.useGlobalCon = !this.connectionOrUrl
 
         // Forces the application to immediately attempt to connect.
         // This is required because "nano" (CouchDB's official NPM module) does not handle connection error properly 
         // and the entire application crashes. Neither try-catch nor async-await can catch this freakish error!
         // Doing this will make sure database connection error is thrown on application startup and not later.
         if (!this.useGlobalCon) this.getDB()
+    }
+
+    /**
+     * @name    createIndexes
+     * @summary create CouchDB indexes for this collection
+     * 
+     * @param {*} indexes 
+     * @returns 
+     */
+    async createIndexes(indexes = []) {
+        if (!indexes?.length) return
+        const db = await this.getDB()
+
+        const promises = indexes.map(index => db.createIndex(index))
+        return await PromisE.all(promises)
     }
 
     /**
