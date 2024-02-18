@@ -10,7 +10,8 @@ import {
     isValidNumber,
     mapJoin,
     fallbackIfFails,
-    isPositiveInteger
+    isPositiveInteger,
+    objClean
 } from './utils'
 
 // globab connection for use with multiple databases
@@ -19,29 +20,41 @@ let connection
 const connections = {}
 const debugTag = '[CouchDBStorage]'
 let defaultUrl = fallbackIfFails(() => process.env.CouchDB_URL)
-
+/**
+   * @name        CouchDBStorage
+   * @summary     a wrapper for `nano` NPM module for reading from and writing to CouchDB
+   * @description connection is only initialized only when first request is made or `getDB()` method is called.
+   *
+   * @param   {String|Object|Null}    connectionOrUrl Possible values:
+   *                                      1. string: CouchDB connection URL including username and password
+   *                                      2. object: existing connection
+   *                                      3. null:   will use global `connection` if available.
+   *                                  Alternatively, use a specific environment variable for individual database.
+   *                                  The name of the environement variable must be in the following format:
+   *                                      `CouchDB_URL_$DBNAME`
+   *                                  Replace `$DBNAME` with database name. The same to be provide in param `dbName`
+   * @param   {String}                dbName          database name
+   * @param   {Array}                 fields (optional) fields to retreive whenever retrieving documents.
+   *                                  This can be overridden in the `extraProps` argument wherever applicable.
+   *                                  Default: `[]` (all fields)
+   * @param   {Function}              middleware (optional) middleware function invoked whenever any documents are retrieved. This can be used to alter documents before saving or retreiving them or simply do other stuff before save/fetch operation.
+   *                Arguments:
+   *                - docs     Array: documents retrieved or about to be saved
+   *                - save     Boolean: true = save operation. False: fetch operation.
+   *                - funcName String: name of the function that invoked the middleware
+   *                                  
+   *                Returns: docs Array OR undefined/null. 
+   *                If Array is returned it will override the docs retrieved or being saved.
+   *
+   *                Caution: when saving docs make sure to not remove `_rev` & `_id`
+   *                When retreiving documents exclude any sensitive properties that should not be exposed to the app.
+   *                To bypass middleware, use `CouchDBStorage.getDoc()`.
+   *
+   * @returns {CouchDBStorage}
+   */
 export default class CouchDBStorage {
-    /**
-     * @name        CouchDBStorage
-     * @summary     a wrapper for `nano` NPM module for reading from and writing to CouchDB
-     * @description connection is only initialized only when first request is made or `getDB()` method is called.
-     *
-     * @param   {String|Object|Null}    connectionOrUrl Possible values:
-     *                                      1. string: CouchDB connection URL including username and password
-     *                                      2. object: existing connection
-     *                                      3. null:   will use global `connection` if available.
-     *                                  Alternatively, use a specific environment variable for individual database.
-     *                                  The name of the environement variable must be in the following format:
-     *                                      `CouchDB_URL_$DBNAME`
-     *                                  Replace `$DBNAME` with database name. The same to be provide in param `dbName`
-     * @param   {String}                dbName          database name
-     * @param   {Array}                 fields (optional) fields to retreive whenever retrieving documents.
-     *                                  This can be overridden in the `extraProps` argument wherever applicable.
-     *                                  Default: `[]` (all fields)
-     *
-     * @returns {CouchDBStorage}
-     */
-    constructor(connectionOrUrl, dbName, fields = []) {
+
+    constructor(connectionOrUrl, dbName, fields = [], middleware) {
         // Global DB name prefix and suffix applied to all databases excluding 
         const prefix = process.env.CouchDB_DBName_Prefix || ''
         const suffix = process.env.CouchDB_DBName_Suffix || ''
@@ -65,6 +78,13 @@ export default class CouchDBStorage {
         this.db = null
         this.dbName = dbName
         this.fields = fields
+        this.middleware = async (docs = [], save = false, funcName) => !middleware
+            ? docs
+            : await fallbackIfFails(
+                middleware,
+                [docs, save, funcName],
+                docs
+            ) || docs
         // whether to use the global connection or database specific
         this.useGlobalCon = !this.connectionOrUrl
 
@@ -138,7 +158,7 @@ export default class CouchDBStorage {
      * @returns {Object} document if available otherwise, undefined
      */
     async find(selector, extraProps, timeout) {
-        const docs = await this.search(
+        let docs = await this.search(
             selector,
             1,
             0,
@@ -171,6 +191,7 @@ export default class CouchDBStorage {
     /**
      * @name    getDoc
      * @summary retrieve a document with all properties. This method can retrieve design documents.
+     * Middleware function is not invoked here.
      * 
      * @param   {String} id document ID. (the `_id` property)
      * 
@@ -208,15 +229,29 @@ export default class CouchDBStorage {
         const db = await this.getDB()
         // if ids supplied only retrieve only those otherwise, retrieve all (paginated)
         const paginate = !ids || ids.length === 0
-        const rows = paginate
-            ? (await this.searchRaw({}, limit, skip, extraProps, timeout)).docs
-            : (await db.fetch({ keys: ids })).rows
+        let docs = paginate
+            ? (await this.searchRaw(
+                {},
+                limit,
+                skip,
+                extraProps,
+                timeout
+            )).docs
+            : (await db.fetch({ keys: ids }))
+                .rows
                 .map(x => x.doc)
                 // ignore not found documents
                 .filter(Boolean)
+
+        docs = await this.middleware(docs, false, 'getAll')
         return asMap
-            ? new Map(rows.map(x => [x._id, x]))
-            : rows
+            ? new Map(
+                docs.map(x => [
+                    x._id,
+                    x,
+                ])
+            )
+            : docs
     }
 
     /**
@@ -284,11 +319,28 @@ export default class CouchDBStorage {
      * @returns {Map|Array}
      */
     async search(selector = {}, limit = 0, skip = 0, asMap = true, extraProps, timeout) {
-        if (!isObj(selector) || Object.keys(selector).length === 0) return asMap ? new Map() : []
-        const result = await this.searchRaw(selector, limit, skip, extraProps, timeout)
+        const invalid = !isObj(selector)
+            || Object.keys(selector).length === 0
+        if (invalid) return asMap
+            ? new Map()
+            : []
+
+        let { docs = [] } = await this.searchRaw(
+            selector,
+            limit,
+            skip,
+            extraProps,
+            timeout
+        ) || {}
+        docs = await this.middleware(docs, false, 'search')
         return !asMap
-            ? result.docs
-            : new Map(result.docs.map(doc => [doc._id, doc]))
+            ? docs
+            : new Map(
+                docs.map(doc => [
+                    doc._id,
+                    doc,
+                ])
+            )
     }
 
     /**
@@ -306,7 +358,7 @@ export default class CouchDBStorage {
      */
     async searchRaw(selector = {}, limit = 0, skip = 0, extraProps = {}, timeout = 30000) {
         const db = await this.getDB()
-        const query = db.find({
+        const queryPromise = db.find({
             fields: this.fields,
             ...extraProps,
             selector,
@@ -316,8 +368,8 @@ export default class CouchDBStorage {
             skip,
         })
         return await !isPositiveInteger(timeout)
-            ? query
-            : PromisE.timeout(query, timeout)
+            ? queryPromise
+            : PromisE.timeout(queryPromise, timeout)
     }
 
     /**
@@ -376,7 +428,9 @@ export default class CouchDBStorage {
             value._rev = existingDoc._rev
         }
 
+        value._id ??= id
         updateTS && setTs(value, existingDoc)
+        value = await this.middleware([value], true, 'set')[0]
         return await PromisE.timeout(
             db.insert(value, id),
             timeout,
@@ -397,7 +451,12 @@ export default class CouchDBStorage {
     async setAll(docs, ignoreIfExists = false, timeout, updateTS = true) {
         if (isMap(docs)) {
             // convert Map to Array
-            docs = Array.from(docs).map(([_id, item]) => ({ ...item, _id }))
+            docs = Array
+                .from(docs)
+                .map(([_id, item]) => ({
+                    _id,
+                    ...item,
+                }))
         }
         if (!docs.length) return
 
@@ -416,7 +475,9 @@ export default class CouchDBStorage {
             doc._rev = existingDoc._rev
             updateTS && setTs(doc, existingDoc)
         }
-        const promise = db.bulk({ docs: docs.filter(Boolean) })
+        docs = docs.filter(Boolean)
+        docs = await this.middleware(docs, true, 'setAll')
+        const promise = db.bulk({ docs })
         return await (
             isValidNumber(timeout)
                 ? PromisE.timeout(promise, timeout)
@@ -447,9 +508,18 @@ export default class CouchDBStorage {
             },
         )
 
-        return includeDocs
-            ? rows.map(x => x.doc)
-            : rows
+        if (!includeDocs) return rows
+
+        const docs = rows.map(x =>
+            this.fields?.length > 0
+                ? objClean(
+                    x.doc,
+                    this.fields,
+                    true
+                )
+                : x.doc
+        )
+        return await this.middleware(docs, false, 'view')
     }
 
     /**
