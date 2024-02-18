@@ -185,7 +185,6 @@ class ChatClient {
                         ? args[i]
                         : param.defaultValue
                 )
-
                 const err = validateObj(
                     args,
                     _params,
@@ -194,7 +193,7 @@ class ChatClient {
                     customMessages,
                     includeValue
                 )
-                if (err) throw new Error(err)
+                if (err) throw new Error(translateError(err))
             }
 
             const [onSuccess, onFail] = eventResultHandlers[eventName] || []
