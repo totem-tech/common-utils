@@ -159,7 +159,7 @@ class ChatClient {
                 includeValue,
                 params = [],
                 result: resultDef = {},
-            } = eventMeta
+            } = eventMeta || {}
             let callback = isFn(args.slice(-1)[0])
                 ? args.splice(-1)[0]
                 : undefined
@@ -193,7 +193,8 @@ class ChatClient {
                     customMessages,
                     includeValue
                 )
-                if (err) throw new Error(translateError(err))
+                console.log({ eventName, err, args, _params })
+                if (err) throw new Error(translateError(err) ?? err)
             }
 
             const [onSuccess, onFail] = eventResultHandlers[eventName] || []
@@ -1187,7 +1188,7 @@ export const getSafeClient = chatClient => new Proxy(chatClient, {
                     timeout = args.slice(-1)[0].value
                     args = args.slice(0, -1)
                 }
-                eventMeta = await chatClient.awaitReady(eventName, timeout)
+                eventMeta = await chatClient.awaitReady(eventName, timeout) || {}
                 const { params = [] } = eventMeta
                 if (params.length > 0) {
                     resultModifier = args.slice(params.length + 1)[0]

@@ -143,14 +143,14 @@ export const generateHash = (seed = uuidV1(), algo = 'blake2', bitLength = 256) 
  * @param    {String}	address 
  * @param    {String}	type            (optional) valid types: polkadot (default), ethereum
  * @param    {Number}	chainId			(optional) chainId for Ethereum address, ss58Format for Polkadot.
- * 											Default: 0
+ * 										Default: `undefined` (for Polkadot), `0` for Ethereum
  * @param    {Boolean}	ignoreChecksum	(optional) for Polkadot only.
- * 											Default: false
+ * 										Default: false
  */
-export const isAddress = (address, type, chainId = 0, ignoreChecksum = false) => {
+export const isAddress = (address, type, chainId, ignoreChecksum = false) => {
 	try {
 		switch (`${type}`.toLowerCase()) {
-			case 'ethereum': return isETHAddress(address, chainId || 0)
+			case 'ethereum': return isETHAddress(address, chainId ?? 0)
 			case 'polkadot':
 			default:
 				const { ss58Decode } = require('./convert')

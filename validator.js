@@ -149,7 +149,7 @@ export const validate = (value, config, customMessages = {}) => {
             min,
             minLength,
             name,
-            properties: childConf = propertiesAlt,
+            properties = propertiesAlt,
             or, // alternative validation configaration if validation fails
             regex,
             reject,
@@ -167,9 +167,9 @@ export const validate = (value, config, customMessages = {}) => {
                 ? value
                 : undefined
         )
-        childConf = !isArr(childConf)
-            ? childConf
-            : childConf // turn properties array into an object validation config
+        properties = !isArr(properties)
+            ? properties
+            : properties // turn properties array into an object validation config
                 .filter(x => !!x.name) // must have a name of the property
                 .reduce((obj, item) => ({
                     ...obj,
@@ -278,21 +278,23 @@ export const validate = (value, config, customMessages = {}) => {
                 }
                 break
             case TYPES.object:
-                if (!isObj(value)) return _msgOrTrue(errorMsgs.object)
+                if (!isObj(value, strict)) return _msgOrTrue(errorMsgs.object)
                 if (
                     isArr(requiredKeys)
                     && requiredKeys.length > 0
                     && !objHasKeys(value, requiredKeys)
                 ) return _msgOrTrue(errorMsgs.requiredKeys)
                 valueIsObj = true
-                // // validate child properties of the `value` object
-                // err = isObj(childConf, strict) && validateObj(
-                //     value,
-                //     childConf,
-                //     failFast,
-                //     includeLabel,
-                //     errorMsgs,
-                // )
+                // validate child properties of the `value` object
+                console.log({ properties })
+                err = properties && validateObj(
+                    value,
+                    properties,
+                    failFast,
+                    includeLabel,
+                    errorMsgs,
+                    includeValue,
+                )
                 if (err) return err
                 break
             case TYPES.string:
@@ -366,7 +368,7 @@ export const validate = (value, config, customMessages = {}) => {
         )
 
         // WIP: validate children | test required
-        const validateChildren = [TYPES.array, TYPES.map].includes(type) && isObj(childConf)
+        const validateChildren = [TYPES.array, TYPES.map].includes(type) && isObj(properties)
         if (validateChildren) {
             const items = valueIsArr
                 ? value
@@ -385,7 +387,7 @@ export const validate = (value, config, customMessages = {}) => {
                         name: valueIsObj
                             ? name
                             : `${name}[${i}]`,
-                        ...childConf,
+                        ...properties,
                     },
                     failFast,
                     includeLabel,
@@ -469,6 +471,8 @@ export const validateObj = (
             const key = keys[i]
             const value = obj[key]
             const keyConf = config[key]
+            if (!isObj(keyConf, false)) continue
+
             const {
                 // config: childConf,
                 customMessages: entryMsgs,
