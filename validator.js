@@ -286,7 +286,6 @@ export const validate = (value, config, customMessages = {}) => {
                 ) return _msgOrTrue(errorMsgs.requiredKeys)
                 valueIsObj = true
                 // validate child properties of the `value` object
-                console.log({ properties })
                 err = properties && validateObj(
                     value,
                     properties,

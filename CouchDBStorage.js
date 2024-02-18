@@ -78,13 +78,13 @@ export default class CouchDBStorage {
         this.db = null
         this.dbName = dbName
         this.fields = fields
-        this.middleware = async (docs = [], save = false, funcName) => !middleware
-            ? docs
-            : await fallbackIfFails(
+        this.middleware = async (docs = [], save = false, funcName) => middleware
+            && await fallbackIfFails(
                 middleware,
                 [docs, save, funcName],
                 docs
-            ) || docs
+            )
+            || docs
         // whether to use the global connection or database specific
         this.useGlobalCon = !this.connectionOrUrl
 
@@ -430,7 +430,7 @@ export default class CouchDBStorage {
 
         value._id ??= id
         updateTS && setTs(value, existingDoc)
-        value = await this.middleware([value], true, 'set')[0]
+        value = (await this.middleware([value], true, 'set'))[0]
         return await PromisE.timeout(
             db.insert(value, id),
             timeout,

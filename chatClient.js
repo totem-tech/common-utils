@@ -193,7 +193,6 @@ class ChatClient {
                     customMessages,
                     includeValue
                 )
-                console.log({ eventName, err, args, _params })
                 if (err) throw new Error(translateError(err) ?? err)
             }
 
@@ -1278,7 +1277,7 @@ const generateEventHandlers = (chatClient, eventsMeta = {}) => {
                 chatClient.query[name] = emitHandler
                 chatClient[name] = emitHandler
             } catch (err) {
-                console.log('ChatClient: failed to generate event handler', err)
+                log('ChatClient: failed to generate event handler', err)
             }
         })
     Object
