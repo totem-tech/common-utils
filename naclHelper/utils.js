@@ -41,7 +41,11 @@ export const keyDataFromEncoded = (encoded, asHex = false) => {
  *                                         Otherwise, will leave as Uint8Array.
  *                                         Default: false
  * 
- * @returns {Object}    { address, publicKey, secretKey }
+ * @returns {{ 
+ *  address: String,
+ *  publicKey: String|Uint8Array,
+ *  secretKey: String|Uint8Array,
+ *  }}    
  */
 export const keyInfoFromKeyData = (keyData = '', ss58Format = undefined, asHex = false) => {
     let bytes = keyDataFromEncoded(keyData, false)
