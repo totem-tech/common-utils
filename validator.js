@@ -175,7 +175,11 @@ export const validate = (value, config, customMessages = {}) => {
                     ...obj,
                     [item.name]: item,
                 }), { required, type: TYPES.object })
-        strict ??= type !== TYPES.email
+        // default strict mode for the following types
+        strict ??= [
+            TYPES.email,
+            TYPES.hex,
+        ].includes(type)
 
         const gotValue = hasValue(value)
         const typeErrMsg = errorMsgs[type]
@@ -233,7 +237,12 @@ export const validate = (value, config, customMessages = {}) => {
                 if (!isHash(value)) return _msgOrTrue(errorMsgs.hash)
                 break
             case TYPES.hex:
-                if (!isHex(value)) return _msgOrTrue(errorMsgs.hex)
+                const prefix = !strict
+                    && isStr(value)
+                    && !value.startsWith('0x')
+                    && '0x'
+                    || ''
+                if (!isHex(prefix + value)) return _msgOrTrue(errorMsgs.hex)
                 break
             case TYPES.identity:
                 const {
