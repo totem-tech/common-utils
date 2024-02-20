@@ -842,6 +842,24 @@ export const objSetPropUndefined = (obj, key, v1, condition, v2) => {
 }
 
 /**
+ * @name	objSorted
+ * @summary create a new object with properties sorted by name
+ * 
+ * @param	{Object} obj 
+ * @param	{Array} keys 
+ * 
+ * @returns {Object} sorted object
+ */
+export const objSort = (obj, keys, ...args) => objClean(
+	obj,
+	keys
+	|| Object
+		.keys(obj)
+		.sort(),
+	...args
+)
+
+/**
  * @name	objToUrlParams
  * @summary	constructs URL param string from an object, excluding any `undefined` values
  * 

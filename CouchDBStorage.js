@@ -11,7 +11,9 @@ import {
     mapJoin,
     fallbackIfFails,
     isPositiveInteger,
-    objClean
+    objClean,
+    objSort,
+    isFn
 } from './utils'
 
 // globab connection for use with multiple databases
@@ -25,36 +27,48 @@ let defaultUrl = fallbackIfFails(() => process.env.CouchDB_URL)
    * @summary     a wrapper for `nano` NPM module for reading from and writing to CouchDB
    * @description connection is only initialized only when first request is made or `getDB()` method is called.
    *
-   * @param   {String|Object|Null}    connectionOrUrl Possible values:
-   *                                      1. string: CouchDB connection URL including username and password
-   *                                      2. object: existing connection
-   *                                      3. null:   will use global `connection` if available.
-   *                                  Alternatively, use a specific environment variable for individual database.
-   *                                  The name of the environement variable must be in the following format:
-   *                                      `CouchDB_URL_$DBNAME`
-   *                                  Replace `$DBNAME` with database name. The same to be provide in param `dbName`
-   * @param   {String}                dbName          database name
-   * @param   {Array}                 fields (optional) fields to retreive whenever retrieving documents.
-   *                                  This can be overridden in the `extraProps` argument wherever applicable.
-   *                                  Default: `[]` (all fields)
-   * @param   {Function}              middleware (optional) middleware function invoked whenever any documents are retrieved. This can be used to alter documents before saving or retreiving them or simply do other stuff before save/fetch operation.
-   *                Arguments:
-   *                - docs     Array: documents retrieved or about to be saved
-   *                - save     Boolean: true = save operation. False: fetch operation.
-   *                - funcName String: name of the function that invoked the middleware
-   *                                  
-   *                Returns: docs Array OR undefined/null. 
-   *                If Array is returned it will override the docs retrieved or being saved.
-   *
-   *                Caution: when saving docs make sure to not remove `_rev` & `_id`
-   *                When retreiving documents exclude any sensitive properties that should not be exposed to the app.
-   *                To bypass middleware, use `CouchDBStorage.getDoc()`.
+   * @param   {String|Object|Null} connectionOrUrl Possible values:
+   *                      - string: CouchDB connection URL including username and password
+   *                      - object: existing connection
+   *                      - null:   will use global `connection` if available.
+   *                      Alternatively, use a specific environment variable for individual database.
+   *                      The name of the environement variable must be in the following format:
+   *                          `CouchDB_URL_$DBNAME`
+   *                      Replace `$DBNAME` with database name. The same to be provide in param `dbName`
+   * @param   {String}    dbName          database name
+   * @param   {Array}     fields (optional) fields to retreive whenever retrieving documents.
+   *                      This can be overridden in the `extraProps` argument wherever applicable.
+   *                      Default: `[]` (all fields)
+   * @param   {Function}  middleware (optional) middleware function invoked whenever any documents are retrieved. This 
+   *                      can be used to alter documents before saving or retreiving them or simply do other stuff 
+   *                      before save/fetch operation.
+   *                      Arguments:
+   *                      - docs     Array: documents retrieved or about to be saved
+   *                      - save     Boolean: true = save operation. False: fetch operation.
+   *                      - funcName String: name of the function that invoked the middleware
+   *                                        
+   *                      Returns: docs Array OR undefined/null. 
+   *                      If Array is returned it will override the docs retrieved or being saved.
+   *                      
+   *                      Caution: when saving docs make sure to not remove `_rev` & `_id`
+   *                      When retreiving documents exclude any sensitive properties that should not be exposed.
+   *                      To bypass middleware, use `CouchDBStorage.getDoc()`.
+   * @param {String}      sortKeys    if and when sort document properties. Executed whenever middleware is executed.
+   *                      Accepted values: 
+   *                      - "always" (default): every time documents are retrieved and saved.
+   *                      - "save": whenever documents are saved (create/update)
+   *                      - any other value to prevent sorting
    *
    * @returns {CouchDBStorage}
    */
 export default class CouchDBStorage {
-
-    constructor(connectionOrUrl, dbName, fields = [], middleware) {
+    constructor(
+        connectionOrUrl,
+        dbName,
+        fields = [],
+        middleware,
+        sortKeys = 'always'
+    ) {
         // Global DB name prefix and suffix applied to all databases excluding 
         const prefix = process.env.CouchDB_DBName_Prefix || ''
         const suffix = process.env.CouchDB_DBName_Suffix || ''
@@ -78,13 +92,31 @@ export default class CouchDBStorage {
         this.db = null
         this.dbName = dbName
         this.fields = fields
-        this.middleware = async (docs = [], save = false, funcName) => middleware
-            && await fallbackIfFails(
-                middleware,
-                [docs, save, funcName],
-                docs
-            )
-            || docs
+        this.middleware = async (docs = [], save = false, funcName) => {
+            // detach object reference to avoid any undesired effects caused by middleware()
+            if (isFn(middleware)) docs = docs.map(x => ({ ...x }))
+            docs = middleware
+                && await fallbackIfFails(
+                    middleware,
+                    [
+                        docs,
+                        save,
+                        funcName,
+                    ],
+                    docs // if middleware() throws exception revert back to docs
+                )
+                || docs
+
+            switch (this.sortKeys) {
+                case 'save':
+                    if (!['set', 'setAll'].includes(funcName)) break
+                case 'always':
+                    docs = docs.map(x => objSort(x))
+                    break
+            }
+            return docs
+        }
+        this.sortKeys = sortKeys // save/always
         // whether to use the global connection or database specific
         this.useGlobalCon = !this.connectionOrUrl
 
