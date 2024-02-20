@@ -591,14 +591,15 @@ export const getFuncParams = func => func
 	.split(', ')
 
 export const getUrlParam = (name, url) => {
-	url ??= fallbackIfFails(() => window.location.href)
+	url ??= fallbackIfFails(() => window.location.href) || ''
 	try {
-		const params = new URLSearchParams('?' + url.split('?')[1])
+		const search = '?' + (url.split('?')?.[1] || '')
+		const params = new URLSearchParams(search)
 		return name
 			? params.get(name) || ''
-			: [...params].reduce((obj, [key, value]) => ({
+			: [...params.keys()].reduce((obj, key) => ({
 				...obj,
-				[key]: value,
+				[key]: params.get(key),
 			}), {})
 	} catch (_) {
 		return getUrlParamRegex(name, url)
@@ -848,19 +849,31 @@ export const objSetPropUndefined = (obj, key, v1, condition, v2) => {
  * 
  * @returns	{String}
  */
-export const objToUrlParams = (obj = {}, excludeUndefined = true) => Object.keys(obj)
-	.map(key => {
-		const value = obj[key]
-		if (excludeUndefined && value === undefined) return
-		const valueEscaped = !isArr(value)
-			? escape(value)
-			// prevents escaping comma when joining array
-			: value.map(escape).join()
-		return `${key}=${valueEscaped}`
+export const objToUrlParams = (obj = {}, excludeUndefined = true) => {
+	const params = new URLSearchParams()
+	Object
+		.keys(obj)
+		.forEach(key => {
+			const value = obj[key]
+			if (value === undefined && excludeUndefined) return
 
-	})
-	.filter(Boolean)
-	.join('&')
+			params.set(key, value)
+		})
+	return params.toString()
+}
+// Object.keys(obj)
+// .map(key => {
+// 	const value = obj[key]
+// 	if (excludeUndefined && value === undefined) return
+// 	const valueEscaped = !isArr(value)
+// 		? escape(value)
+// 		// prevents escaping comma when joining array
+// 		: value.map(escape).join()
+// 	return `${key}=${valueEscaped}`
+
+// })
+// .filter(Boolean)
+// .join('&')
 
 export const objToFormData = (obj = {}, excludeUndefined = true) => {
 	let formData = new FormData()

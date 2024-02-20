@@ -64,7 +64,8 @@ if (rw().history) rw({ history: null })
 //- migrate end
 
 export const textsCap = {
-    timeout: 'request timed out'
+    invalidParams: 'invalid parameters.',
+    timeout: 'request timed out',
 }
 translated(textsCap, true)
 
@@ -193,7 +194,7 @@ class ChatClient {
                     customMessages,
                     includeValue
                 )
-                if (err) throw new Error(translateError(err) ?? err)
+                if (err) throw new Error(`${textsCap.invalidParams} ` + translateError(err) ?? err)
             }
 
             const [onSuccess, onFail] = eventResultHandlers[eventName] || []
@@ -1222,7 +1223,6 @@ const generateEventHandlers = (chatClient, eventsMeta = {}) => {
         emittables = {},
         listenables = {},
     } = eventsMeta
-    chatClient.query = {}
     const eventName2VarName = eventName => {
         const arr = eventName.split('-')
         return arr[0] + textCapitalize([...arr.slice(1)]).join('')
@@ -1231,6 +1231,11 @@ const generateEventHandlers = (chatClient, eventsMeta = {}) => {
     Object
         .keys(emittables)
         .forEach(eventName => {
+            const ignore = eventName?.startsWith('on')
+                && eventName?.slice(2)[0] === eventName?.slice(2)[0].toUpperCase()
+            // prevent adding emitter function that mimics listener function names
+            if (ignore) return
+
             try {
                 const eventMeta = emittables[eventName] || {}
                 let {
@@ -1272,9 +1277,11 @@ const generateEventHandlers = (chatClient, eventsMeta = {}) => {
                 )
                 // add meta data
                 eventMeta.eventName = eventName
-                emitHandler.meta = eventMeta
+                // emitHandler.meta = eventMeta
+                Object
+                    .keys(eventMeta)
+                    .forEach(key => emitHandler[key] = eventMeta[key])
 
-                chatClient.query[name] = emitHandler
                 chatClient[name] = emitHandler
             } catch (err) {
                 log('ChatClient: failed to generate event handler', err)
