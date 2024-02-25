@@ -1,4 +1,5 @@
 import PromisE from './PromisE'
+import { isObjArr } from './utils'
 // import { Client, Message } from 'discord.js'
 // import { BehaviorSubject } from 'rxjs'
 
@@ -38,7 +39,13 @@ import PromisE from './PromisE'
  * @name    sendMessage
  * @summary send message to Discord channel using webhook
  * 
- * @param {*} content 
+ * @param {String|{
+ *  color: String,
+ *  description: String,
+ *  timestamp: String,
+ *  title: String,
+ *  url: String,
+ * }[]}       content   content or embeds
  * @param {*} tag 
  * @param {*} username 
  * @param {*} webhookUrl 
@@ -60,8 +67,13 @@ export const sendMessage = async (
     avatar_url = process.env.DISCORD_WEBHOOK_AVATAR_URL,
     timeout = 60000,
 ) => {
-    content = `${content || ''}`
-    if (!content) throw new Error('Empty content')
+    const embeds = isObjArr(content) && content.length > 0
+        ? content
+        : undefined
+    content = embeds
+        ? ''
+        : `${content || ''}`
+    if (!content && embeds.length === 0) throw new Error('Empty content')
     const contentRedacted = sendMessage.redactRegex
         ? content.replace(sendMessage.redactRegex, '')
         : content
@@ -94,7 +106,8 @@ export const sendMessage = async (
             webhookUrl + '?wait=true',
             {
                 avatar_url,
-                content: contentRedacted,
+                ...!!contentRedacted && { content: contentRedacted },
+                ...!!embeds && { embeds },
                 username
             },
             {},
@@ -105,7 +118,7 @@ export const sendMessage = async (
             console.error(
                 tag,
                 '[DiscordWebhook]: failed to send message.',
-                { content: contentRedacted, tag },
+                { content: contentRedacted, embeds, tag },
                 err
             )
             // ToDo: save as JSON and re-attempt later??

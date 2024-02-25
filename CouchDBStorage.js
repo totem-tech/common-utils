@@ -92,9 +92,20 @@ export default class CouchDBStorage {
         this.db = null
         this.dbName = dbName
         this.fields = fields
-        this.middleware = async (docs = [], save = false, funcName) => {
+        this.middleware = async (
+            docs = [],
+            save = false,
+            funcName,
+            allowDelete = false
+        ) => {
+            const isWrite = ['set', 'setAll'].includes(funcName)
             // detach object reference to avoid any undesired effects caused by middleware()
-            if (isFn(middleware)) docs = docs.map(x => ({ ...x }))
+            if (isFn(middleware)) docs = docs.map(x => {
+                // prevent unwanted deletion of entries.
+                // Otherwise, frontend can send entries with "_deleted" and it will delete the entry.
+                if (isWrite && !allowDelete) delete x._deleted
+                return { ...x }
+            })
             docs = middleware
                 && await fallbackIfFails(
                     middleware,
@@ -109,7 +120,7 @@ export default class CouchDBStorage {
 
             switch (this.sortKeys) {
                 case 'save':
-                    if (!['set', 'setAll'].includes(funcName)) break
+                    if (!isWrite) break
                 case 'always':
                     docs = docs.map(x => objSort(x))
                     break
@@ -508,7 +519,12 @@ export default class CouchDBStorage {
             updateTS && setTs(doc, existingDoc)
         }
         docs = docs.filter(Boolean)
-        docs = await this.middleware(docs, true, 'setAll')
+        docs = await this.middleware(
+            docs,
+            true, // save
+            'setAll',
+            true, // allow "_deleted"
+        )
         const promise = db.bulk({ docs })
         return await (
             isValidNumber(timeout)
@@ -639,7 +655,9 @@ export const setDefaultUrl = url => defaultUrl = url
  */
 const setTs = (doc, existingDoc) => {
     // add/update creation and update time
-    doc.tsCreated = (existingDoc || doc).tsCreated || new Date()
+    doc.tsCreated = existingDoc?.tsCreated
+        || doc.tsCreated
+        || new Date()
     if (!!existingDoc || doc.tsUpdated) {
         doc.tsUpdated = new Date()
     }
