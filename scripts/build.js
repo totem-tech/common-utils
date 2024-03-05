@@ -67,7 +67,13 @@ const run = async () => {
     const containsChanges = !result
         .toString()
         .includes('nothing to commit')
-    if (containsChanges) return console.error('Please make sure to there are no uncommited changes.')
+    if (containsChanges) return console.error(
+        '\n'
+        + '-'.repeat(50)
+        + '\nPlease make sure to there are no uncommited changes.\n'
+        + '-'.repeat(50)
+        + '\n'
+    )
 
     // get current commit
     const commitHash = getCommitHash()
