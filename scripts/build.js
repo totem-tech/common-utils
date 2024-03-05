@@ -118,6 +118,9 @@ const run = async () => {
         // make sure it has switched to the build branch
         if (getBranch() !== buildBranch) return console.error('Failed to switch to build branch! Reason unknown')
 
+        // make sure build branch is updated
+        execSync('git pull')
+
         // check if the commit has already been built
         result = execSync('git log -1')
         const lastBuiltCommit = result
