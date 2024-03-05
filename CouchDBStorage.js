@@ -119,9 +119,9 @@ export default class CouchDBStorage {
                 || docs
 
             switch (this.sortKeys) {
-                case 'save':
+                case 'save': // sort properties by name only when saving (create/update)
                     if (!isWrite) break
-                case 'always':
+                case 'always':// always sort properties by name
                     docs = docs.map(x => objSort(x))
                     break
             }
