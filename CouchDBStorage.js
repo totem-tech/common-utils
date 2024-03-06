@@ -232,22 +232,6 @@ export default class CouchDBStorage {
     }
 
     /**
-     * @name    getDoc
-     * @summary retrieve a document with all properties. This method can retrieve design documents.
-     * Middleware function is not invoked here.
-     * 
-     * @param   {String} id document ID. (the `_id` property)
-     * 
-     * @returns {Object}
-     */
-    async getDoc(id) {
-        const db = await this.getDB()
-        try {
-            return await db.get(id)
-        } catch (_) { }
-    }
-
-    /**
      * @name    getAll
      * @summary get all or specific documents from a database.
      * 
@@ -268,10 +252,19 @@ export default class CouchDBStorage {
      *                              Default: `15000`
      * @returns {Map|Array}
      */
-    async getAll(ids = [], asMap = true, limit = 25, skip = 0, extraProps = {}, timeout) {
+    async getAll(
+        ids = [],
+        asMap = true,
+        limit = 25,
+        skip = 0,
+        extraProps,
+        timeout,
+    ) {
         const db = await this.getDB()
         // if ids supplied only retrieve only those otherwise, retrieve all (paginated)
         const paginate = !ids || ids.length === 0
+        const fields = extraProps?.fields || this.fields
+        const gotFields = fields?.length > 0
         let docs = paginate
             ? (await this.searchRaw(
                 {},
@@ -282,7 +275,9 @@ export default class CouchDBStorage {
             )).docs
             : (await db.fetch({ keys: ids }))
                 .rows
-                .map(x => x.doc)
+                .map(x => !gotFields
+                    ? x.doc
+                    : objClean(x.doc, fields))
                 // ignore not found documents
                 .filter(Boolean)
 
@@ -341,6 +336,22 @@ export default class CouchDBStorage {
         })())
 
         return await this.dbPromise
+    }
+
+    /**
+     * @name    getDoc
+     * @summary retrieve a document with all properties. This method can retrieve design documents.
+     * Middleware function is not invoked here.
+     * 
+     * @param   {String} id document ID. (the `_id` property)
+     * 
+     * @returns {Object}
+     */
+    async getDoc(id) {
+        const db = await this.getDB()
+        try {
+            return await db.get(id)
+        } catch (_) { }
     }
 
     /**
@@ -504,21 +515,26 @@ export default class CouchDBStorage {
         if (!docs.length) return
 
         const db = await this.getDB()
+        const ids = docs
+            .map(doc => doc._id)
+            .filter(Boolean)
+        const existingDocs = await this.getAll(ids, true)
         for (let i = 0;i < docs.length;i++) {
             const doc = docs[i]
-            if (!doc._id || doc._rev) continue
-
-            const existingDoc = await this.get(doc._id, [])
-            if (!existingDoc) continue
+            const existingDoc = existingDocs.get(doc._id)
+            updateTS && setTs(doc, existingDoc)
+            if (!doc._id || !existingDoc) continue
             if (ignoreIfExists) {
                 docs[i] = null
                 continue
             }
             // attach `_rev` to prevent conflicts when updating existing items
             doc._rev = existingDoc._rev
-            updateTS && setTs(doc, existingDoc)
         }
         docs = docs.filter(Boolean)
+        // zero docs
+        if (!docs.length) return []
+
         docs = await this.middleware(
             docs,
             true, // save
@@ -654,12 +670,11 @@ export const setDefaultUrl = url => defaultUrl = url
  * @returns {Object}    doc
  */
 const setTs = (doc, existingDoc) => {
+    const now = new Date()
     // add/update creation and update time
     doc.tsCreated = existingDoc?.tsCreated
         || doc.tsCreated
-        || new Date()
-    if (!!existingDoc || doc.tsUpdated) {
-        doc.tsUpdated = new Date()
-    }
+        || now
+    if (!!existingDoc || doc.tsUpdated) doc.tsUpdated = now
     return doc
 }
