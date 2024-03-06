@@ -64,7 +64,7 @@ if (rw().history) rw({ history: null })
 //- migrate end
 
 export const textsCap = {
-    invalidParams: 'invalid parameters.',
+    invalidParams: 'invalid parameters',
     timeout: 'request timed out',
 }
 translated(textsCap, true)
@@ -194,7 +194,7 @@ class ChatClient {
                     customMessages,
                     includeValue
                 )
-                if (err) throw new Error(`${textsCap.invalidParams} ` + translateError(err) ?? err)
+                if (err) throw new Error(translateError(err) ?? err) //`${textsCap.invalidParams}: ` + 
             }
 
             const [onSuccess, onFail] = eventResultHandlers[eventName] || []
