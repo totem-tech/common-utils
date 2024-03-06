@@ -1,5 +1,6 @@
 const { execSync: xs } = require('child_process')
 const fs = require('fs')
+const { exit } = require('process')
 
 const execSync = (cmd, ...args) => {
     console.log(`>> Executing: ${cmd}\n`)
@@ -18,6 +19,11 @@ const getCommitHash = () => execSync('git log -1')
     .split('\n')[0]
     .split('commit')[1]
     .trim()
+
+const exitWithErr = (err, ...args) => {
+    console.error(err, ...args)
+    exit(1)
+}
 
 /**
  * @name    run
@@ -57,7 +63,7 @@ const run = async () => {
     const cleanupCmds = []
     const branchName = getBranch()
     console.log('Branch Name:', branchName)
-    if (branchName.endsWith(buildBranchSuffix)) return console.error(
+    if (branchName.endsWith(buildBranchSuffix)) exitWithErr(
         'Please run this script from a branch that does not end with',
         buildBranchSuffix
     )
@@ -67,7 +73,7 @@ const run = async () => {
     const containsChanges = !result
         .toString()
         .includes('nothing to commit')
-    if (containsChanges) return console.error(
+    if (containsChanges) exitWithErr(
         '\n'
         + '-'.repeat(50)
         + '\nPlease make sure to there are no uncommited changes.\n'
@@ -77,7 +83,7 @@ const run = async () => {
 
     // get current commit
     const commitHash = getCommitHash()
-    if (!commitHash) console.log('Create a commit first')
+    if (!commitHash) return console.error('Create a commit first')
     const buildBranch = `${branchName}${buildBranchSuffix}`
 
     // build current commit (assumes `distDir` directory is either ignored or accepted in the original branch)
@@ -90,6 +96,7 @@ const run = async () => {
     console.log(`Copying build files to temp directory: ${distDir} >> ${tempDistPath}`)
     execSync(`mkdir -p ${tempPath} && rm -rf ${tempDistPath}`)
     execSync(`cp -rf ${distDir} ${tempDistPath}`)
+    execSync(`rm -rf ${distDir}`)
 
     cleanupCmds.push(`rm -rf ${tempDistPath}`)
     let exists
@@ -116,7 +123,7 @@ const run = async () => {
             : console.log('Creating build branch: ' + buildBranch)
         execSync(`git switch ${!exists ? '-c ' : ''}${buildBranch}`)
         // make sure it has switched to the build branch
-        if (getBranch() !== buildBranch) return console.error('Failed to switch to build branch! Reason unknown')
+        if (getBranch() !== buildBranch) exitWithErr('Failed to switch to build branch! Reason unknown')
 
         // make sure build branch is updated
         execSync('git pull')
@@ -130,7 +137,7 @@ const run = async () => {
             ?.split('Build for ')[1]
             ?.split(' ')?.[0]
         const isBuilt = commitHash === lastBuiltCommit
-        if (isBuilt && !push) throw new Error('This build has already been committed')
+        if (isBuilt && !push) exitWithErr('This build has already been committed.')
 
         if (!isBuilt) {
             const distPath = `${distDir}${distDir.endsWith('/') ? '' : '/'}`
