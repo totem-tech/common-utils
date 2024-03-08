@@ -2,6 +2,7 @@ import {
     bytesToHex,
     hexToBytes,
     strToU8a,
+    u8aToStr,
 } from '../convert'
 import { keyDataFromEncoded } from './utils'
 
@@ -11,12 +12,23 @@ import { keyDataFromEncoded } from './utils'
  * 
  * @param   {String}    message 
  * @param   {String}    secretKey   
- * @param   {Boolean}   asHex       (optional) Default: true
+ * @param   {Boolean}   asHex       (optional) Default: `true`
+ * @param   {Boolean}   detached    (optional) whether to sign using `sign.detached()` or `sign()`
+ *                                  Default: `true`
  * 
  * @returns {String|Uint8Array} String Hex if `asHex = true`, otherwise, Uint8Array
  */
-export const newSignature = (message, secretKey, asHex = true) => {
-    const signature = require('tweetnacl').sign.detached(
+export const newSignature = (
+    message,
+    secretKey,
+    asHex = true,
+    detached = true
+) => {
+    const sign = require('tweetnacl').sign
+    const signer = detached
+        ? sign.detached
+        : sign
+    const signature = signer(
         strToU8a(message),
         hexToBytes(secretKey),
     )
@@ -79,16 +91,27 @@ export const signingKeyPair = (keyData, asHex = true) => {
  * @param   {String|Uint8Array} message 
  * @param   {String|Uint8Array} signature
  * @param   {String|Uint8Array} publicKey
+ * @param   {Boolean}           detached    whether messages was signed using `nacl.sign.detached()` or `nacl.sign()`
+ *                                          Default: `true`
  *
  * @returns {Boolean}
  */
-export const verifySignature = (message, signature, publicKey) => {
-    const { verify } = require('tweetnacl').sign.detached
-    return verify(
+export const verifySignature = (
+    message,
+    signature,
+    publicKey,
+    detached = true
+) => {
+    const sign = require('tweetnacl').sign
+    if (detached) return sign.detached.verify(
         strToU8a(message),
         hexToBytes(signature),
-        hexToBytes(publicKey),
+        hexToBytes(publicKey)
     )
+
+    // non-detached verify
+    const openedMsgArr = sign.open(hexToBytes(signature), hexToBytes(publicKey))
+    return !!openedMsgArr && u8aToStr(openedMsgArr) === message
 }
 
 export default {

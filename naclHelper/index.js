@@ -7,6 +7,7 @@ export * from './utils'
 
 export const box = require('./box').default
 export const map = require('./map').default
+export const nacl = require('tweetnacl')
 export const object = require('./object').default
 export const secretBox = require('./secretBox').default
 export const sign = require('./sign').default
@@ -18,4 +19,5 @@ export default {
     object,
     secretBox,
     sign,
+    utils,
 }
