@@ -1214,6 +1214,26 @@ export const strFill = (str, maxLen = 2, filler = ' ', after = false) => {
 }
 
 /**
+ * @name	strTrim
+ * @summary recursively remove leading and trailing spaces from string value(s).
+ * 
+ * @param	{String|Object|Array} value if unsupported value is passed it will remain unchanged.
+ * 
+ * @returns {*}
+ */
+export const strTrim = value => {
+	if (isStr(value)) return value.trim()
+	if (isObj(value, true) || isArr(value)) {
+		Object
+			.keys(value)
+			.forEach(key =>
+				value[key] = strTrim(value[key])
+			)
+	}
+	return value
+}
+
+/**
  * @name	textCapitalize
  * @summary capitalizes the first letter of input
  * 
