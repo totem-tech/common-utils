@@ -50,13 +50,13 @@ export const errorMessages = {
     minLengthNum: 'minimum number of digits required',
     minLengthText: 'minimum number of characters required',
     number: 'please enter a valid number',
-    required: 'required field',
+    required: 'required input is missing',
     readOnlyField: 'read only field',
     url: 'invalid URL',
 }
 translated(errorMessages, true)
 const textsCap = {
-    requiredField: 'required field'
+    requiredField: 'required input is missing'
 }
 translated(textsCap, true)
 const validationTypes = [...Object.values(TYPES), 'text']
