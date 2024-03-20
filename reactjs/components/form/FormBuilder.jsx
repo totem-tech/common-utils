@@ -446,7 +446,7 @@ const addInterceptorCb = (
             ),
         validatorConfig: {
             ...submitClicked && {
-                required: !hidden && (required?.value ?? !!required)
+                required: !(hidden.value ?? hidden) && (required?.value ?? !!required)
             },
             ...validatorConfig,
         },

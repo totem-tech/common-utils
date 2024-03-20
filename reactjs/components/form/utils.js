@@ -78,6 +78,7 @@ export const checkInputInvalid = (
         value: _value,
         rxValue: value = _value,
     } = { ..._input, ..._input?.inputProps }
+    hidden = hidden?.value ?? hidden
     // if (validatedValue !== undefined && validatedValue !== value) return true
 
     const isValid = error !== true && valid !== false
@@ -241,29 +242,59 @@ export const reValidateInputs = (
     values = isSubjectLike(values)
         ? values.value
         : values || getValues(inputs)
-    const names = Object
-        .keys(values)
-        .map(name => {
-            const input = findInput(name, inputs) || {}
-            const {
-                hidden,
-                id,
-                required,
-                rxValue,
-                type,
-            } = { ...input, ...input?.inputProps }
-            const ignore = !(required?.value ?? required)
-                || hidden
-                || type === 'hidden'
-            if (ignore) return
+    // const names = Object
+    //     .keys(values)
+    //     .map(name => {
+    //         const input = findInput(name, inputs) || {}
+    //         const {
+    //             hidden,
+    //             id,
+    //             required,
+    //             rxValue,
+    //             type,
+    //         } = { ...input, ...input?.inputProps }
+    //         const ignore = !(required?.value ?? required)
+    //             || hidden
+    //             || type === 'hidden'
+    //         if (ignore) return
 
-            const invalid = checkInputInvalid(input, inputsHidden)
-            if (!invalid) return
+    //         const invalid = checkInputInvalid(input, inputsHidden)
+    //         if (!invalid) return
 
-            if (rxValue) rxValue[VALIDATED_KEY] = null
-            rxValue?.next?.(values[name])
-            return name
-        })
+    //         if (rxValue) rxValue[VALIDATED_KEY] = null
+    //         rxValue?.next?.(values[name])
+    //         return name
+    //     })
+    //     .filter(Boolean)
+
+    const names = inputs.map(input => {
+        const {
+            hidden,
+            id,
+            inputs: childInputs = [],
+            name,
+            required,
+            rxValue,
+            type,
+        } = { ...input, ...input?.inputProps }
+        const ignore = !(required?.value ?? required)
+            || (hidden?.value ?? hidden)
+            || type === 'hidden'
+        if (ignore) return
+
+        if (childInputs?.length > 0 && type === 'group') return reValidateInputs(
+            childInputs,
+            values,
+            inputsHidden,
+        )
+
+        // input is valid
+        if (!checkInputInvalid(input, inputsHidden)) return
+
+        if (rxValue) rxValue[VALIDATED_KEY] = null
+        rxValue?.next?.(values[name])
+        return name
+    })
         .filter(Boolean)
 
     const top = document
