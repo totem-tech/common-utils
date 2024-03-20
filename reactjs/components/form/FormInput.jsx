@@ -852,7 +852,7 @@ const handleChangeCb = (
         ...args
     )
     isPromise(err)
-        ? err.then(triggerChange)
+        ? err.then(triggerChange, triggerChange)
         : triggerChange(err)
 }
 
