@@ -56,7 +56,7 @@ export const errorMessages = {
 }
 translated(errorMessages, true)
 const textsCap = {
-    requiredField: 'required input is missing'
+    requiredFieldIndicator: 'the asterisk (*) indicates that an input must not be empty'
 }
 translated(textsCap, true)
 const validationTypes = [...Object.values(TYPES), 'text']
@@ -423,7 +423,7 @@ export const FormInput = React.memo(function FormInput(props) {
                         children: '*',
                         className: 'InputRequiredIndicator',
                         style: { color: 'red', paddingLeft: 3 },
-                        title: textsCap.requiredField,
+                        title: textsCap.requiredFieldIndicator,
                     }} />
                 )}
                 {showCount && (
