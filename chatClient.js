@@ -64,8 +64,11 @@ if (rw().history) rw({ history: null })
 //- migrate end
 
 export const textsCap = {
+    connectionFailed: 'backend service connection timed out',
+    eventsMetaNotReceived: 'did not receive events metadata before timeout',
     invalidParams: 'invalid parameters',
-    timeout: 'request timed out',
+    loginTimeout: 'log in request timed out',
+    maintenanceMode: 'backend service is in maintenance mode',
 }
 translated(textsCap, true)
 
@@ -248,7 +251,7 @@ class ChatClient {
                 rxIsConnected,
                 true,
                 timeout,
-                textsCap.timeout
+                textsCap.connectionFailed,
             )[0]
         }
         const eventMeta = await this.getEventsMeta(eventName, timeout)
@@ -259,7 +262,7 @@ class ChatClient {
             rxIsLoggedIn,
             true,
             timeout,
-            textsCap.timeout,
+            textsCap.loginTimeout,
         )[0]
 
         doWait = rxIsInMaintenanceMode.value && !maintenanceMode
@@ -270,7 +273,7 @@ class ChatClient {
                 rxIsInMaintenanceMode,
                 false,
                 timeout,
-                textsCap.timeout,
+                textsCap.maintenanceMode,
             )[0]
         }
 
@@ -427,7 +430,7 @@ class ChatClient {
             this.rxEventsMeta,
             isObj,
             timeout,
-            textsCap.timeout
+            textsCap.eventsMetaNotReceived,
         )[0]
         if (!eventName) return result
 
