@@ -76,7 +76,8 @@ class ChatClient {
     constructor(
         url = API_URL,
         namespace,
-        autoDisconnectMs = parseInt(AUTO_DISCONNECT_MS) || 0
+        autoDisconnectMs = parseInt(AUTO_DISCONNECT_MS) || 0,
+        timeout = 30000
     ) {
         if (!url) {
             let { hostname = '' } = fallbackIfFails(() => window.location) || {}
@@ -129,9 +130,16 @@ class ChatClient {
         this.rxIsInMaintenanceMode = rxIsInMaintenanceMode
         this.rxIsLoggedIn = rxIsLoggedIn
         this.rxIsRegistered = rxIsRegistered
+        this.timeout = timeout?.value ?? timeout
 
-        // converts callback based emission to promise. With 30 seconds timeout.
-        this._emitter = PromisE.getSocketEmitter(socket, 30000, 0, null)
+        // converts callback based emission to promise. 
+        // Global 30 seconds timeout unless overridden by individual request.
+        this._emitter = PromisE.getSocketEmitter(
+            socket,
+            this.timeout,
+            0,
+            null
+        )
 
         /**
          * @name    emit
@@ -149,10 +157,10 @@ class ChatClient {
             args = [],
             resultModifier,
             onError,
-            timeout,
+            timeout = this.timeout,
             eventMeta
         ) => {
-            if (timeout instanceof EmitTimeout) timeout = timeout.value
+            timeout = timeout?.value ?? timeout
             if (!eventName) throw new Error('Event name required')
             let callbackIndex // if undefined will use last argument
             eventMeta ??= await this.awaitReady(eventName, timeout) || {}
@@ -1106,13 +1114,15 @@ export const getClient = chatClient
  *
  * @returns {ChatClient}
  */
-export function getClientOrg(url, namespace, disconnectDelayMs) {
+export function getClientOrg(url, namespace, disconnectDelayMs, timeout, ...rest) {
     if (instance) return instance
 
     const chatClient = new ChatClient(
         url,
         namespace,
-        disconnectDelayMs
+        disconnectDelayMs,
+        timeout,
+        ...rest
     )
     instance = getSafeClient(chatClient)
 
@@ -1186,11 +1196,11 @@ export const getSafeClient = chatClient => new Proxy(chatClient, {
         return isListenable
             ? (cb, once) => chatClient.on(eventName, cb, once)
             : async (...args) => {
-                let resultModifier, onError, timeout, eventMeta
-                if (args.slice(-1)[0] instanceof EmitTimeout) {
-                    timeout = args.slice(-1)[0].value
-                    args = args.slice(0, -1)
-                }
+                let resultModifier, onError, eventMeta
+                const timeout = args
+                    .find(x => x instanceof EmitTimeout)
+                    ?.value
+                    ?? chatClient.timeout
                 eventMeta = await chatClient.awaitReady(eventName, timeout) || {}
                 const { params = [] } = eventMeta
                 if (params.length > 0) {
