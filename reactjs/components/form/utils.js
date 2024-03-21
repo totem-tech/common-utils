@@ -36,6 +36,7 @@ export const addMissingProps = (input, nameSuffix = ++addMissingProps.count) => 
         type = ip?.type,
     } = input
     input._init_ = 'yes'
+    input.rxValidationInProgress ??= new BehaviorSubject(false)
     if (type === 'group') {
         childInputs?.forEach?.(addMissingProps)
         return input

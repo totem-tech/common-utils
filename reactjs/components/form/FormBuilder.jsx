@@ -6,7 +6,7 @@ import React, {
 } from 'react'
 import { BehaviorSubject } from 'rxjs'
 import { translated } from '../../../languageHelper'
-import { copyRxSubject } from '../../../rx'
+import { IGNORE_UPDATE_SYMBOL, copyRxSubject } from '../../../rx'
 import {
     arrUnique,
     className,
@@ -136,6 +136,7 @@ export const FormBuilder = React.memo(function FormBuilder(props) {
 
     return (
         <>
+            {state.validationInProgressWatcher}
             {prefix}
             <Form {...{
                 autoComplete: 'off',
@@ -509,13 +510,37 @@ const setup = props => {
             submitInProgress = false,
             submitDisabled = false,
             submitDisabledIfUnchanged: requireChange = false,
+            validationInProgress,
             valuesToCompare,
         } = state
 
         if (!state.init) {
-            inputs?.forEach?.(addMissingProps)
             state.init = true
             state.components = { ...defaultComponents, ...components }
+            inputs?.forEach?.(addMissingProps)
+            const getAllRxValInProgress = inputs => inputs
+                .map(input => input?.inputs?.length > 0
+                    ? getAllRxValInProgress(input.inputs)
+                    : input.rxValidationInProgress
+                )
+                .flat()
+            state.validationInProgressWatcher = (
+                <RxSubjectView {...{
+                    render: () => '',
+                    subject: copyRxSubject(
+                        getAllRxValInProgress(inputs)
+                            .flat()
+                            .filter(isSubjectLike),
+                        null,
+                        arr => {
+                            const validationInProgress = !!arr?.find?.(Boolean)
+                            rxState.next({ ...rxState.value, validationInProgress })
+                            return validationInProgress
+                        },
+                        100, //delay 100ms before updating
+                    ),
+                }} />
+            )
         }
 
         submitDisabled = isObj(submitDisabled)
@@ -553,6 +578,7 @@ const setup = props => {
         // 4. one or more required inputs does not contain a value
         const submitShouldDisable = submitDisabled
             || submitInProgress
+            || validationInProgress
             || loading
             || !!inputsInvalid
             || valuesChanged
@@ -588,8 +614,9 @@ const setup = props => {
                 onSubmit,
                 submitClicked,
                 submitDisabled,
+                validationInProgress,
             } = rxState.value
-            if (submitDisabled || loading) return
+            if (submitDisabled || loading || validationInProgress) return
 
             const { inputs = [] } = rxState.value
             const values = getValues(inputs)

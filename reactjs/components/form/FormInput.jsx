@@ -668,6 +668,7 @@ const handleChangeCb = (
         integer = false, // number validation
         onError,
         onChangeSelectValue,
+        rxValidationInProgress,
         uncheckedValue = false,
         validate,
         validatorConfig = {},
@@ -769,10 +770,11 @@ const handleChangeCb = (
                 break
         }
     }
+    // mark input as being validated
+    !rxValidationInProgress?.value && rxValidationInProgress?.next(true)
 
     // input value is required but empty
     // if (required && !hasVal) err = true
-
     const requireValidator = !err
         && shouldValidate
         && validationTypes.includes(_validatorConfig?.type)
@@ -842,6 +844,9 @@ const handleChangeCb = (
         const unchagned = ___changeCount !== rxValue.___changeCount
             || isEqual(rxValue.value, data.value)
         !unchagned && rxValue.next(data.value)
+
+        // mark input as not being validated
+        ___changeCount === rxValue.___changeCount && rxValidationInProgress?.next(false)
     }
 
     if (err || !isFn(validate)) return triggerChange(err)
@@ -851,6 +856,7 @@ const handleChangeCb = (
         data,
         ...args
     )
+
     isPromise(err)
         ? err.then(triggerChange, triggerChange)
         : triggerChange(err)
