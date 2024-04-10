@@ -182,14 +182,23 @@ export const validate = (value, config, customMessages = {}) => {
         ].includes(type)
 
         const gotValue = hasValue(value)
-        const typeErrMsg = errorMsgs[type]
+        // const typeErrMsg = errorMsgs[type]
         if (isObj(or) && !!TYPES[or.type]) {
             const configWithoutOr = objWithoutKeys(config, ['or'])
             err = validate(value, configWithoutOr, errorMsgs)
-            // primary validation
-            if (!err && gotValue || err !== typeErrMsg) return err
-            // secondary (or) validation
-            return validate(value, or, errorMsgs)
+            if (!err) return null
+
+            const errOr = validate(value, or, errorMsgs)
+            // alternative config validated successfully
+            if (!errOr) return null
+
+            return typeof value === or.type
+                ? errOr
+                : err
+            // // primary validation
+            // if (!err && gotValue || err !== typeErrMsg) return err
+            // // secondary (or) validation
+            // return validate(value, or, errorMsgs)
         }
         // if doesn't have any value (undefined/null) and not `required`, assume valid
         if (!gotValue) return required
@@ -233,7 +242,7 @@ export const validate = (value, config, customMessages = {}) => {
             case TYPES.function:
                 if (!isFn(value)) return _msgOrTrue(errorMsgs.function)
                 break
-            case 'hash':
+            case TYPES.hash:
                 if (!isHash(value)) return _msgOrTrue(errorMsgs.hash)
                 break
             case TYPES.hex:
