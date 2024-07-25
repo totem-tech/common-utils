@@ -275,7 +275,7 @@ export default class CouchDBStorage {
             )).docs
             : (await db.fetch({ keys: ids }))
                 .rows
-                .map(x => !gotFields
+                .map(x => !isObj(x.doc) || !gotFields
                     ? x.doc
                     : objClean(x.doc, fields))
                 // ignore not found documents
