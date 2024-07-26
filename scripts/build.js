@@ -1,24 +1,31 @@
-// const { execSync: xs } = require('child_process')
 // const fs = require('fs')
 // const { exit } = require('process')
 
+// const { execSync: xs } = require('child_process')
 // const execSync = (cmd, ...args) => {
 //     console.log(`>> Executing: ${cmd}\n`)
-//     return xs(cmd, ...args)
+//     try {
+//         return xs(cmd, ...args)
+//     } catch (error) {
+//         console.error(`Error executing ${cmd}`, error)
+//         throw error
+//     }
 // }
-// Update to solve issue with webpack < 5 errors during build. 
-const execa = require('execa')
 
-const execSync = async (cmd, ...args) => {
-    console.log(`>> Executing: ${cmd}\n`)
+const execa = require('execa');
+
+const xs = (cmd, ...args) => {
+    console.log(`>> Executing: ${cmd}\n`);
     try {
-        const { stdout } = await execa.command(cmd, ...args)
-        return stdout
+        const { stdout } = execa.sync(cmd, args);
+        return stdout;
     } catch (error) {
-        console.error(`Error executing ${cmd}`, error)
-        throw error
+        console.error(`Error executing ${cmd}`, error);
+        throw error;
     }
-}
+};
+
+const execSync = xs;
 
 const push = ([...process.argv][2] || '1') === '1'
 const distDir = [...process.argv][3] || 'dist'
