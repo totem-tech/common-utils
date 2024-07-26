@@ -1,11 +1,25 @@
-const { execSync: xs } = require('child_process')
-const fs = require('fs')
-const { exit } = require('process')
+// const { execSync: xs } = require('child_process')
+// const fs = require('fs')
+// const { exit } = require('process')
 
-const execSync = (cmd, ...args) => {
+// const execSync = (cmd, ...args) => {
+//     console.log(`>> Executing: ${cmd}\n`)
+//     return xs(cmd, ...args)
+// }
+// Update to solve issue with webpack < 5 errors during build. 
+const execa = require('execa')
+
+const execSync = async (cmd, ...args) => {
     console.log(`>> Executing: ${cmd}\n`)
-    return xs(cmd, ...args)
+    try {
+        const { stdout } = await execa.command(cmd, ...args)
+        return stdout
+    } catch (error) {
+        console.error(`Error executing ${cmd}`, error)
+        throw error
+    }
 }
+
 const push = ([...process.argv][2] || '1') === '1'
 const distDir = [...process.argv][3] || 'dist'
 let buildBranchSuffix = [...process.argv][4] || '-build'
@@ -22,7 +36,7 @@ const getCommitHash = () => execSync('git log -1')
 
 const exitWithErr = (err, ...args) => {
     console.error(err, ...args)
-    exit(1)
+    process.exit(1)
 }
 
 /**
@@ -146,7 +160,11 @@ const run = async () => {
 
             const htmlPath = `${distPath}index.html`
             const txtPath = `${distPath}commit-hash.txt`
-            const indexExists = fs.existsSync(htmlPath)
+            // removed & replaced for webpack < 5 compatibility
+            // const indexExists = fs.existsSync(htmlPath)
+            const indexExists = await fetch(htmlPath)
+                .then(response => response.ok)
+                .catch(() => false);
             console.log('Adding commit hash to  ', indexExists ? htmlPath : txtPath)
             if (indexExists) {
                 execSync(`echo '<script>window.commitHash="${commitHash}";</script>' >> ${htmlPath}`)
