@@ -1,6 +1,7 @@
-const fs = require('fs')
-const { exit } = require('process')
 const { execSync: xs } = require('child_process')
+const fs = require('fs')
+// const { exit } = require('process')
+
 const execSync = (cmd, ...args) => {
     console.log(`>> Executing: ${cmd}\n`)
     try {
