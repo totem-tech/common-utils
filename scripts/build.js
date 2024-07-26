@@ -1,6 +1,5 @@
 const { execSync: xs } = require('child_process')
 const fs = require('fs')
-// const { exit } = require('process')
 
 const execSync = (cmd, ...args) => {
     console.log(`>> Executing: ${cmd}\n`)
@@ -11,22 +10,6 @@ const execSync = (cmd, ...args) => {
         throw error
     }
 }
-
-// const execa = require('execa');
-
-// const xs = (cmd, ...args) => {
-//     console.log(`>> Executing: ${cmd}\n`);
-//     try {
-//         const { stdout } = execa.sync(cmd, args);
-//         return stdout;
-//     } catch (error) {
-//         console.error(`Error executing ${cmd}`, error);
-//         throw error;
-//     }
-// };
-
-// const execSync = xs;
-
 const push = ([...process.argv][2] || '1') === '1'
 const distDir = [...process.argv][3] || 'dist'
 let buildBranchSuffix = [...process.argv][4] || '-build'
